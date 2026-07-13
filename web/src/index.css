@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent-200: #cbc7ff;
+  --color-accent-300: #ada8ff;
+  --color-accent-400: #8c86ff;
+  --color-accent-500: #6f63f5;
+  --color-accent-600: #5b4fe0;
+  --color-accent-700: #4a3fc4;
+
+  --color-slate-50: #fafafb;
+  --color-slate-100: #f4f4f7;
+  --color-slate-200: #e6e6ec;
+  --color-slate-300: #c2c2cc;
+  --color-slate-400: #9c9ca7;
+  --color-slate-500: #7a7a85;
+  --color-slate-600: #3f3f47;
+  --color-slate-700: #2a2a31;
+  --color-slate-800: #1c1c21;
+  --color-slate-900: #0f0f12;
+  --color-slate-950: #08080a;
+
+  --color-sky-200: var(--color-accent-200);
+  --color-sky-300: var(--color-accent-300);
+  --color-sky-400: var(--color-accent-400);
+  --color-sky-500: var(--color-accent-500);
+  --color-sky-600: var(--color-accent-600);
+
+  --color-violet-200: var(--color-accent-200);
+  --color-violet-300: var(--color-accent-300);
+  --color-violet-400: var(--color-accent-400);
+  --color-violet-500: var(--color-accent-500);
+
+  --color-fuchsia-300: var(--color-accent-300);
+  --color-fuchsia-500: var(--color-accent-500);
+
+  --color-indigo-500: var(--color-accent-500);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #08080a;
+  color: #e6e6ec;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a31 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #2a2a31;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #3f3f47;
+}

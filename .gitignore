@@ -1,0 +1,22 @@
+# Go binaries
+/opdeals
+/opdeals-server
+/server
+*.test
+
+# build output (air live-reload + make build)
+/tmp/
+/bin/
+/web/tmp/
+
+# data cache + backups
+/data/
+/backups/
+
+# frontend
+/web/node_modules/
+/web/dist/
+
+# misc
+.DS_Store
+*.log

@@ -1,0 +1,16 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  bin = "./tmp/server"
+  # API-only in dev; the frontend is served by Vite (:5173, proxies /api -> :8080).
+  args_bin = ["-web="]
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "bin", "web", "data", "scratch", "tasks"]
+  exclude_regex = ["_test\\.go"]
+  stop_on_error = true
+  delay = 400
+
+[misc]
+  clean_on_exit = true

@@ -1,0 +1,12 @@
+data/
+tmp/
+scratch/
+tasks/
+web/node_modules/
+web/dist/
+opdeals
+opdeals-server
+*.log
+Dockerfile
+docker-compose.yml
+.dockerignore
