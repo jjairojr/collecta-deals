@@ -46,7 +46,9 @@ this, every redeploy wipes all history.
   `sync-up.sh` calls to reload the pushed deals snapshots with zero downtime.
   Generate one with `openssl rand -hex 24`.
 
-`PORT` is injected by Railway automatically; the start command reads it via `-addr :$PORT`.
+`PORT` is injected by Railway automatically; the app reads it from the env var
+(no `-addr` flag needed — Railway runs the start command without a shell, so a
+literal `$PORT` would not expand).
 
 ## 4. Deploy
 

@@ -108,6 +108,13 @@ func run() error {
 		*trackSchedule = false
 	}
 
+	// Cloud platforms (Railway, Fly, Render, …) inject the listen port via the
+	// PORT env var and run the start command without a shell, so a "-addr :$PORT"
+	// never expands. Honor PORT directly unless -addr was set explicitly.
+	if port := os.Getenv("PORT"); port != "" && *addr == ":8080" {
+		*addr = ":" + port
+	}
+
 	logger := logx.New(os.Stderr)
 	dealsLog := logger.WithPrefix("DEALS")
 	trackLog := logger.WithPrefix("TRACKING")
