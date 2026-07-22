@@ -18,7 +18,6 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=build /opdeals-server /usr/local/bin/opdeals-server
 COPY --from=web /src/web/dist web/dist
-VOLUME /app/data
 EXPOSE 8080
 ENTRYPOINT ["opdeals-server"]
 CMD ["-web=web/dist", "-schedule"]
