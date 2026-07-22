@@ -42,10 +42,16 @@ type Server struct {
 	webDir      string
 	games       map[string]*GameStack
 	defaultGame string
+	readOnly    bool
+	adminToken  string
 }
 
-func New(webDir string, games map[string]*GameStack, defaultGame string) *Server {
-	return &Server{webDir: webDir, games: games, defaultGame: defaultGame}
+// New builds the API server. readOnly gates every scrape-triggering endpoint
+// (refresh/capture) so a serve-only prod instance never scrapes; adminToken (when
+// non-empty) enables POST /api/admin/reload to reload deals snapshots from disk
+// after a local scrape pushes fresh files onto the volume.
+func New(webDir string, games map[string]*GameStack, defaultGame string, readOnly bool, adminToken string) *Server {
+	return &Server{webDir: webDir, games: games, defaultGame: defaultGame, readOnly: readOnly, adminToken: adminToken}
 }
 
 // stackFor resolves the game stack for a request's query, defaulting to the
@@ -122,6 +128,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/trades", s.handleTradesList)
 	mux.HandleFunc("POST /api/trades", s.handleTradesCreate)
 	mux.HandleFunc("PUT /api/trades/{id}", s.handleTradesUpdate)
+	mux.HandleFunc("POST /api/trades/{id}/sell", s.handleTradesSell)
 	mux.HandleFunc("DELETE /api/trades/{id}", s.handleTradesDelete)
 	mux.HandleFunc("GET /api/trades/quote", s.handleTradesQuote)
 	mux.HandleFunc("GET /api/portfolio/all", s.handlePortfolioAll)
@@ -129,6 +136,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/quotes", s.handleQuotesCreate)
 	mux.HandleFunc("PUT /api/quotes/{id}", s.handleQuotesUpdate)
 	mux.HandleFunc("DELETE /api/quotes/{id}", s.handleQuotesDelete)
+	if s.adminToken != "" {
+		mux.HandleFunc("POST /api/admin/reload", s.handleAdminReload)
+	}
 	if s.webDir != "" {
 		mux.Handle("/", s.spaHandler())
 	}
@@ -139,6 +149,7 @@ type gameInfo struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	HasDeals bool   `json:"hasDeals"`
+	HasMyP   bool   `json:"hasMyP"`
 }
 
 func (s *Server) gameInfoFor(gs *GameStack) gameInfo {
@@ -146,6 +157,7 @@ func (s *Server) gameInfoFor(gs *GameStack) gameInfo {
 		ID:       gs.Game.ID,
 		Name:     gs.Game.Name,
 		HasDeals: gs.Game.HasDeals() && gs.Deals != nil,
+		HasMyP:   gs.Game.MyP != nil && gs.Deals != nil,
 	}
 }
 
@@ -177,6 +189,7 @@ func (s *Server) handleDeals(w http.ResponseWriter, r *http.Request) {
 		UsePrice:       stringParam(q, "usPrice", "low"),
 		SortBy:         stringParam(q, "sort", "margin"),
 		Set:            stringParam(q, "set", ""),
+		Source:         stringParam(q, "source", ""),
 		Limit:          intParam(q, "limit", 100),
 		RequireInStock: boolParam(q, "requireInStock", true),
 		SPOnly:         boolParam(q, "spOnly", false),
@@ -212,6 +225,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			SortBy:         stringParam(q, "sort", "margin"),
 			Query:          query,
 			Set:            stringParam(q, "set", ""),
+			Source:         stringParam(q, "source", ""),
 			Limit:          intParam(q, "limit", 100),
 			RequireInStock: false,
 			Matcher:        compare.MatcherFor(gs.Game),
@@ -246,6 +260,10 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	if s.readOnly {
+		writeJSON(w, map[string]bool{"started": false})
+		return
+	}
 	gs := s.stackFor(r.URL.Query())
 	if gs.Deals == nil {
 		writeJSON(w, map[string]bool{"started": false})
@@ -253,6 +271,28 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 	go gs.Deals.Refresh(context.Background())
 	writeJSON(w, map[string]bool{"started": true})
+}
+
+// handleAdminReload re-reads every game's deals snapshot from disk so a serve-only
+// instance picks up files a local scrape just pushed onto the volume, without a
+// restart. Tracking data needs nothing here — it is read from disk on each request.
+func (s *Server) handleAdminReload(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Admin-Token") != s.adminToken {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	reloaded := 0
+	for _, gs := range s.games {
+		if gs.Deals == nil {
+			continue
+		}
+		if err := gs.Deals.Load(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		reloaded++
+	}
+	writeJSON(w, map[string]int{"reloaded": reloaded})
 }
 
 type trendsResponse struct {
@@ -1076,6 +1116,10 @@ func (s *Server) handleExportImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCapture(w http.ResponseWriter, r *http.Request) {
+	if s.readOnly {
+		writeJSON(w, map[string]bool{"started": false})
+		return
+	}
 	gs := s.stackFor(r.URL.Query())
 	if gs.Capturer == nil {
 		writeJSON(w, map[string]bool{"started": false})
@@ -1086,6 +1130,10 @@ func (s *Server) handleCapture(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCaptureSealed(w http.ResponseWriter, r *http.Request) {
+	if s.readOnly {
+		writeJSON(w, map[string]bool{"started": false})
+		return
+	}
 	gs := s.stackFor(r.URL.Query())
 	if gs.Capturer == nil {
 		writeJSON(w, map[string]bool{"started": false})

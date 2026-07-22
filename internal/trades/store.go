@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -115,6 +116,70 @@ func (s *Store) Update(id string, mut func(*Trade)) (Trade, error) {
 		}
 	}
 	return Trade{}, ErrNotFound
+}
+
+type Sale struct {
+	Qty          int
+	SellPrice    float64
+	SellCurrency string
+	SellDate     string
+	Buyer        string
+}
+
+func (s *Store) Sell(id string, sale Sale) (Trade, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return Trade{}, err
+	}
+	for i := range all {
+		if all[i].ID != id {
+			continue
+		}
+		now := time.Now()
+		orig := &all[i]
+		if orig.Qty <= 0 {
+			orig.Qty = 1
+		}
+		if sale.Qty <= 0 || sale.Qty >= orig.Qty {
+			orig.Status = "sold"
+			orig.SellPrice = sale.SellPrice
+			orig.SellCurrency = sale.SellCurrency
+			orig.SellDate = sale.SellDate
+			orig.Buyer = sale.Buyer
+			orig.UpdatedAt = now
+			result := *orig
+			if err := s.persist(all); err != nil {
+				return Trade{}, err
+			}
+			return result, nil
+		}
+		soldShip := round2(orig.ShippingBRL * float64(sale.Qty) / float64(orig.Qty))
+		sold := *orig
+		sold.ID = newID()
+		sold.Qty = sale.Qty
+		sold.ShippingBRL = soldShip
+		sold.Status = "sold"
+		sold.SellPrice = sale.SellPrice
+		sold.SellCurrency = sale.SellCurrency
+		sold.SellDate = sale.SellDate
+		sold.Buyer = sale.Buyer
+		sold.UpdatedAt = now
+		orig.Qty -= sale.Qty
+		orig.ShippingBRL = round2(orig.ShippingBRL - soldShip)
+		orig.UpdatedAt = now
+		all = append(all, sold)
+		if err := s.persist(all); err != nil {
+			return Trade{}, err
+		}
+		return sold, nil
+	}
+	return Trade{}, ErrNotFound
+}
+
+func round2(v float64) float64 {
+	return math.Round(v*100) / 100
 }
 
 func (s *Store) Delete(id string) error {

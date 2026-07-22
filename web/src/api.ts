@@ -38,11 +38,17 @@ export interface Status {
   prices: number;
 }
 
+// DealSource scopes a deals query to one Brazilian marketplace. "liga" matches
+// every per-game Liga source; "" keeps the historical cheapest-across-sources
+// behaviour.
+export type DealSource = "" | "liga" | "mypcards";
+
 export interface DealFilters {
   minMargin: number;
   minPrice: number;
   sort: string;
   set: string;
+  source: DealSource;
   limit: number;
   verifiedOnly: boolean;
   spOnly: boolean;
@@ -91,6 +97,7 @@ export interface GameInfo {
   id: string;
   name: string;
   hasDeals: boolean;
+  hasMyP: boolean;
 }
 
 let gamesCache: GameInfo[] = [];
@@ -132,11 +139,17 @@ export function getDeals(filters: DealFilters): Promise<DealsResponse> {
   if (filters.set) {
     params.set("set", filters.set);
   }
+  if (filters.source) {
+    params.set("source", filters.source);
+  }
   return getJSON<DealsResponse>(`${base}/deals?${params.toString()}`);
 }
 
-export function searchDeals(query: string, limit = 200): Promise<DealsResponse> {
+export function searchDeals(query: string, source: DealSource = "", limit = 200): Promise<DealsResponse> {
   const params = gp(new URLSearchParams({ q: query, limit: String(limit) }));
+  if (source) {
+    params.set("source", source);
+  }
   return getJSON<DealsResponse>(`${base}/search?${params.toString()}`);
 }
 
@@ -451,35 +464,54 @@ export function productIDFromTcgURL(url?: string): number | undefined {
   return m ? Number(m[1]) : undefined;
 }
 
+// dealCardKey resolves a deal's set/number for image and selection lookups.
+// Liga buyUrls carry ?ed=/&num= query params; other sources (mypcards) use a
+// path-based product URL, so fall back to the deal's own fields, which every
+// source populates.
+function dealCardKey(deal: Deal): { set: string; number: string } | null {
+  let set = deal.set ?? "";
+  let number = deal.number;
+  try {
+    const u = new URL(deal.buyUrl);
+    set = u.searchParams.get("ed") ?? set;
+    number = u.searchParams.get("num") ?? number;
+  } catch {
+    // Non-URL buyUrl — fall through to the deal fields.
+  }
+  if (!set) {
+    return null;
+  }
+  return { set, number };
+}
+
 export function dealSelection(
   deal: Deal,
 ): { set: string; number: string; name: string; priceBRL: number } | null {
-  try {
-    const u = new URL(deal.buyUrl);
-    const set = u.searchParams.get("ed");
-    const number = u.searchParams.get("num") ?? deal.number;
-    if (!set) {
-      return null;
-    }
-    return { set, number, name: deal.name, priceBRL: deal.lowBRL };
-  } catch {
+  const key = dealCardKey(deal);
+  if (!key) {
     return null;
   }
+  return { set: key.set, number: key.number, name: deal.name, priceBRL: deal.lowBRL };
 }
 
 export function dealImageURL(deal: Deal): string | null {
-  try {
-    const u = new URL(deal.buyUrl);
-    const set = u.searchParams.get("ed");
-    const number = u.searchParams.get("num") ?? deal.number;
-    if (!set) {
-      return null;
-    }
-    const params = gp(new URLSearchParams({ set, number, url: deal.buyUrl, v: imgVersion }));
-    return `${base}/card-image?${params.toString()}`;
-  } catch {
+  const key = dealCardKey(deal);
+  if (!key) {
     return null;
   }
+  const params = gp(new URLSearchParams({ set: key.set, number: key.number, v: imgVersion }));
+  const ligaUrl = deal.buyUrl.includes("ed=");
+  if (ligaUrl) {
+    // Liga: let the backend resolve the number-keyed Liga page image, unchanged.
+    params.set("url", deal.buyUrl);
+  } else {
+    // Other sources carry no Liga page; use the exact TCGplayer product art.
+    const productID = productIDFromTcgURL(deal.tcgUrl);
+    if (productID) {
+      params.set("productID", String(productID));
+    }
+  }
+  return `${base}/card-image?${params.toString()}`;
 }
 
 export async function exportImage(cards: { set: string; number: string }[]): Promise<Blob> {
@@ -572,6 +604,7 @@ export interface QuoteItem {
   variant?: string;
   qty: number;
   unitBRL: number;
+  pct?: number;
   marketUSD?: number;
   ligaLowBRL?: number;
   ligaAvgBRL?: number;
@@ -664,6 +697,18 @@ export function createTrade(t: Partial<Trade>): Promise<Trade> {
 
 export function updateTrade(id: string, t: Partial<Trade>): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades/${id}?${gp(new URLSearchParams()).toString()}`, "PUT", t);
+}
+
+export interface SellTradeInput {
+  qty: number;
+  sellPrice: number;
+  sellCurrency: "BRL" | "USD";
+  sellDate?: string;
+  buyer?: string;
+}
+
+export function sellTrade(id: string, sale: SellTradeInput): Promise<Trade> {
+  return sendJSON<Trade>(`${base}/trades/${id}/sell?${gp(new URLSearchParams()).toString()}`, "POST", sale);
 }
 
 export async function deleteTrade(id: string): Promise<void> {

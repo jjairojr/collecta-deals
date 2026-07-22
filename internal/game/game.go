@@ -63,6 +63,45 @@ type Game struct {
 	// browser) rather than the direct HTTP client. onepiece/riftbound/lorcana are
 	// challenged; pokemon is currently open. Flip if Liga's protection changes.
 	Challenged bool
+
+	// MyP configures mypcards.com as a second Brazilian source; nil means the
+	// game is not carried there and the MyP scraper skips it entirely.
+	MyP *MyP
+}
+
+// MyP describes a game's section of mypcards.com. The site lays every game out
+// identically (/{Slug}/edicoes paginated, then /{Slug}/{edition-slug}), so a
+// game only needs its URL slug, the prefix its data-ga-item-id values carry,
+// and any set codes that disagree with the Liga/TCGCSV vocabulary.
+type MyP struct {
+	// Slug is the URL path segment, e.g. "onepiece" or "riftbound".
+	Slug string
+
+	// GAPrefix is the leading token of data-ga-item-id ("one", "riftbound").
+	// Listing grids carry cross-sell cards from other games, so this filter is
+	// what keeps another game's cards out of this game's snapshot.
+	GAPrefix string
+
+	// SetAliases rewrites MyP's set code to the canonical Liga/TCGCSV one. Set
+	// codes are part of the match key for set-scoped games, so an unmapped
+	// disagreement silently drops every deal in that set.
+	SetAliases map[string]string
+
+	// StripPrintSuffix removes a trailing "p<digits>" print marker from the
+	// number (One Piece writes "op16-080p1"). Games whose numbers carry other
+	// trailing letters must leave this false and let the Matcher normalize.
+	StripPrintSuffix bool
+}
+
+// SetCode maps a MyP set code to its canonical Liga/TCGCSV equivalent.
+func (m *MyP) SetCode(code string) string {
+	if m == nil {
+		return code
+	}
+	if canon, ok := m.SetAliases[code]; ok {
+		return canon
+	}
+	return code
 }
 
 // AllowsHost reports whether host is one of this game's Liga hosts.
@@ -141,6 +180,11 @@ func OnePiece() Game {
 		},
 		Market:     onePieceMarket(),
 		Challenged: true,
+		MyP: &MyP{
+			Slug:             "onepiece",
+			GAPrefix:         "one",
+			StripPrintSuffix: true,
+		},
 	}
 }
 
@@ -174,6 +218,17 @@ func Riftbound() Game {
 		DefaultTrackSets: []string{"UNL", "SFD", "OGS", "OGN", "ROPP", "OGN-PR"},
 		Market:           riftboundMarket(),
 		Challenged:       true,
+		MyP: &MyP{
+			Slug:     "riftbound",
+			GAPrefix: "riftbound",
+			// MyP shares TCGCSV's abbreviations except Spiritforged, which it
+			// transposes to SPF. OPP/PR match riftboundGroupSet's remapping.
+			SetAliases: map[string]string{
+				"SPF": "SFD",
+				"OPP": "ROPP",
+				"PR":  "OGN-PR",
+			},
+		},
 	}
 }
 

@@ -134,31 +134,32 @@ export default function ShareList({
   const downloadImage = async () => {
     setBusy(true);
     try {
-      const blob = await buildImage(selected, rows, opts, currency);
-      if (!blob) {
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${getGame()}-for-sale.png`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const blobs = await buildImages(selected, rows, opts, currency);
+      blobs.forEach((blob, i) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = pageFilename(i, blobs.length);
+        a.click();
+        URL.revokeObjectURL(url);
+      });
     } finally {
       setBusy(false);
     }
   };
 
-  // copyImage puts the PNG on the clipboard so it can be pasted straight into a
-  // chat on desktop (where the native share sheet is usually unavailable).
+  // copyImage puts the first page on the clipboard so it can be pasted straight
+  // into a chat on desktop (where the native share sheet is usually
+  // unavailable). Clipboard holds a single image, so multi-page lists fall back
+  // to Download / Share for the remaining pages.
   const copyImage = async () => {
     setBusy(true);
     try {
-      const blob = await buildImage(selected, rows, opts, currency);
-      if (!blob || typeof ClipboardItem === "undefined") {
+      const blobs = await buildImages(selected, rows, opts, currency);
+      if (blobs.length === 0 || typeof ClipboardItem === "undefined") {
         return;
       }
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blobs[0] })]);
       setCopiedImg(true);
       window.setTimeout(() => setCopiedImg(false), 1800);
     } catch {
@@ -177,10 +178,12 @@ export default function ShareList({
     const text = buildText(selected, rows, opts, currency);
     setSharing(true);
     try {
-      const blob = await buildImage(selected, rows, opts, currency);
-      const file = blob ? new File([blob], `${getGame()}-for-sale.png`, { type: "image/png" }) : null;
-      if (file && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text });
+      const blobs = await buildImages(selected, rows, opts, currency);
+      const files = blobs.map(
+        (blob, i) => new File([blob], pageFilename(i, blobs.length), { type: "image/png" }),
+      );
+      if (files.length > 0 && navigator.canShare?.({ files })) {
+        await navigator.share({ files, text });
         return;
       }
       if (navigator.share) {
@@ -207,7 +210,8 @@ export default function ShareList({
           <h3 className="text-sm font-semibold text-slate-100">Share list</h3>
           <p className="mt-0.5 text-xs text-slate-400">
             Pick cards, then Share to WhatsApp. Asking prices are a % of the live
-            TCGplayer price, in US$ or R$ — edit any of them.
+            TCGplayer price, in US$ or R$ — edit any of them. Long lists split into
+            pages of {PAGE_SIZE} so each image stays sharp.
           </p>
         </div>
         <button
@@ -562,6 +566,10 @@ const CAPTION_H = 66;
 const TITLE_H = 54;
 const FOOTER_H = 52;
 const SCALE = 2;
+// Cap each exported image at PAGE_SIZE cards (4 cols × 5 rows) so a long list
+// splits into several short, sharp PNGs instead of one very tall image that
+// WhatsApp compresses into a blur.
+const PAGE_SIZE = 20;
 
 const C_BG = "#0f0f12";
 const C_TITLE = "#f4f4f7";
@@ -581,14 +589,38 @@ interface Layout {
   gridH: number;
 }
 
-function layout(count: number, opts: ShareOpts): Layout {
-  const cols = Math.min(4, Math.max(1, count));
-  const rowsN = Math.ceil(count / cols);
+// layout sizes one page. cols is fixed across pages (from the full list) so
+// every page shares a width; showFooter reserves the total row only where it's
+// drawn (the last page).
+function layout(count: number, opts: ShareOpts, cols: number, showFooter: boolean): Layout {
+  const rowsN = Math.max(1, Math.ceil(count / cols));
   const width = PAD * 2 + cols * IMG_W + (cols - 1) * GAP;
   const gridH = rowsN * (IMG_H + CAPTION_H) + Math.max(rowsN - 1, 0) * GAP;
-  const footerH = opts.includeAsking ? FOOTER_H : 0;
+  const footerH = opts.includeAsking && showFooter ? FOOTER_H : 0;
   const height = PAD * 2 + TITLE_H + gridH + footerH;
   return { cols, rowsN, width, height, gridTop: PAD + TITLE_H, gridH };
+}
+
+// gridCols is the shared column count for a list of `count` cards.
+function gridCols(count: number): number {
+  return Math.min(4, Math.max(1, count));
+}
+
+function paginate<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+// PageInfo positions one page within the exported set: its index, the total
+// page count, the full card count (for the header), and the shared column grid.
+interface PageInfo {
+  index: number;
+  count: number;
+  totalCards: number;
+  cols: number;
 }
 
 // imgSrc resolves a card's art, preferring its exact TCGplayer product image
@@ -606,16 +638,20 @@ function imgKey(t: TradeView): string {
   return `${t.set}|${t.number}|${productIDFromTcgURL(t.tcgUrl) ?? ""}`;
 }
 
+// paint draws one page: its cards, a header with a page indicator, and the
+// grand total only on the last page. grandTotal is the sum across every page.
 function paint(
   ctx: CanvasRenderingContext2D,
-  selected: TradeView[],
+  cards: TradeView[],
   rows: Record<string, RowState>,
   opts: ShareOpts,
   currency: Currency,
-  total: number,
+  grandTotal: number,
   cache: Map<string, HTMLImageElement | null>,
+  page: PageInfo,
 ) {
-  const lay = layout(selected.length, opts);
+  const showFooter = opts.includeAsking && page.index === page.count - 1;
+  const lay = layout(cards.length, opts, page.cols, showFooter);
 
   ctx.fillStyle = C_BG;
   ctx.fillRect(0, 0, lay.width, lay.height);
@@ -629,18 +665,22 @@ function paint(
   ctx.fillStyle = C_MUTED;
   ctx.font = "500 13px ui-sans-serif, system-ui, sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText(`${selected.length} cards`, lay.width - PAD, PAD + 8);
+  const header =
+    page.count > 1
+      ? `${page.totalCards} cards · ${page.index + 1}/${page.count}`
+      : `${page.totalCards} cards`;
+  ctx.fillText(header, lay.width - PAD, PAD + 8);
   ctx.textAlign = "left";
 
-  selected.forEach((t, i) => {
-    const c = i % lay.cols;
-    const r = Math.floor(i / lay.cols);
+  cards.forEach((t, i) => {
+    const c = i % page.cols;
+    const r = Math.floor(i / page.cols);
     const x = PAD + c * (IMG_W + GAP);
     const y = lay.gridTop + r * (IMG_H + CAPTION_H + GAP);
     drawCell(ctx, t, rows[t.id], opts, currency, cache.get(imgKey(t)) ?? null, x, y);
   });
 
-  if (opts.includeAsking) {
+  if (showFooter) {
     const fy = lay.gridTop + lay.gridH + 16;
     ctx.fillStyle = C_META;
     ctx.font = "500 14px ui-sans-serif, system-ui, sans-serif";
@@ -649,7 +689,7 @@ function paint(
     ctx.fillStyle = C_ASK;
     ctx.font = "700 20px ui-sans-serif, system-ui, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText(money(total, currency), lay.width - PAD, fy - 3);
+    ctx.fillText(money(grandTotal, currency), lay.width - PAD, fy - 3);
     ctx.textAlign = "left";
   }
 }
@@ -743,29 +783,60 @@ async function ensureImages(
   );
 }
 
-async function buildImage(
+function grandTotalOf(
+  selected: TradeView[],
+  rows: Record<string, RowState>,
+): number {
+  return selected.reduce((sum, t) => sum + (rows[t.id]?.ask ?? 0) * Math.max(t.qty, 1), 0);
+}
+
+// buildImages renders the list into one PNG per PAGE_SIZE-card page, so a long
+// list ships as several short, sharp images. All card art is loaded once and
+// shared across pages; the grand total prints on the final page only.
+async function buildImages(
   selected: TradeView[],
   rows: Record<string, RowState>,
   opts: ShareOpts,
   currency: Currency,
-): Promise<Blob | null> {
+): Promise<Blob[]> {
   if (selected.length === 0) {
-    return null;
+    return [];
   }
   const cache = new Map<string, HTMLImageElement | null>();
   await ensureImages(selected, cache);
-  const lay = layout(selected.length, opts);
-  const canvas = document.createElement("canvas");
-  canvas.width = lay.width * SCALE;
-  canvas.height = lay.height * SCALE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return null;
+  const cols = gridCols(selected.length);
+  const pages = paginate(selected, PAGE_SIZE);
+  const grand = grandTotalOf(selected, rows);
+  const blobs: Blob[] = [];
+  for (let p = 0; p < pages.length; p++) {
+    const cards = pages[p];
+    const page: PageInfo = { index: p, count: pages.length, totalCards: selected.length, cols };
+    const showFooter = opts.includeAsking && p === pages.length - 1;
+    const lay = layout(cards.length, opts, cols, showFooter);
+    const canvas = document.createElement("canvas");
+    canvas.width = lay.width * SCALE;
+    canvas.height = lay.height * SCALE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      continue;
+    }
+    ctx.scale(SCALE, SCALE);
+    paint(ctx, cards, rows, opts, currency, grand, cache, page);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+    if (blob) {
+      blobs.push(blob);
+    }
   }
-  ctx.scale(SCALE, SCALE);
-  const total = selected.reduce((sum, t) => sum + (rows[t.id]?.ask ?? 0) * Math.max(t.qty, 1), 0);
-  paint(ctx, selected, rows, opts, currency, total, cache);
-  return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return blobs;
+}
+
+// pageFilename names page i of n: bare when there's a single page, numbered when
+// the list spans several.
+function pageFilename(index: number, count: number): string {
+  const base = `${getGame()}-for-sale`;
+  return count > 1 ? `${base}-${index + 1}.png` : `${base}.png`;
 }
 
 // ImagePreview renders the same grid inline so the list can be reviewed before
@@ -784,11 +855,13 @@ function ImagePreview({
   currency: Currency;
   total: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const cacheRef = useRef<Map<string, HTMLImageElement | null>>(new Map());
   const [imgVersion, setImgVersion] = useState(0);
 
   const ids = selected.map((t) => t.id).join(",");
+  const cols = gridCols(selected.length);
+  const pages = paginate(selected, PAGE_SIZE);
 
   useEffect(() => {
     let cancelled = false;
@@ -803,20 +876,25 @@ function ImagePreview({
   }, [ids, selected]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || selected.length === 0) {
-      return;
-    }
-    const lay = layout(selected.length, opts);
-    canvas.width = lay.width * SCALE;
-    canvas.height = lay.height * SCALE;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      return;
-    }
-    ctx.scale(SCALE, SCALE);
-    paint(ctx, selected, rows, opts, currency, total, cacheRef.current);
-  }, [ids, selected, rows, opts, currency, total, imgVersion]);
+    pages.forEach((cards, p) => {
+      const canvas = canvasRefs.current[p];
+      if (!canvas) {
+        return;
+      }
+      const page: PageInfo = { index: p, count: pages.length, totalCards: selected.length, cols };
+      const showFooter = opts.includeAsking && p === pages.length - 1;
+      const lay = layout(cards.length, opts, cols, showFooter);
+      canvas.width = lay.width * SCALE;
+      canvas.height = lay.height * SCALE;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return;
+      }
+      ctx.scale(SCALE, SCALE);
+      paint(ctx, cards, rows, opts, currency, total, cacheRef.current, page);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids, rows, opts, currency, total, imgVersion, cols]);
 
   if (selected.length === 0) {
     return (
@@ -827,8 +905,22 @@ function ImagePreview({
   }
 
   return (
-    <div className="max-h-[36rem] overflow-auto rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-      <canvas ref={canvasRef} className="mx-auto h-auto max-w-full" />
+    <div className="max-h-[36rem] space-y-4 overflow-auto rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+      {pages.map((_, p) => (
+        <div key={p} className="space-y-1.5">
+          {pages.length > 1 && (
+            <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              Page {p + 1} / {pages.length}
+            </div>
+          )}
+          <canvas
+            ref={(el) => {
+              canvasRefs.current[p] = el;
+            }}
+            className="mx-auto h-auto max-w-full"
+          />
+        </div>
+      ))}
     </div>
   );
 }

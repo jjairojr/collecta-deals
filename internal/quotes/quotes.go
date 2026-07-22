@@ -23,6 +23,7 @@ type Item struct {
 	Variant    string  `json:"variant,omitempty"`
 	Qty        int     `json:"qty"`
 	UnitBRL    float64 `json:"unitBRL"`
+	Pct        float64 `json:"pct,omitempty"`
 	MarketUSD  float64 `json:"marketUSD,omitempty"`
 	LigaLowBRL float64 `json:"ligaLowBRL,omitempty"`
 	LigaAvgBRL float64 `json:"ligaAvgBRL,omitempty"`
@@ -98,6 +99,9 @@ func normalize(q *Quote) {
 	for i := range q.Items {
 		if q.Items[i].Qty < 1 {
 			q.Items[i].Qty = 1
+		}
+		if q.Items[i].Pct < 0 {
+			q.Items[i].Pct = 0
 		}
 	}
 }

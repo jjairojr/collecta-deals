@@ -67,8 +67,8 @@ func Fetch(ctx context.Context, logger *logx.Logger, opts Options) (model.Snapsh
 		ligaFetcher = flaresolverr.NewRouter(ligaHTTP, opts.FlareSolverr, gm.LigaHosts)
 	}
 	sources := []model.BrazilSource{liga.New(ligaFetcher, logger, opts.Concurrency, opts.Sets, gm)}
-	if opts.MyPCards && gm.ID == "onepiece" {
-		sources = append(sources, mypcards.New(logger, opts.Concurrency))
+	if opts.MyPCards && gm.MyP != nil {
+		sources = append(sources, mypcards.New(logger, opts.Concurrency, gm))
 	}
 	us := tcgcsv.New(client, logger, opts.Concurrency, gm.Market)
 	tcg := tcgplayer.New(client, logger)

@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"opdeals/internal/game"
 	"opdeals/internal/model"
 )
 
 var (
 	editionLinkRe = regexp.MustCompile(`<a\s[^>]*class="edicao-link"[^>]*>`)
-	editionHrefRe = regexp.MustCompile(`href="/onepiece/([a-z0-9-]+)"`)
 
 	streamItemRe = regexp.MustCompile(`(?s)<li class="stream-item" data-key="(\d+)">(.*?)</li>`)
 	gaRe         = regexp.MustCompile(`data-ga-item-id="([^"]*)"`)
@@ -29,12 +29,13 @@ type listingItem struct {
 	key     string
 }
 
-func parseEditions(htmlBytes []byte) []string {
+func parseEditions(htmlBytes []byte, gameSlug string) []string {
 	doc := string(htmlBytes)
-	seen := make(map[string]struct{})
+	hrefRe := regexp.MustCompile(`href="/` + regexp.QuoteMeta(gameSlug) + `/([a-z0-9-]+)"`)
+	seen := map[string]struct{}{"edicoes": {}}
 	var slugs []string
 	for _, tag := range editionLinkRe.FindAllString(doc, -1) {
-		m := editionHrefRe.FindStringSubmatch(tag)
+		m := hrefRe.FindStringSubmatch(tag)
 		if m == nil {
 			continue
 		}
@@ -48,14 +49,14 @@ func parseEditions(htmlBytes []byte) []string {
 	return slugs
 }
 
-func parseListing(htmlBytes []byte) []listingItem {
+func parseListing(htmlBytes []byte, cfg game.MyP) []listingItem {
 	doc := string(htmlBytes)
 	var out []listingItem
 	for _, m := range streamItemRe.FindAllStringSubmatch(doc, -1) {
 		key, inner := m[1], m[2]
 
 		ga := firstSubmatch(gaRe, inner)
-		number := numberFromGA(ga)
+		number := numberFromGA(ga, cfg)
 		if number == "" {
 			continue
 		}
@@ -69,11 +70,11 @@ func parseListing(htmlBytes []byte) []listingItem {
 			key: key,
 			listing: model.BrazilListing{
 				Number:       number,
-				SetCode:      setCode(ga, firstSubmatch(edicaoRe, inner)),
+				SetCode:      cfg.SetCode(setCode(ga, firstSubmatch(edicaoRe, inner))),
 				Name:         html.UnescapeString(strings.TrimSpace(firstSubmatch(nameRe, inner))),
 				Variant:      "Normal",
 				Source:       sourceName,
-				URL:          productURL(firstSubmatch(productRe, inner)),
+				URL:          productURL(firstSubmatch(productRe, inner), cfg.Slug),
 				LowBRL:       price,
 				StockChecked: true,
 				InStock:      qty > 0,
@@ -83,13 +84,20 @@ func parseListing(htmlBytes []byte) []listingItem {
 	return out
 }
 
-func numberFromGA(ga string) string {
+// numberFromGA pulls the card number out of a data-ga-item-id such as
+// "one_op16_op16-080p1" or "riftbound_unl_059a/219". Listing grids mix in
+// cross-sell cards from other games, so a mismatched prefix is skipped rather
+// than parsed. Denominators and letter suffixes are left for the game's Matcher
+// to normalize — stripping them here would fabricate matches.
+func numberFromGA(ga string, cfg game.MyP) string {
 	parts := strings.Split(ga, "_")
-	if len(parts) < 3 || parts[0] != "one" {
+	if len(parts) < 3 || cfg.GAPrefix == "" || parts[0] != cfg.GAPrefix {
 		return ""
 	}
 	num := strings.Join(parts[2:], "_")
-	num = printSuffixRe.ReplaceAllString(num, "")
+	if cfg.StripPrintSuffix {
+		num = printSuffixRe.ReplaceAllString(num, "")
+	}
 	return model.NormalizeNumber(num)
 }
 
@@ -103,10 +111,10 @@ func setCode(ga, edicao string) string {
 	return ""
 }
 
-func productURL(href string) string {
+func productURL(href, gameSlug string) string {
 	href = html.UnescapeString(strings.TrimSpace(href))
 	if href == "" {
-		return baseURL + "/onepiece"
+		return baseURL + "/" + gameSlug
 	}
 	if strings.HasPrefix(href, "http") {
 		return href

@@ -58,7 +58,7 @@ function DealArt({ deal }: { deal: Deal }) {
   );
 }
 
-function DealCard({ deal }: { deal: Deal }) {
+function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
   const tier = marginTier(deal.marginPct);
   const barWidth = Math.max(4, Math.min(100, deal.marginPct));
   const rounded = Math.round(deal.marginPct);
@@ -134,7 +134,7 @@ function DealCard({ deal }: { deal: Deal }) {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <BrSupply copies={deal.brCopies} sellers={deal.brSellers} />
+          {showDepth && <BrSupply copies={deal.brCopies} sellers={deal.brSellers} />}
           <UsTrust listings={deal.usListings} qty={deal.usQty} />
         </div>
 
@@ -161,7 +161,7 @@ function DealCard({ deal }: { deal: Deal }) {
   );
 }
 
-export default function DealsGrid({ deals }: { deals: Deal[] }) {
+export default function DealsGrid({ deals, showDepth = true }: { deals: Deal[]; showDepth?: boolean }) {
   const { backfill } = useSelection();
   useEffect(() => {
     backfill(deals.map(dealSelection).filter((c): c is NonNullable<typeof c> => c !== null));
@@ -169,7 +169,7 @@ export default function DealsGrid({ deals }: { deals: Deal[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {deals.map((d) => (
-        <DealCard key={`${d.number}-${d.tcgUrl}`} deal={d} />
+        <DealCard key={`${d.number}-${d.tcgUrl}`} deal={d} showDepth={showDepth} />
       ))}
     </div>
   );

@@ -99,7 +99,14 @@ func run() error {
 	scheduleInterval := flag.Duration("schedule-interval", 6*time.Hour, "target cadence of a full scheduler cycle (all games, deals + captures)")
 	scheduleGap := flag.Duration("schedule-gap", 2*time.Minute, "pause between scheduler jobs so rate-limit windows reset")
 	flaresolverrURL := flag.String("flaresolverr", "", "FlareSolverr endpoint URL, e.g. http://flaresolverr:8191, used to fetch Cloudflare-challenged Liga hosts (empty = direct)")
+	serveOnly := flag.Bool("serve-only", false, "read-only mode for a prod instance fed by local scrapes: load snapshots and serve, never scrape (no schedulers, no background deals refresh, refresh/capture endpoints disabled)")
+	adminToken := flag.String("admin-token", os.Getenv("ADMIN_TOKEN"), "token for POST /api/admin/reload (reload deals snapshots from disk after a sync); empty disables the endpoint")
 	flag.Parse()
+
+	if *serveOnly {
+		*schedule = false
+		*trackSchedule = false
+	}
 
 	logger := logx.New(os.Stderr)
 	dealsLog := logger.WithPrefix("DEALS")
@@ -110,7 +117,8 @@ func run() error {
 		*gndCaptureOnce || *gndCaptureSealedOnce
 	// The unified scheduler owns all refresh timing, so the per-store background
 	// refresh goroutines are suppressed alongside one-shot runs (Load still happens).
-	loadOnly := oneShot || *schedule
+	// Serve-only never scrapes, so it also only loads.
+	loadOnly := oneShot || *schedule || *serveOnly
 
 	var solver *flaresolverr.Client
 	if *flaresolverrURL != "" {
@@ -148,6 +156,7 @@ func run() error {
 			Timeout:      *timeout,
 			VerifyFloor:  *verifyFloor,
 			LivePrices:   *livePrices,
+			MyPCards:     *myPCards,
 			FlareSolverr: solver,
 			HeldKeys:     heldCardKeys(rftTrades, compare.MatcherFor(game.Riftbound())),
 		})
@@ -390,7 +399,7 @@ func run() error {
 		lorStack.Game.ID: lorStack,
 		gndStack.Game.ID: gndStack,
 	}
-	srv := api.New(*webDir, games, opStack.Game.ID)
+	srv := api.New(*webDir, games, opStack.Game.ID, *serveOnly, *adminToken)
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
 }
@@ -554,7 +563,7 @@ func buildStack(p stackParams) (*api.GameStack, *tracking.Capturer, error) {
 		}
 		fetcher := ligaFetcher(httpClient, p.solver, p.game)
 		ligaClient := liga.New(fetcher, p.log, p.concurrency, p.trackSets, p.game)
-		capturer = tracking.NewCapturer(p.log, ligaClient, trackStore, p.trackSets, p.minPrice, p.tz, p.interval, p.trackSealed, p.game.FloorLangs, p.fxProvider)
+		capturer = tracking.NewCapturer(p.log, ligaClient, trackStore, p.trackSets, p.minPrice, p.tz, p.interval, p.trackSealed, p.game.FloorLangs, p.fxProvider, imgStore)
 	}
 
 	return &api.GameStack{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"opdeals/internal/cardimg"
 	"opdeals/internal/liga"
 	"opdeals/internal/logx"
 	"opdeals/internal/model"
@@ -27,10 +28,11 @@ type Capturer struct {
 	fxProvider func() float64
 	sealed     bool
 	floorLangs []string
+	img        *cardimg.Store
 }
 
-func NewCapturer(log *logx.Logger, ligaClient *liga.Client, store *Store, sets []string, minCardBRL float64, tz *time.Location, interval time.Duration, sealed bool, floorLangs []string, fxProvider func() float64) *Capturer {
-	return &Capturer{log: log, liga: ligaClient, store: store, sets: sets, minCardBRL: minCardBRL, tz: tz, interval: interval, sealed: sealed, floorLangs: floorLangs, fxProvider: fxProvider}
+func NewCapturer(log *logx.Logger, ligaClient *liga.Client, store *Store, sets []string, minCardBRL float64, tz *time.Location, interval time.Duration, sealed bool, floorLangs []string, fxProvider func() float64, img *cardimg.Store) *Capturer {
+	return &Capturer{log: log, liga: ligaClient, store: store, sets: sets, minCardBRL: minCardBRL, tz: tz, interval: interval, sealed: sealed, floorLangs: floorLangs, fxProvider: fxProvider, img: img}
 }
 
 func (c *Capturer) Sets() []string { return c.sets }
@@ -186,9 +188,10 @@ func (c *Capturer) captureSealed(ctx context.Context, now time.Time, date string
 	if len(products) == 0 {
 		return fmt.Errorf("sealed: no products enumerated")
 	}
-	detail := c.liga.SealedDetail(ctx, products)
+	detail, images := c.liga.SealedDetail(ctx, products)
 
 	cards := make([]CardDay, 0, len(products))
+	seedImgs := make(map[string]string, len(products))
 	for _, p := range products {
 		stores := detail[p.URL]
 		if len(stores) == 0 {
@@ -198,6 +201,9 @@ func (c *Capturer) captureSealed(ctx context.Context, now time.Time, date string
 		if f, ok := liga.Floor(stores, c.floorLangs); ok && f > 0 {
 			low = f
 		}
+		if img := images[p.URL]; img != "" {
+			seedImgs[p.PCode] = img
+		}
 		cards = append(cards, CardDay{
 			Number: p.PCode,
 			Name:   p.Name,
@@ -205,6 +211,9 @@ func (c *Capturer) captureSealed(ctx context.Context, now time.Time, date string
 			URL:    p.URL,
 			Stores: toStoreQty(stores),
 		})
+	}
+	if c.img != nil {
+		c.img.SeedMany(sealedSet, seedImgs)
 	}
 	if len(cards) == 0 {
 		return fmt.Errorf("sealed: no per-store stock decoded")

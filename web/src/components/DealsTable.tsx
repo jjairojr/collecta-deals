@@ -35,7 +35,7 @@ function sourceLabel(source: string): string {
   return "BR";
 }
 
-export default function DealsTable({ deals }: { deals: Deal[] }) {
+export default function DealsTable({ deals, showDepth = true }: { deals: Deal[]; showDepth?: boolean }) {
   const { has, toggle, backfill } = useSelection();
   useEffect(() => {
     backfill(deals.map(dealSelection).filter((c): c is NonNullable<typeof c> => c !== null));
@@ -50,7 +50,7 @@ export default function DealsTable({ deals }: { deals: Deal[] }) {
             <TableHead>Name</TableHead>
             <TableHead>Rarity</TableHead>
             <TableHead className="text-right">Brazil</TableHead>
-            <TableHead>BR supply</TableHead>
+            {showDepth && <TableHead>BR supply</TableHead>}
             <TableHead className="text-right">Buy (US$)</TableHead>
             <TableHead className="text-right">Sell (US$)</TableHead>
             <TableHead>US depth</TableHead>
@@ -77,7 +77,7 @@ export default function DealsTable({ deals }: { deals: Deal[] }) {
                 <span className="flex items-center gap-1">
                   {d.set && <span className="text-slate-500">{d.set} ·</span>}
                   {d.number}
-                  {d.verified && (
+                  {showDepth && d.verified && (
                     <BadgeCheck
                       className="h-3.5 w-3.5 text-emerald-400"
                       aria-label="Stock verified"
@@ -95,9 +95,11 @@ export default function DealsTable({ deals }: { deals: Deal[] }) {
               <TableCell className="whitespace-nowrap text-right tabular-nums text-slate-300">
                 {brl(d.lowBRL)}
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <BrSupply copies={d.brCopies} sellers={d.brSellers} />
-              </TableCell>
+              {showDepth && (
+                <TableCell className="whitespace-nowrap">
+                  <BrSupply copies={d.brCopies} sellers={d.brSellers} />
+                </TableCell>
+              )}
               <TableCell className="whitespace-nowrap text-right tabular-nums text-slate-400">
                 {usd(d.buyUSD)}
               </TableCell>

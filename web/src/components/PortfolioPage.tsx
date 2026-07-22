@@ -8,6 +8,7 @@ import {
   getPortfolio,
   getQuote,
   productIDFromTcgURL,
+  sellTrade,
   updateTrade,
   type PortfolioResponse,
   type QuoteMatch,
@@ -442,19 +443,25 @@ function TradeRow({ t, onChanged }: { t: TradeView; onChanged: () => void }) {
 }
 
 function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
-  const [price, setPrice] = useState("");
+  const [qty, setQty] = useState(String(t.qty));
+  const [priceEach, setPriceEach] = useState("");
   const [currency, setCurrency] = useState<"BRL" | "USD">("BRL");
   const [date, setDate] = useState("");
   const [buyer, setBuyer] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const sellQty = Math.min(Math.max(Number(qty) || 0, 1), t.qty);
+  const each = Number(priceEach) || 0;
+  const total = each * sellQty;
+  const money = currency === "USD" ? usd : brl0;
+  const partial = sellQty < t.qty;
+
   const submit = async () => {
     setSaving(true);
     try {
-      await updateTrade(t.id, {
-        ...t,
-        status: "sold",
-        sellPrice: Number(price) || 0,
+      await sellTrade(t.id, {
+        qty: sellQty,
+        sellPrice: total,
         sellCurrency: currency,
         sellDate: date,
         buyer,
@@ -467,8 +474,13 @@ function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="Sell price">
-        <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-32" placeholder="0,00" />
+      {t.qty > 1 && (
+        <Field label={`Qty (of ${t.qty})`}>
+          <Input type="number" min={1} max={t.qty} value={qty} onChange={(e) => setQty(e.target.value)} className="w-20" />
+        </Field>
+      )}
+      <Field label={t.qty > 1 ? "Price each" : "Sell price"}>
+        <Input type="number" value={priceEach} onChange={(e) => setPriceEach(e.target.value)} className="w-32" placeholder="0,00" />
       </Field>
       <Field label="Currency">
         <ToggleGroup
@@ -486,8 +498,14 @@ function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
       <Field label="Buyer (optional)">
         <Input value={buyer} onChange={(e) => setBuyer(e.target.value)} className="w-40" placeholder="P2P buyer" />
       </Field>
-      <Button onClick={submit} disabled={saving || !price}>
-        {saving ? "Saving…" : "Mark sold"}
+      {t.qty > 1 && each > 0 && (
+        <div className="pb-2 text-xs text-slate-400">
+          Total <span className="font-semibold text-slate-200">{money(total)}</span>
+          {partial ? ` · ${t.qty - sellQty} stay holding` : ""}
+        </div>
+      )}
+      <Button onClick={submit} disabled={saving || !each}>
+        {saving ? "Saving…" : partial ? `Sell ${sellQty}` : "Mark sold"}
       </Button>
     </div>
   );

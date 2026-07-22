@@ -40,6 +40,19 @@ function quoteTotal(items: QuoteItem[]): number {
   return items.reduce((sum, it) => sum + it.unitBRL * it.qty, 0);
 }
 
+function effPct(it: QuoteItem, pct: number): number {
+  return it.pct && it.pct > 0 ? it.pct : pct;
+}
+
+function quoteOffer(items: QuoteItem[], pct: number): number {
+  return items.reduce((sum, it) => sum + (it.unitBRL * it.qty * effPct(it, pct)) / 100, 0);
+}
+
+function blendedPct(items: QuoteItem[], pct: number): number {
+  const total = quoteTotal(items);
+  return total > 0 ? Math.round((quoteOffer(items, pct) / total) * 100) : Math.round(pct);
+}
+
 function seedUnitBRL(
   market: QuoteMarket,
   ligaLowBRL: number | undefined,
@@ -59,19 +72,22 @@ export function buildQuoteText(q: Quote): string {
   lines.push("", "Tenho interesse nas seguintes cartas (NM / Inglês):", "");
   for (const it of q.items) {
     const label = it.name.includes(it.number) ? it.name : `${it.name} (${it.number})`;
+    const pct = effPct(it, q.pct);
+    const offerUnit = Math.round((it.unitBRL * pct) / 100);
     if (it.qty > 1) {
-      lines.push(`• ${label} ×${it.qty} — ${brl0(it.unitBRL)}/un = ${brl0(it.unitBRL * it.qty)}`);
+      lines.push(`• ${label} ×${it.qty} — ${brl0(offerUnit)}/un = ${brl0(offerUnit * it.qty)} (${pct}%)`);
     } else {
-      lines.push(`• ${label} — ${brl0(it.unitBRL)}`);
+      lines.push(`• ${label} — ${brl0(offerUnit)} (${pct}%)`);
     }
   }
   const total = quoteTotal(q.items);
-  const offer = (total * q.pct) / 100;
+  const offer = quoteOffer(q.items, q.pct);
+  const blended = blendedPct(q.items, q.pct);
   lines.push("");
-  if (q.pct < 100) {
+  if (blended < 100) {
     lines.push(`Valor de mercado: ${brl0(total)}`);
   }
-  lines.push(`💰 Minha oferta (${Math.round(q.pct)}%): ${brl0(offer)}`);
+  lines.push(`💰 Total oferta (${blended}%): ${brl0(offer)}`);
   lines.push("💸 Pago à vista no PIX, na hora!");
   return lines.join("\n");
 }
@@ -182,9 +198,9 @@ export default function QuotePage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-300">{brl0(total)}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-emerald-300">
-                      {brl0((total * q.pct) / 100)}
+                      {brl0(quoteOffer(q.items, q.pct))}
                       <span className="ml-1 text-[10px] font-normal text-slate-500">
-                        {Math.round(q.pct)}%
+                        {blendedPct(q.items, q.pct)}%
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-slate-500">{timeAgo(q.updatedAt)}</td>
@@ -236,7 +252,7 @@ function QuoteEditor({
   const [error, setError] = useState<string | null>(null);
 
   const total = quoteTotal(items);
-  const offer = (total * pct) / 100;
+  const offer = quoteOffer(items, pct);
   const brOnly = brOnlyGame;
 
   useEffect(() => {
@@ -405,7 +421,9 @@ function QuoteEditor({
                 <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Liga R$</th>
                 {!brOnly && <th className="whitespace-nowrap px-3 py-2 text-right font-medium">TCG</th>}
                 <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Unitário R$</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">%</th>
                 <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Total</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Oferta</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -458,8 +476,25 @@ function QuoteEditor({
                       className="ml-auto w-24 text-right"
                     />
                   </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="relative ml-auto w-20">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={effPct(it, pct)}
+                        onChange={(e) => patchItem(idx, { pct: Math.max(0, Number(e.target.value) || 0) })}
+                        className="w-20 pr-7 text-right"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                        %
+                      </span>
+                    </div>
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums text-slate-200">
                     {brl0(it.unitBRL * it.qty)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-emerald-300">
+                    {brl0((it.unitBRL * it.qty * effPct(it, pct)) / 100)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <div className="flex items-center justify-end gap-1">
@@ -512,7 +547,7 @@ function QuoteEditor({
             </div>
             <div>
               <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                Oferta ({Math.round(pct)}%)
+                Oferta ({blendedPct(items, pct)}%)
               </div>
               <div className="text-lg font-bold tabular-nums text-emerald-300">{brl0(offer)}</div>
             </div>

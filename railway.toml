@@ -1,0 +1,18 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Railway runs this in a shell and it overrides the Dockerfile ENTRYPOINT/CMD,
+# so $PORT expands. Serve-only: prod never scrapes — it loads snapshots and serves
+# the portfolio. Scraping runs locally (docker-compose, with FlareSolverr) and the
+# output is pushed onto this /app/data volume via scripts/sync-up.sh, which then
+# calls POST /api/admin/reload (guarded by the ADMIN_TOKEN env var) to swap the
+# fresh deals snapshots in. Keep numReplicas = 1: the app owns a single /app/data
+# volume; a second replica would fight over the JSON writes the sync/reload does.
+startCommand = "opdeals-server -web=web/dist -addr :$PORT -serve-only"
+numReplicas = 1
+healthcheckPath = "/api/games"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

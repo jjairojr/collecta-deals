@@ -20,3 +20,6 @@
 # misc
 .DS_Store
 *.log
+
+# deploy secrets
+/scripts/deploy.env

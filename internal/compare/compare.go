@@ -17,6 +17,7 @@ type Options struct {
 	SortBy         string
 	Query          string
 	Set            string
+	Source         string
 	Limit          int
 	RequireInStock bool
 	SPOnly         bool
@@ -151,7 +152,7 @@ func Deals(listings []model.BrazilListing, prices []model.USPrice, opts Options)
 	index := indexPrices(prices, m)
 	query := strings.ToLower(strings.TrimSpace(opts.Query))
 	deals := make([]model.Deal, 0)
-	for key, l := range cheapestListings(listings, opts.RequireInStock, m) {
+	for key, l := range cheapestListings(listings, opts.RequireInStock, m, opts.Source) {
 		if query != "" && !matchesQuery(l, query) {
 			continue
 		}
@@ -260,10 +261,29 @@ func matchesQuery(l model.BrazilListing, query string) bool {
 		strings.Contains(strings.ToLower(l.SetCode), query)
 }
 
-func cheapestListings(listings []model.BrazilListing, requireInStock bool, m Matcher) map[string]model.BrazilListing {
+// MatchesSource reports whether a listing's source satisfies a source filter.
+// An empty filter accepts everything, preserving the historical cheapest-wins
+// behaviour across sources. "liga" matches every per-game Liga source name
+// (ligaonepiece, ligariftbound, …); anything else is an exact match.
+func MatchesSource(source, want string) bool {
+	want = strings.ToLower(strings.TrimSpace(want))
+	if want == "" {
+		return true
+	}
+	source = strings.ToLower(strings.TrimSpace(source))
+	if want == "liga" {
+		return strings.HasPrefix(source, "liga")
+	}
+	return source == want
+}
+
+func cheapestListings(listings []model.BrazilListing, requireInStock bool, m Matcher, source string) map[string]model.BrazilListing {
 	best := make(map[string]model.BrazilListing, len(listings))
 	for _, l := range listings {
 		if l.LowBRL <= 0 {
+			continue
+		}
+		if !MatchesSource(l.Source, source) {
 			continue
 		}
 		if requireInStock {
@@ -283,7 +303,7 @@ func cheapestListings(listings []model.BrazilListing, requireInStock bool, m Mat
 }
 
 func BRIndex(listings []model.BrazilListing, m Matcher) map[string]model.BrazilListing {
-	return cheapestListings(listings, false, m)
+	return cheapestListings(listings, false, m, "")
 }
 
 var cardCodeRe = regexp.MustCompile(`^[a-z]{1,5}[0-9]{0,3}-[a-z0-9-]+$`)
@@ -350,7 +370,7 @@ func CandidateListings(listings []model.BrazilListing, prices []model.USPrice, f
 	index := indexPrices(prices, m)
 	candidateKeys := make(map[string]bool)
 	us := make([]model.USPrice, 0)
-	for key, l := range cheapestListings(listings, false, m) {
+	for key, l := range cheapestListings(listings, false, m, "") {
 		p, ok := index[key]
 		if !ok {
 			continue

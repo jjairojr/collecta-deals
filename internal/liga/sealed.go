@@ -22,6 +22,7 @@ var (
 	prodTileRe   = regexp.MustCompile(`prod/view&(?:amp;)?pcode=(\d+)&(?:amp;)?prod=([^"]+)"`)
 	prodStockRe  = regexp.MustCompile(`(?s)var prod_stock\s*=\s*(\[.*?\]);`)
 	prodStoresRe = regexp.MustCompile(`(?s)var prod_stores\s*=\s*(\{.*?\});`)
+	prodImgRe    = regexp.MustCompile(`//repositorio\.sbrauble\.com/arquivos/up/prod/\d+/[^"'\s]+\.(?:jpg|jpeg|png)`)
 )
 
 type SealedProduct struct {
@@ -107,15 +108,19 @@ func sealedSetCode(name string, re *regexp.Regexp) string {
 	return m
 }
 
-func (c *Client) SealedDetail(ctx context.Context, products []SealedProduct) map[string][]StoreListing {
+// SealedDetail fetches each product's page for per-store stock. It also returns
+// each product URL's CDN image (scraped from the same page) so callers can warm
+// the image cache without a second Cloudflare-challenged fetch.
+func (c *Client) SealedDetail(ctx context.Context, products []SealedProduct) (map[string][]StoreListing, map[string]string) {
 	result := make(map[string][]StoreListing, len(products))
+	images := make(map[string]string, len(products))
 	if len(products) == 0 {
-		return result
+		return result, images
 	}
 	c.log.Printf("BR  fetching per-store stock for %d sealed products (%v warmup)", len(products), stockWarmup)
 	select {
 	case <-ctx.Done():
-		return result
+		return result, images
 	case <-time.After(stockWarmup):
 	}
 
@@ -126,12 +131,12 @@ func (c *Client) SealedDetail(ctx context.Context, products []SealedProduct) map
 			c.log.Printf("BR  sealed detail retry round %d: %d products (after %v cooldown)", round, len(pending), stockCooldown)
 			select {
 			case <-ctx.Done():
-				return result
+				return result, images
 			case <-time.After(stockCooldown):
 			}
 		}
 		var blocked bool
-		pending, blocked = c.sealedDetailRound(ctx, pending, result, total)
+		pending, blocked = c.sealedDetailRound(ctx, pending, result, images, total)
 		if blocked {
 			c.log.Printf("BR  sealed detail: origin blocked us, aborting detail fetch")
 			break
@@ -141,10 +146,10 @@ func (c *Client) SealedDetail(ctx context.Context, products []SealedProduct) map
 		c.log.Printf("BR  sealed detail: %d products left unfetched after %d rounds", len(pending), stockRounds)
 	}
 	c.log.Printf("BR  sealed detail fetched for %d/%d products", len(result), len(products))
-	return result
+	return result, images
 }
 
-func (c *Client) sealedDetailRound(ctx context.Context, products []SealedProduct, result map[string][]StoreListing, total int) ([]SealedProduct, bool) {
+func (c *Client) sealedDetailRound(ctx context.Context, products []SealedProduct, result map[string][]StoreListing, images map[string]string, total int) ([]SealedProduct, bool) {
 	var (
 		mu     sync.Mutex
 		failed []SealedProduct
@@ -175,8 +180,15 @@ func (c *Client) sealedDetailRound(ctx context.Context, products []SealedProduct
 			qtyAtlas := c.fetchAtlas(ctx, quantAtlasURL(body))
 			priceAtlas := c.fetchAtlas(ctx, priceAtlasURL(body))
 			listings := parseProductStock(body, p.PCode, qtyAtlas, priceAtlas)
+			var imgURL string
+			if m := prodImgRe.Find(body); m != nil {
+				imgURL = "https:" + string(m)
+			}
 			mu.Lock()
 			result[p.URL] = listings
+			if imgURL != "" {
+				images[p.URL] = imgURL
+			}
 			done := len(result)
 			mu.Unlock()
 			if done == total || done%stockLogEvery == 0 {

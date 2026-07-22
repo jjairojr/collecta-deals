@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"opdeals/internal/game"
 	"opdeals/internal/logx"
 	"opdeals/internal/model"
 )
@@ -28,24 +29,34 @@ type Client struct {
 	log         *logx.Logger
 	concurrency int
 	interval    time.Duration
+	cfg         game.MyP
 }
 
-func New(logger *logx.Logger, concurrency int) *Client {
+// New builds a scraper for one game's mypcards.com section. Games whose MyP
+// config is nil are not carried on the site and must not reach here.
+func New(logger *logx.Logger, concurrency int, g game.Game) *Client {
 	if concurrency < 1 {
 		concurrency = defaultConcurrency
 	}
 	if concurrency > maxConcurrency {
 		concurrency = maxConcurrency
 	}
-	return &Client{log: logger, concurrency: concurrency, interval: setInterval}
+	cfg := game.MyP{}
+	if g.MyP != nil {
+		cfg = *g.MyP
+	}
+	return &Client{log: logger, concurrency: concurrency, interval: setInterval, cfg: cfg}
 }
 
 func (c *Client) Name() string { return sourceName }
 
-// Listings drives a headless Chrome through Cloudflare, then scrapes every One
-// Piece edition. It is fail-soft: any browser/challenge failure logs and returns
-// no listings rather than failing the whole scan.
+// Listings drives a headless Chrome through Cloudflare, then scrapes every
+// edition of the configured game. It is fail-soft: any browser/challenge
+// failure logs and returns no listings rather than failing the whole scan.
 func (c *Client) Listings(ctx context.Context) ([]model.BrazilListing, error) {
+	if c.cfg.Slug == "" {
+		return nil, nil
+	}
 	b := newBrowser(ctx)
 	defer b.close()
 
@@ -110,7 +121,7 @@ func (c *Client) editions(ctx context.Context, b *browser) ([]string, error) {
 	var slugs []string
 	seen := make(map[string]bool)
 	for page := 1; page <= maxEditionPages; page++ {
-		url := fmt.Sprintf("%s/onepiece/edicoes?page=%d&per-page=%d", baseURL, page, editionsPerPage)
+		url := fmt.Sprintf("%s/%s/edicoes?page=%d&per-page=%d", baseURL, c.cfg.Slug, page, editionsPerPage)
 		doc, err := b.fetch(ctx, url)
 		if err != nil {
 			if page == 1 {
@@ -119,7 +130,7 @@ func (c *Client) editions(ctx context.Context, b *browser) ([]string, error) {
 			break
 		}
 		newCount := 0
-		for _, s := range parseEditions([]byte(doc)) {
+		for _, s := range parseEditions([]byte(doc), c.cfg.Slug) {
 			if seen[s] {
 				continue
 			}
@@ -143,14 +154,14 @@ func (c *Client) setListings(ctx context.Context, b *browser, slug string) []lis
 			return all
 		default:
 		}
-		url := fmt.Sprintf("%s/onepiece/%s?page=%d", baseURL, slug, page)
+		url := fmt.Sprintf("%s/%s/%s?page=%d", baseURL, c.cfg.Slug, slug, page)
 		doc, err := b.fetch(ctx, url)
 		if err != nil {
 			c.log.Printf("BR  %s p%d failed: %v", slug, page, err)
 			break
 		}
 		newCount := 0
-		for _, it := range parseListing([]byte(doc)) {
+		for _, it := range parseListing([]byte(doc), c.cfg) {
 			if seen[it.key] {
 				continue
 			}

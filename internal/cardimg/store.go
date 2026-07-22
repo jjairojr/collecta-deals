@@ -131,6 +131,39 @@ func (s *Store) store(set, number, url string) {
 	}
 }
 
+// SeedMany caches image URLs already extracted elsewhere (e.g. scraped from a
+// sealed product's page during capture), avoiding a second Cloudflare-challenged
+// fetch. It skips empty and unchanged entries and saves at most once.
+func (s *Store) SeedMany(set string, urls map[string]string) {
+	if len(urls) == 0 {
+		return
+	}
+	s.mu.Lock()
+	changed := false
+	for number, url := range urls {
+		if url == "" {
+			continue
+		}
+		k := key(set, number)
+		if s.urls[k] == url {
+			continue
+		}
+		s.urls[k] = url
+		if s.uniqueNums {
+			s.byNum[number] = url
+		}
+		changed = true
+	}
+	var err error
+	if changed {
+		err = s.save()
+	}
+	s.mu.Unlock()
+	if err != nil {
+		s.log.Printf("cardimg: seed save: %v", err)
+	}
+}
+
 // Resolve returns the CDN image URL for a card, fetching and scraping the card
 // page once and caching the result. pageURL is the card's LigaOnePiece page.
 func (s *Store) Resolve(ctx context.Context, set, number, pageURL string) (string, error) {

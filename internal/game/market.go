@@ -97,7 +97,10 @@ func riftboundMarket() *Market {
 		SetScopedKey:         true,
 		StripDenominator:     true,
 		StripLeadingZeros:    true,
-		NumberSuffixVariants: map[string]string{"A": "alt", "S": "sig", "*": "sig"},
+		// Every source spells the signature printing differently: Liga "226S",
+		// TCGCSV "226*", MyP "226P". All three must collapse to the same token
+		// or signature cards silently fail to match.
+		NumberSuffixVariants: map[string]string{"A": "alt", "S": "sig", "*": "sig", "P": "sig"},
 	}
 }
 

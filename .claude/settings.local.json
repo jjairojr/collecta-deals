@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(networksetup -getinfo \"Wi-Fi\")"
+      "Bash(networksetup -getinfo \"Wi-Fi\")",
+      "Bash(curl -s \"https://tcgcsv.com/tcgplayer/89/groups\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(f\\\\\"{g['groupId']}  {g['abbreviation']}  {g['name']}\\\\\" for g in d['results']\\)\\)\")"
     ]
   }
 }

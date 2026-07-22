@@ -146,6 +146,41 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, updated)
 }
 
+func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
+	gs := s.stackFor(r.URL.Query())
+	if gs.Trades == nil {
+		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var in struct {
+		Qty          int     `json:"qty"`
+		SellPrice    float64 `json:"sellPrice"`
+		SellCurrency string  `json:"sellCurrency"`
+		SellDate     string  `json:"sellDate"`
+		Buyer        string  `json:"buyer"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	sold, err := gs.Trades.Sell(r.PathValue("id"), trades.Sale{
+		Qty:          in.Qty,
+		SellPrice:    in.SellPrice,
+		SellCurrency: in.SellCurrency,
+		SellDate:     in.SellDate,
+		Buyer:        in.Buyer,
+	})
+	if errors.Is(err, trades.ErrNotFound) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, sold)
+}
+
 func (s *Server) handleTradesDelete(w http.ResponseWriter, r *http.Request) {
 	gs := s.stackFor(r.URL.Query())
 	if gs.Trades == nil {

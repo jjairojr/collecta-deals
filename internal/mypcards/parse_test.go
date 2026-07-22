@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"opdeals/internal/game"
 	"opdeals/internal/model"
 )
 
@@ -19,7 +20,7 @@ func readTestdata(t *testing.T, name string) []byte {
 }
 
 func TestParseEditions(t *testing.T) {
-	slugs := parseEditions(readTestdata(t, "editions.html"))
+	slugs := parseEditions(readTestdata(t, "editions.html"), "onepiece")
 	if len(slugs) < 40 {
 		t.Fatalf("expected many edition slugs, got %d", len(slugs))
 	}
@@ -49,7 +50,7 @@ func findByNumber(items []listingItem, number string) (model.BrazilListing, bool
 }
 
 func TestParseListing(t *testing.T) {
-	items := parseListing(readTestdata(t, "set_op16_p1.html"))
+	items := parseListing(readTestdata(t, "set_op16_p1.html"), *game.OnePiece().MyP)
 	if len(items) < 20 {
 		t.Fatalf("expected ~30 singles, got %d", len(items))
 	}
@@ -98,7 +99,7 @@ func TestParseListing(t *testing.T) {
 }
 
 func TestParseListingOverflowIsEmpty(t *testing.T) {
-	items := parseListing(readTestdata(t, "set_overflow.html"))
+	items := parseListing(readTestdata(t, "set_overflow.html"), *game.OnePiece().MyP)
 	if len(items) != 0 {
 		t.Fatalf("overflow page should yield 0 one_ singles, got %d", len(items))
 	}
@@ -129,8 +130,44 @@ func TestNumberFromGA(t *testing.T) {
 		"op_8775_228435":      "",
 	}
 	for in, want := range cases {
-		if got := numberFromGA(in); got != want {
+		if got := numberFromGA(in, *game.OnePiece().MyP); got != want {
 			t.Errorf("numberFromGA(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Riftbound numbers keep their denominator and letter suffix for the Matcher to
+// normalize, and One Piece's print-suffix strip must not apply: "234p" is a
+// distinct printing, not "234". Cross-sell cards from other games are dropped.
+func TestNumberFromGARiftbound(t *testing.T) {
+	cfg := *game.Riftbound().MyP
+	cases := map[string]string{
+		"riftbound_unl_234/219":  "234/219",
+		"riftbound_unl_059a/219": "059A/219",
+		"riftbound_opp_197b/298": "197B/298",
+		"riftbound_unl_234p/219": "234P/219",
+		"one_op16_op16-080p1":    "",
+		"mp_331390":              "",
+		"op_8775_228435":         "",
+	}
+	for in, want := range cases {
+		if got := numberFromGA(in, cfg); got != want {
+			t.Errorf("numberFromGA(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// MyP transposes Spiritforged to SPF and uses TCGCSV's OPP/PR promo abbrevs;
+// all three must land on the Liga codes or set-scoped matching drops the set.
+func TestRiftboundSetAliases(t *testing.T) {
+	cfg := game.Riftbound().MyP
+	cases := map[string]string{
+		"SPF": "SFD", "OPP": "ROPP", "PR": "OGN-PR",
+		"UNL": "UNL", "OGN": "OGN", "VEN": "VEN", "OGS": "OGS", "JDG": "JDG",
+	}
+	for in, want := range cases {
+		if got := cfg.SetCode(in); got != want {
+			t.Errorf("SetCode(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
