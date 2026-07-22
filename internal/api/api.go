@@ -283,14 +283,19 @@ func (s *Server) handleAdminReload(w http.ResponseWriter, r *http.Request) {
 	}
 	reloaded := 0
 	for _, gs := range s.games {
-		if gs.Deals == nil {
-			continue
+		if gs.Deals != nil {
+			if err := gs.Deals.Load(); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			reloaded++
 		}
-		if err := gs.Deals.Load(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if gs.Cardimg != nil {
+			if err := gs.Cardimg.Reload(); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
-		reloaded++
 	}
 	writeJSON(w, map[string]int{"reloaded": reloaded})
 }

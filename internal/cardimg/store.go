@@ -90,6 +90,37 @@ func (s *Store) load() {
 	}
 }
 
+// Reload re-reads images.json from disk into memory, swapping the URL maps under
+// lock. A serve-only instance never resolves new card art itself (its Liga host is
+// Cloudflare-challenged), so it depends on the images.json a local scrape pushes
+// onto the volume — this lets POST /api/admin/reload pick that up without a restart.
+func (s *Store) Reload() error {
+	body, err := os.ReadFile(s.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var m map[string]string
+	if err := json.Unmarshal(body, &m); err != nil {
+		return fmt.Errorf("decode %s: %w", s.path, err)
+	}
+	byNum := map[string]string{}
+	if s.uniqueNums {
+		for k, u := range m {
+			if u != "" {
+				byNum[numberOf(k)] = u
+			}
+		}
+	}
+	s.mu.Lock()
+	s.urls = m
+	s.byNum = byNum
+	s.mu.Unlock()
+	return nil
+}
+
 func (s *Store) save() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
