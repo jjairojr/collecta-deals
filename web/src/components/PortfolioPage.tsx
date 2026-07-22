@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Wallet, Coins, TrendingUp, PiggyBank, ExternalLink, Share2, Package, Pencil, Truck, Check } from "lucide-react";
+import { Plus, Trash2, Wallet, Coins, TrendingUp, PiggyBank, ExternalLink, Share2, Package, Pencil, Truck, Check, Search, Download, ChevronDown, ChevronsUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
 import {
   createTrade,
   deleteTrade,
@@ -15,6 +15,7 @@ import {
   type TradeView,
 } from "../api";
 import { brl0, usd } from "../format";
+import { toCSV, downloadCSV } from "../csv";
 
 // In BR-only games (no US deals pipeline) there is no US price: the portfolio
 // values holdings in BRL and the API returns market figures already in reais
@@ -86,6 +87,190 @@ function sectionSummary(list: TradeView[]): SectionSummary {
   return s;
 }
 
+type SortKey = "name" | "cost" | "market" | "value" | "pnl" | "margin";
+interface SortState {
+  key: SortKey;
+  dir: "asc" | "desc";
+}
+
+function matchesQuery(t: TradeView, q: string): boolean {
+  if (!q) {
+    return true;
+  }
+  return `${t.name} ${t.number} ${t.store ?? ""}`.toLowerCase().includes(q);
+}
+
+function sortValue(t: TradeView, key: SortKey): number | string {
+  switch (key) {
+    case "name":
+      return cleanName(t.name).toLowerCase();
+    case "cost":
+      return t.costBRL;
+    case "market":
+      return t.marketKnown ? t.marketUSD : (t.manualBRL ?? 0);
+    case "value":
+      return t.valueBRL;
+    case "pnl":
+      return t.profitBRL;
+    case "margin":
+      return t.marginPct;
+  }
+}
+
+function sortTrades(list: TradeView[], sort: SortState): TradeView[] {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const av = sortValue(a, sort.key);
+    const bv = sortValue(b, sort.key);
+    if (typeof av === "string" && typeof bv === "string") {
+      return av.localeCompare(bv) * dir;
+    }
+    if (typeof av === "number" && typeof bv === "number") {
+      return (av - bv) * dir;
+    }
+    return 0;
+  });
+}
+
+const CSV_HEADERS = [
+  "status", "number", "name", "set", "condition", "qty", "store", "buyDate",
+  "delivered", "costBRL", "marketUnit", "valueBRL", "pnlBRL", "marginPct",
+  "sellDate", "sellPrice", "sellCurrency", "buyer",
+];
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function csvRows(list: TradeView[]): (string | number)[][] {
+  return list.map((t) => {
+    const marketUnit =
+      t.kind === "sealed"
+        ? (t.manualBRL ? round2(t.manualBRL) : "")
+        : (t.marketKnown ? round2(t.marketUSD) : "");
+    return [
+      t.realized ? "sold" : "held",
+      t.number,
+      t.name,
+      t.set,
+      t.condition ?? "",
+      t.qty,
+      t.store ?? "",
+      t.buyDate ?? "",
+      t.realized ? "" : t.delivered ? "yes" : "no",
+      round2(t.costBRL),
+      marketUnit,
+      round2(t.valueBRL),
+      round2(t.profitBRL),
+      Math.round(t.marginPct),
+      t.sellDate ?? "",
+      t.sellPrice != null ? round2(t.sellPrice) : "",
+      t.sellCurrency ?? "",
+      t.buyer ?? "",
+    ];
+  });
+}
+
+type QuickFilter = "all" | "gainers" | "losers" | "transit" | "delivered";
+type GroupBy = "set" | "store" | "none";
+
+const QUICK: { v: QuickFilter; label: string }[] = [
+  { v: "all", label: "All" },
+  { v: "gainers", label: "Gainers" },
+  { v: "losers", label: "Losers" },
+  { v: "transit", label: "In transit" },
+  { v: "delivered", label: "Delivered" },
+];
+
+function passesQuick(t: TradeView, f: QuickFilter): boolean {
+  switch (f) {
+    case "gainers":
+      return t.profitBRL > 0;
+    case "losers":
+      return t.profitBRL < 0;
+    case "transit":
+      return !t.delivered;
+    case "delivered":
+      return Boolean(t.delivered);
+    default:
+      return true;
+  }
+}
+
+interface Group {
+  key: string;
+  trades: TradeView[];
+  count: number;
+  invested: number;
+  value: number;
+  pnl: number;
+  marginPct: number;
+}
+
+function groupKeyOf(t: TradeView, by: GroupBy): string {
+  if (by === "store") {
+    return t.store?.trim() || "No store";
+  }
+  return t.set?.trim() || "—";
+}
+
+function groupTrades(list: TradeView[], by: GroupBy): Group[] {
+  const map = new Map<string, TradeView[]>();
+  for (const t of list) {
+    const k = groupKeyOf(t, by);
+    const arr = map.get(k);
+    if (arr) {
+      arr.push(t);
+    } else {
+      map.set(k, [t]);
+    }
+  }
+  const groups: Group[] = [];
+  for (const [key, trades] of map) {
+    let count = 0;
+    let invested = 0;
+    let value = 0;
+    let pnl = 0;
+    for (const t of trades) {
+      count += t.qty;
+      invested += t.costBRL;
+      value += t.valueBRL;
+      pnl += t.profitBRL;
+    }
+    groups.push({ key, trades, count, invested, value, pnl, marginPct: invested > 0 ? (pnl / invested) * 100 : 0 });
+  }
+  groups.sort((a, b) => b.value - a.value);
+  return groups;
+}
+
+interface Insights {
+  topGainer?: TradeView;
+  topLoser?: TradeView;
+  biggest?: TradeView;
+  transitCount: number;
+  transitValue: number;
+}
+
+function computeInsights(list: TradeView[]): Insights {
+  const r: Insights = { transitCount: 0, transitValue: 0 };
+  for (const t of list) {
+    if (t.profitBRL > 0 && (!r.topGainer || t.profitBRL > r.topGainer.profitBRL)) {
+      r.topGainer = t;
+    }
+    if (t.profitBRL < 0 && (!r.topLoser || t.profitBRL < r.topLoser.profitBRL)) {
+      r.topLoser = t;
+    }
+    if (!r.biggest || t.valueBRL > r.biggest.valueBRL) {
+      r.biggest = t;
+    }
+    if (!t.delivered) {
+      r.transitCount += t.qty;
+      r.transitValue += t.valueBRL;
+    }
+  }
+  return r;
+}
+
 export default function PortfolioPage() {
   const [pct, setPct] = useState(90);
   const [section, setSection] = useState<Section>("singles");
@@ -94,6 +279,12 @@ export default function PortfolioPage() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortState>({ key: "value", dir: "desc" });
+  const [soldOpen, setSoldOpen] = useState(true);
+  const [quick, setQuick] = useState<QuickFilter>("all");
+  const [groupBy, setGroupBy] = useState<GroupBy>("set");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const load = useCallback(async (p: number) => {
     try {
@@ -119,15 +310,78 @@ export default function PortfolioPage() {
     [trades, section],
   );
   const summary = useMemo(() => sectionSummary(active), [active]);
+
+  const q = query.trim().toLowerCase();
   const holdings = useMemo(
-    () => active.filter((t) => !t.realized).sort((a, b) => b.valueBRL - a.valueBRL),
-    [active],
+    () => sortTrades(active.filter((t) => !t.realized && matchesQuery(t, q)), sort),
+    [active, q, sort],
   );
   const sold = useMemo(
-    () => active.filter((t) => t.realized).sort((a, b) => b.valueBRL - a.valueBRL),
-    [active],
+    () => sortTrades(active.filter((t) => t.realized && matchesQuery(t, q)), sort),
+    [active, q, sort],
+  );
+  const visibleHoldings = useMemo(() => holdings.filter((t) => passesQuick(t, quick)), [holdings, quick]);
+  const soldVisible = useMemo(
+    () => (quick === "transit" || quick === "delivered" ? [] : sold.filter((t) => passesQuick(t, quick))),
+    [sold, quick],
+  );
+  const maxValue = useMemo(() => visibleHoldings.reduce((m, t) => Math.max(m, t.valueBRL), 0), [visibleHoldings]);
+  const holdingsValue = useMemo(() => visibleHoldings.reduce((s, t) => s + t.valueBRL, 0), [visibleHoldings]);
+  const soldRealized = useMemo(() => soldVisible.reduce((s, t) => s + t.profitBRL, 0), [soldVisible]);
+  const insights = useMemo(() => computeInsights(visibleHoldings), [visibleHoldings]);
+  const holdingsGroups = useMemo(
+    () => (groupBy === "none" ? [] : groupTrades(visibleHoldings, groupBy)),
+    [visibleHoldings, groupBy],
+  );
+  const soldGroups = useMemo(
+    () => (groupBy === "none" ? [] : groupTrades(soldVisible, groupBy)),
+    [soldVisible, groupBy],
+  );
+  const quickCounts = useMemo(
+    () => ({
+      all: holdings.length,
+      gainers: holdings.filter((t) => t.profitBRL > 0).length,
+      losers: holdings.filter((t) => t.profitBRL < 0).length,
+      transit: holdings.filter((t) => !t.delivered).length,
+      delivered: holdings.filter((t) => Boolean(t.delivered)).length,
+    }),
+    [holdings],
   );
   const isSealed = section === "sealed";
+  const anyExpanded = expanded.size > 0;
+
+  const onSort = useCallback((key: SortKey) => {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+  }, []);
+
+  const toggleGroup = useCallback((key: string) => {
+    setExpanded((s) => {
+      const next = new Set(s);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const changeGroupBy = useCallback((g: GroupBy) => {
+    setGroupBy(g);
+    setExpanded(new Set());
+  }, []);
+
+  const expandAll = useCallback(() => {
+    setExpanded(new Set([...holdingsGroups, ...soldGroups].map((g) => g.key)));
+  }, [holdingsGroups, soldGroups]);
+
+  const collapseAll = useCallback(() => setExpanded(new Set()), []);
+
+  const exportCSV = useCallback(() => {
+    const rows = csvRows([...visibleHoldings, ...soldVisible]);
+    const date = new Date().toISOString().slice(0, 10);
+    downloadCSV(`portfolio-${getGame()}-${section}-${date}.csv`, toCSV(CSV_HEADERS, rows));
+  }, [visibleHoldings, soldVisible, section]);
 
   return (
     <div className="space-y-6">
@@ -180,17 +434,67 @@ export default function PortfolioPage() {
         </div>
       )}
 
+      {!loading && visibleHoldings.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Insight
+            label="Top gainer"
+            primary={insights.topGainer ? cleanName(insights.topGainer.name) : "—"}
+            secondary={insights.topGainer ? `+${brl0(insights.topGainer.profitBRL)}` : undefined}
+            tone="up"
+          />
+          <Insight
+            label="Top loser"
+            primary={insights.topLoser ? cleanName(insights.topLoser.name) : "—"}
+            secondary={insights.topLoser ? `−${brl0(Math.abs(insights.topLoser.profitBRL))}` : undefined}
+            tone="down"
+          />
+          <Insight
+            label="Biggest position"
+            primary={insights.biggest ? cleanName(insights.biggest.name) : "—"}
+            secondary={insights.biggest ? brl0(insights.biggest.valueBRL) : undefined}
+          />
+          <Insight
+            label="In transit"
+            primary={insights.transitCount ? `${insights.transitCount} ${isSealed ? "items" : "cards"}` : "None"}
+            secondary={insights.transitCount ? brl0(insights.transitValue) : undefined}
+          />
+        </div>
+      )}
+
       {error && (
         <div className="rounded-xl border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
           {error}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-200">
-          Holdings <span className="font-normal text-slate-500">· {holdings.length}</span>
-        </h2>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full min-w-[200px] max-w-xs sm:w-auto sm:flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={isSealed ? "Search products, store…" : "Search cards, number, store…"}
+            className="w-full pl-9 pr-8"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:text-slate-300"
+              title="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={exportCSV}
+            disabled={active.length === 0}
+            title="Download this view as a spreadsheet"
+          >
+            <Download /> Export CSV
+          </Button>
           {!isSealed && (
             <Button
               variant="outline"
@@ -206,6 +510,40 @@ export default function PortfolioPage() {
           </Button>
         </div>
       </div>
+
+      {!loading && active.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {QUICK.map((qf) => (
+              <Chip key={qf.v} active={quick === qf.v} onClick={() => setQuick(qf.v)}>
+                {qf.label} <span className="opacity-60">{quickCounts[qf.v]}</span>
+              </Chip>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Group by</span>
+              <ToggleGroup
+                value={groupBy}
+                onChange={(v) => changeGroupBy(v === "store" ? "store" : v === "none" ? "none" : "set")}
+                options={[
+                  { value: "set", label: "Set" },
+                  { value: "store", label: "Store" },
+                  { value: "none", label: "None" },
+                ]}
+              />
+            </div>
+            {groupBy !== "none" && holdingsGroups.length + soldGroups.length > 0 && (
+              <button
+                onClick={anyExpanded ? collapseAll : expandAll}
+                className="text-xs font-medium text-sky-300 hover:text-sky-200"
+              >
+                {anyExpanded ? "Collapse all" : "Expand all"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {adding &&
         (isSealed ? (
@@ -239,21 +577,98 @@ export default function PortfolioPage() {
         </Panel>
       ) : (
         <div className="space-y-6">
-          {isSealed ? (
-            <SealedTable trades={holdings} onChanged={refresh} empty="No sealed products held right now." />
-          ) : (
-            <TradeTable trades={holdings} onChanged={refresh} empty="No cards held right now." />
-          )}
-          {sold.length > 0 && (
-            <div className="space-y-3">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold text-slate-200">
-                Sold <span className="font-normal text-slate-500">· {sold.length}</span>
+                Holdings <span className="font-normal text-slate-500">· {visibleHoldings.length}</span>
               </h2>
-              {isSealed ? (
-                <SealedTable trades={sold} onChanged={refresh} empty="" />
+              <span className="ml-auto tabular-nums text-xs font-medium text-slate-400">
+                {brl0(holdingsValue)} value
+              </span>
+            </div>
+            {groupBy === "none" ? (
+              isSealed ? (
+                <SealedTable
+                  trades={visibleHoldings}
+                  onChanged={refresh}
+                  empty={q || quick !== "all" ? "No products match your filters." : "No sealed products held right now."}
+                  sort={sort}
+                  onSort={onSort}
+                  maxValue={maxValue}
+                />
               ) : (
-                <TradeTable trades={sold} onChanged={refresh} empty="" />
-              )}
+                <TradeTable
+                  trades={visibleHoldings}
+                  onChanged={refresh}
+                  empty={q || quick !== "all" ? "No cards match your filters." : "No cards held right now."}
+                  sort={sort}
+                  onSort={onSort}
+                  maxValue={maxValue}
+                />
+              )
+            ) : holdingsGroups.length === 0 ? (
+              <Panel>{q || quick !== "all" ? "No cards match your filters." : "Nothing held right now."}</Panel>
+            ) : (
+              <div className="space-y-2">
+                {holdingsGroups.map((g) => (
+                  <GroupBlock
+                    key={g.key}
+                    g={g}
+                    isSealed={isSealed}
+                    open={expanded.has(g.key)}
+                    onToggle={() => toggleGroup(g.key)}
+                    sort={sort}
+                    onSort={onSort}
+                    maxValue={maxValue}
+                    onChanged={refresh}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {soldVisible.length > 0 && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setSoldOpen((o) => !o)}
+                className="flex w-full items-center gap-2 text-left"
+              >
+                <ChevronDown
+                  className={`h-4 w-4 text-slate-500 transition-transform ${soldOpen ? "" : "-rotate-90"}`}
+                />
+                <h2 className="text-sm font-semibold text-slate-200">
+                  Sold <span className="font-normal text-slate-500">· {soldVisible.length}</span>
+                </h2>
+                <span
+                  className={`ml-auto tabular-nums text-xs font-medium ${soldRealized >= 0 ? "text-emerald-300" : "text-rose-300"}`}
+                >
+                  {soldRealized >= 0 ? "+" : "−"}
+                  {brl0(Math.abs(soldRealized))} realized
+                </span>
+              </button>
+              {soldOpen &&
+                (groupBy === "none" ? (
+                  isSealed ? (
+                    <SealedTable trades={soldVisible} onChanged={refresh} empty="" sort={sort} onSort={onSort} maxValue={0} />
+                  ) : (
+                    <TradeTable trades={soldVisible} onChanged={refresh} empty="" sort={sort} onSort={onSort} maxValue={0} />
+                  )
+                ) : (
+                  <div className="space-y-2">
+                    {soldGroups.map((g) => (
+                      <GroupBlock
+                        key={g.key}
+                        g={g}
+                        isSealed={isSealed}
+                        open={expanded.has(g.key)}
+                        onToggle={() => toggleGroup(g.key)}
+                        sort={sort}
+                        onSort={onSort}
+                        maxValue={0}
+                        onChanged={refresh}
+                      />
+                    ))}
+                  </div>
+                ))}
             </div>
           )}
         </div>
@@ -292,27 +707,165 @@ export function PnlKpi({ icon, label, value, strong }: { icon: React.ReactNode; 
   );
 }
 
-function TradeTable({ trades, onChanged, empty }: { trades: TradeView[]; onChanged: () => void; empty: string }) {
+function Insight({
+  label,
+  primary,
+  secondary,
+  tone,
+}: {
+  label: string;
+  primary: string;
+  secondary?: string;
+  tone?: "up" | "down";
+}) {
+  const toneCls = tone === "up" ? "text-emerald-300" : tone === "down" ? "text-rose-300" : "text-slate-100";
+  return (
+    <Card className="p-3">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-0.5 truncate text-sm font-semibold ${toneCls}`} title={primary}>
+        {primary}
+      </div>
+      {secondary && <div className="truncate text-[11px] tabular-nums text-slate-500">{secondary}</div>}
+    </Card>
+  );
+}
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-colors ${
+        active
+          ? "bg-sky-500/20 text-sky-200 ring-sky-500/30"
+          : "bg-slate-900 text-slate-400 ring-slate-700 hover:text-slate-200"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GroupBlock({
+  g,
+  isSealed,
+  open,
+  onToggle,
+  sort,
+  onSort,
+  maxValue,
+  onChanged,
+}: SortableProps & {
+  g: Group;
+  isSealed: boolean;
+  open: boolean;
+  onToggle: () => void;
+  maxValue: number;
+  onChanged: () => void;
+}) {
+  const up = g.pnl >= 0;
+  const noun = isSealed ? (g.count === 1 ? "item" : "items") : g.count === 1 ? "card" : "cards";
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-800/40"
+      >
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "" : "-rotate-90"}`}
+        />
+        <span className="truncate font-semibold text-slate-100">{g.key}</span>
+        <span className="shrink-0 text-xs text-slate-500">
+          {g.count} {noun}
+        </span>
+        <div className="ml-auto flex shrink-0 items-center gap-3 tabular-nums text-xs sm:gap-5">
+          <span className="hidden text-slate-500 sm:inline">
+            inv <span className="text-slate-300">{brl0(g.invested)}</span>
+          </span>
+          <span className="text-slate-500">
+            val <span className="text-slate-200">{brl0(g.value)}</span>
+          </span>
+          <span className={`font-semibold ${up ? "text-emerald-300" : "text-rose-300"}`}>
+            {up ? "+" : "−"}
+            {brl0(Math.abs(g.pnl))}
+          </span>
+          <MarginPill pct={g.marginPct} up={up} />
+        </div>
+      </button>
+      {open && (
+        <div className="border-t border-slate-800">
+          {isSealed ? (
+            <SealedTable trades={g.trades} onChanged={onChanged} empty="" sort={sort} onSort={onSort} maxValue={maxValue} bare />
+          ) : (
+            <TradeTable trades={g.trades} onChanged={onChanged} empty="" sort={sort} onSort={onSort} maxValue={maxValue} bare />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SortableProps {
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = "right",
+}: SortableProps & { label: string; sortKey: SortKey; align?: "left" | "right" }) {
+  const activeCol = sort.key === sortKey;
+  return (
+    <th
+      className={`px-3 py-2 font-medium ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 hover:text-slate-300 ${align === "right" ? "flex-row-reverse" : ""} ${activeCol ? "text-slate-300" : ""}`}
+      >
+        {label}
+        {activeCol ? (
+          sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ChevronsUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </th>
+  );
+}
+
+function TradeTable({
+  trades,
+  onChanged,
+  empty,
+  sort,
+  onSort,
+  maxValue,
+  bare,
+}: SortableProps & { trades: TradeView[]; onChanged: () => void; empty: string; maxValue: number; bare?: boolean }) {
   if (trades.length === 0) {
     return empty ? <Panel>{empty}</Panel> : null;
   }
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40"}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-3 py-2 font-medium">Card</th>
-            <th className="px-3 py-2 text-right font-medium">Cost</th>
-            <th className="px-3 py-2 text-right font-medium">{isBRGame() ? "Floor" : "TCG"}</th>
-            <th className="px-3 py-2 text-right font-medium">Value / Sold</th>
-            <th className="px-3 py-2 text-right font-medium">P&L</th>
-            <th className="px-3 py-2 text-right font-medium">Margin</th>
+            <SortableTh label="Card" sortKey="name" sort={sort} onSort={onSort} align="left" />
+            <SortableTh label="Cost" sortKey="cost" sort={sort} onSort={onSort} />
+            <SortableTh label={isBRGame() ? "Floor" : "TCG"} sortKey="market" sort={sort} onSort={onSort} />
+            <SortableTh label="Value / Sold" sortKey="value" sort={sort} onSort={onSort} />
+            <SortableTh label="P&L" sortKey="pnl" sort={sort} onSort={onSort} />
+            <SortableTh label="Margin" sortKey="margin" sort={sort} onSort={onSort} />
             <th className="px-3 py-2" />
           </tr>
         </thead>
         <tbody>
           {trades.map((t) => (
-            <TradeRow key={t.id} t={t} onChanged={onChanged} />
+            <TradeRow key={t.id} t={t} onChanged={onChanged} maxValue={maxValue} />
           ))}
         </tbody>
       </table>
@@ -348,12 +901,44 @@ function DeliveryToggle({ t, onChanged }: { t: TradeView; onChanged: () => void 
   );
 }
 
-function TradeRow({ t, onChanged }: { t: TradeView; onChanged: () => void }) {
+function ValueCell({ t, maxValue }: { t: TradeView; maxValue: number }) {
+  const showBar = !t.realized && maxValue > 0 && t.valueBRL > 0;
+  const width = showBar ? Math.max(3, (t.valueBRL / maxValue) * 100) : 0;
+  return (
+    <td className="relative px-3 py-2 text-right tabular-nums text-slate-200">
+      {showBar && (
+        <div
+          className="pointer-events-none absolute inset-y-1 right-0 rounded-l bg-sky-500/10"
+          style={{ width: `${width}%` }}
+        />
+      )}
+      <span className="relative z-10">{brl0(t.valueBRL)}</span>
+      {t.realized && <div className="relative z-10 text-[10px] text-slate-500">{t.sellDate || "sold"}</div>}
+    </td>
+  );
+}
+
+function MarginPill({ pct, up }: { pct: number; up: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${
+        up
+          ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/20"
+          : "bg-rose-500/10 text-rose-300 ring-rose-500/20"
+      }`}
+    >
+      {up ? "+" : ""}
+      {Math.round(pct)}%
+    </span>
+  );
+}
+
+function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => void; maxValue: number }) {
   const [selling, setSelling] = useState(false);
   const up = t.profitBRL >= 0;
   return (
     <>
-      <tr className="border-b border-slate-800/60 last:border-0">
+      <tr className={`border-b border-slate-800/60 last:border-0 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             <CardArt set={t.set} number={t.number} name={t.name} productID={productIDFromTcgURL(t.tcgUrl)} className="h-12 w-[34px] shrink-0 rounded" />
@@ -373,17 +958,13 @@ function TradeRow({ t, onChanged }: { t: TradeView; onChanged: () => void }) {
         <td className="px-3 py-2 text-right tabular-nums text-slate-400">
           {t.marketKnown ? marketMoney(t.marketUSD) : "—"}
         </td>
-        <td className="px-3 py-2 text-right tabular-nums text-slate-200">
-          {brl0(t.valueBRL)}
-          {t.realized && <div className="text-[10px] text-slate-500">{t.sellDate || "sold"}</div>}
-        </td>
+        <ValueCell t={t} maxValue={maxValue} />
         <td className={`px-3 py-2 text-right font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
           {up ? "+" : "−"}
           {brl0(Math.abs(t.profitBRL))}
         </td>
-        <td className={`px-3 py-2 text-right tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
-          {up ? "+" : ""}
-          {Math.round(t.marginPct)}%
+        <td className="px-3 py-2 text-right">
+          <MarginPill pct={t.marginPct} up={up} />
         </td>
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
@@ -656,27 +1237,35 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
   );
 }
 
-function SealedTable({ trades, onChanged, empty }: { trades: TradeView[]; onChanged: () => void; empty: string }) {
+function SealedTable({
+  trades,
+  onChanged,
+  empty,
+  sort,
+  onSort,
+  maxValue,
+  bare,
+}: SortableProps & { trades: TradeView[]; onChanged: () => void; empty: string; maxValue: number; bare?: boolean }) {
   if (trades.length === 0) {
     return empty ? <Panel>{empty}</Panel> : null;
   }
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40"}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-            <th className="px-3 py-2 font-medium">Product</th>
-            <th className="px-3 py-2 text-right font-medium">Cost</th>
-            <th className="px-3 py-2 text-right font-medium">Current R$</th>
-            <th className="px-3 py-2 text-right font-medium">Value / Sold</th>
-            <th className="px-3 py-2 text-right font-medium">P&L</th>
-            <th className="px-3 py-2 text-right font-medium">Margin</th>
+            <SortableTh label="Product" sortKey="name" sort={sort} onSort={onSort} align="left" />
+            <SortableTh label="Cost" sortKey="cost" sort={sort} onSort={onSort} />
+            <SortableTh label="Current R$" sortKey="market" sort={sort} onSort={onSort} />
+            <SortableTh label="Value / Sold" sortKey="value" sort={sort} onSort={onSort} />
+            <SortableTh label="P&L" sortKey="pnl" sort={sort} onSort={onSort} />
+            <SortableTh label="Margin" sortKey="margin" sort={sort} onSort={onSort} />
             <th className="px-3 py-2" />
           </tr>
         </thead>
         <tbody>
           {trades.map((t) => (
-            <SealedRow key={t.id} t={t} onChanged={onChanged} />
+            <SealedRow key={t.id} t={t} onChanged={onChanged} maxValue={maxValue} />
           ))}
         </tbody>
       </table>
@@ -684,13 +1273,13 @@ function SealedTable({ trades, onChanged, empty }: { trades: TradeView[]; onChan
   );
 }
 
-function SealedRow({ t, onChanged }: { t: TradeView; onChanged: () => void }) {
+function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => void; maxValue: number }) {
   const [selling, setSelling] = useState(false);
   const [editing, setEditing] = useState(false);
   const up = t.profitBRL >= 0;
   return (
     <>
-      <tr className="border-b border-slate-800/60 last:border-0">
+      <tr className={`border-b border-slate-800/60 last:border-0 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             <div className="flex h-12 w-[34px] shrink-0 items-center justify-center rounded bg-slate-800/70 text-slate-400">
@@ -712,17 +1301,13 @@ function SealedRow({ t, onChanged }: { t: TradeView; onChanged: () => void }) {
         <td className="px-3 py-2 text-right tabular-nums text-slate-400">
           {t.manualBRL ? brl0(t.manualBRL) : "—"}
         </td>
-        <td className="px-3 py-2 text-right tabular-nums text-slate-200">
-          {brl0(t.valueBRL)}
-          {t.realized && <div className="text-[10px] text-slate-500">{t.sellDate || "sold"}</div>}
-        </td>
+        <ValueCell t={t} maxValue={maxValue} />
         <td className={`px-3 py-2 text-right font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
           {up ? "+" : "−"}
           {brl0(Math.abs(t.profitBRL))}
         </td>
-        <td className={`px-3 py-2 text-right tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
-          {up ? "+" : ""}
-          {Math.round(t.marginPct)}%
+        <td className="px-3 py-2 text-right">
+          <MarginPill pct={t.marginPct} up={up} />
         </td>
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
