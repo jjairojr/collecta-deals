@@ -14,7 +14,7 @@ import {
   type QuoteMatch,
   type TradeView,
 } from "../api";
-import { brl0, usd } from "../format";
+import { brl0, usd, timeAgo, fullStamp } from "../format";
 import { toCSV, downloadCSV } from "../csv";
 
 // In BR-only games (no US deals pipeline) there is no US price: the portfolio
@@ -87,7 +87,7 @@ function sectionSummary(list: TradeView[]): SectionSummary {
   return s;
 }
 
-type SortKey = "name" | "cost" | "market" | "value" | "pnl" | "margin";
+type SortKey = "name" | "cost" | "market" | "value" | "pnl" | "margin" | "added";
 interface SortState {
   key: SortKey;
   dir: "asc" | "desc";
@@ -114,6 +114,8 @@ function sortValue(t: TradeView, key: SortKey): number | string {
       return t.profitBRL;
     case "margin":
       return t.marginPct;
+    case "added":
+      return Date.parse(t.createdAt) || 0;
   }
 }
 
@@ -860,6 +862,7 @@ function TradeTable({
             <SortableTh label="Value / Sold" sortKey="value" sort={sort} onSort={onSort} />
             <SortableTh label="P&L" sortKey="pnl" sort={sort} onSort={onSort} />
             <SortableTh label="Margin" sortKey="margin" sort={sort} onSort={onSort} />
+            <SortableTh label="Added" sortKey="added" sort={sort} onSort={onSort} />
             <th className="px-3 py-2" />
           </tr>
         </thead>
@@ -935,6 +938,7 @@ function MarginPill({ pct, up }: { pct: number; up: boolean }) {
 
 function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => void; maxValue: number }) {
   const [selling, setSelling] = useState(false);
+  const [editing, setEditing] = useState(false);
   const up = t.profitBRL >= 0;
   return (
     <>
@@ -966,6 +970,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
         <td className="px-3 py-2 text-right">
           <MarginPill pct={t.marginPct} up={up} />
         </td>
+        <AddedCell t={t} />
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
             {t.tcgUrl && (
@@ -985,7 +990,20 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
               <>
                 <DeliveryToggle t={t} onChanged={onChanged} />
                 <button
-                  onClick={() => setSelling((s) => !s)}
+                  onClick={() => {
+                    setEditing((e) => !e);
+                    setSelling(false);
+                  }}
+                  className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  title="Edit what you paid and the trade details"
+                >
+                  <Pencil className="h-3 w-3" /> Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setSelling((s) => !s);
+                    setEditing(false);
+                  }}
                   className="rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
                 >
                   Sell
@@ -1006,9 +1024,22 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
           </div>
         </td>
       </tr>
+      {editing && (
+        <tr className="bg-slate-900/60">
+          <td colSpan={8} className="px-3 py-3">
+            <EditTradeForm
+              t={t}
+              onDone={() => {
+                setEditing(false);
+                onChanged();
+              }}
+            />
+          </td>
+        </tr>
+      )}
       {selling && (
         <tr className="bg-slate-900/60">
-          <td colSpan={7} className="px-3 py-3">
+          <td colSpan={8} className="px-3 py-3">
             <SellForm
               t={t}
               onDone={() => {
@@ -1020,6 +1051,15 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
         </tr>
       )}
     </>
+  );
+}
+
+// AddedCell shows when a trade was logged, compact with the exact stamp on hover.
+function AddedCell({ t }: { t: TradeView }) {
+  return (
+    <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-500" title={fullStamp(t.createdAt)}>
+      {timeAgo(t.createdAt)}
+    </td>
   );
 }
 
@@ -1260,6 +1300,7 @@ function SealedTable({
             <SortableTh label="Value / Sold" sortKey="value" sort={sort} onSort={onSort} />
             <SortableTh label="P&L" sortKey="pnl" sort={sort} onSort={onSort} />
             <SortableTh label="Margin" sortKey="margin" sort={sort} onSort={onSort} />
+            <SortableTh label="Added" sortKey="added" sort={sort} onSort={onSort} />
             <th className="px-3 py-2" />
           </tr>
         </thead>
@@ -1309,6 +1350,7 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
         <td className="px-3 py-2 text-right">
           <MarginPill pct={t.marginPct} up={up} />
         </td>
+        <AddedCell t={t} />
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
             {t.realized ? (
@@ -1322,9 +1364,9 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                     setSelling(false);
                   }}
                   className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                  title="Update current value"
+                  title="Edit current value and what you paid"
                 >
-                  <Pencil className="h-3 w-3" /> Value
+                  <Pencil className="h-3 w-3" /> Edit
                 </button>
                 <button
                   onClick={() => {
@@ -1353,9 +1395,10 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
       </tr>
       {editing && (
         <tr className="bg-slate-900/60">
-          <td colSpan={7} className="px-3 py-3">
-            <EditValueForm
+          <td colSpan={8} className="px-3 py-3">
+            <EditTradeForm
               t={t}
+              sealed
               onDone={() => {
                 setEditing(false);
                 onChanged();
@@ -1366,7 +1409,7 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
       )}
       {selling && (
         <tr className="bg-slate-900/60">
-          <td colSpan={7} className="px-3 py-3">
+          <td colSpan={8} className="px-3 py-3">
             <SellForm
               t={t}
               onDone={() => {
@@ -1381,14 +1424,38 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
   );
 }
 
-function EditValueForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
-  const [value, setValue] = useState(t.manualBRL ? String(t.manualBRL) : "");
+// EditTradeForm fixes an already-logged trade: what you paid (buy + frete + qty)
+// plus the descriptive fields, so a mistyped cost no longer needs a delete/re-add.
+// The sealed variant swaps Condition for the manual current-value estimate, which
+// is what values a sealed holding (valuation.go uses ManualBRL * Qty).
+function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; onDone: () => void }) {
+  const [manualBRL, setManualBRL] = useState(t.manualBRL ? String(t.manualBRL) : "");
+  const [buyBRL, setBuyBRL] = useState(t.buyBRL ? String(t.buyBRL) : "");
+  const [shippingBRL, setShippingBRL] = useState(t.shippingBRL ? String(t.shippingBRL) : "");
+  const [qty, setQty] = useState(String(t.qty));
+  const [condition, setCondition] = useState(t.condition ?? "");
+  const [store, setStore] = useState(t.store ?? "");
+  const [buyDate, setBuyDate] = useState(t.buyDate ?? "");
   const [saving, setSaving] = useState(false);
+
+  const nextQty = Math.max(Number(qty) || 1, 1);
+  const nextBuy = Number(buyBRL) || 0;
+  const nextShip = Number(shippingBRL) || 0;
+  const nextCost = nextQty * nextBuy + nextShip;
 
   const submit = async () => {
     setSaving(true);
     try {
-      await updateTrade(t.id, { ...t, manualBRL: Number(value) || 0 });
+      await updateTrade(t.id, {
+        ...t,
+        buyBRL: nextBuy,
+        shippingBRL: nextShip,
+        qty: nextQty,
+        condition,
+        store,
+        buyDate,
+        ...(sealed ? { manualBRL: Number(manualBRL) || 0 } : {}),
+      });
       onDone();
     } finally {
       setSaving(false);
@@ -1397,11 +1464,37 @@ function EditValueForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="Current value R$ (per unit)">
-        <Input type="number" value={value} onChange={(e) => setValue(e.target.value)} className="w-40" placeholder="0,00" />
+      {sealed && (
+        <Field label="Current value R$ (per unit)">
+          <Input type="number" value={manualBRL} onChange={(e) => setManualBRL(e.target.value)} className="w-36" placeholder="0,00" />
+        </Field>
+      )}
+      <Field label="Buy R$ (per unit)">
+        <Input type="number" value={buyBRL} onChange={(e) => setBuyBRL(e.target.value)} className="w-32" placeholder="0,00" />
       </Field>
-      <Button onClick={submit} disabled={saving || !value}>
-        {saving ? "Saving…" : "Update value"}
+      <Field label="Frete R$">
+        <Input type="number" value={shippingBRL} onChange={(e) => setShippingBRL(e.target.value)} className="w-28" placeholder="0,00" />
+      </Field>
+      <Field label="Qty">
+        <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-20" />
+      </Field>
+      {!sealed && (
+        <Field label="Condition">
+          <Input value={condition} onChange={(e) => setCondition(e.target.value)} className="w-24" placeholder="NM" />
+        </Field>
+      )}
+      <Field label="Store">
+        <Input value={store} onChange={(e) => setStore(e.target.value)} className="w-36" placeholder="Legends" />
+      </Field>
+      <Field label="Buy date">
+        <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} className="w-40" />
+      </Field>
+      <div className="pb-2 text-xs text-slate-400">
+        Cost <span className="font-semibold text-slate-200">{brl0(nextCost)}</span>
+        {nextCost !== t.costBRL ? <span className="text-slate-500"> · was {brl0(t.costBRL)}</span> : ""}
+      </div>
+      <Button onClick={submit} disabled={saving}>
+        {saving ? "Saving…" : "Save changes"}
       </Button>
     </div>
   );
