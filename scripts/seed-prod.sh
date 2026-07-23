@@ -30,7 +30,8 @@ case "$ans" in y|Y|yes) ;; *) echo "aborted."; exit 1 ;; esac
 
 for it in "${items[@]}"; do
 	echo ">> $it"
-	vf_upload "$it" "/$it"
+	# Into the volume ROOT — see the note in sync-up.sh about cp -r nesting.
+	vf_upload "$it" "/"
 done
 
 reload_prod

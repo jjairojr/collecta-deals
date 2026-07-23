@@ -107,6 +107,16 @@ the local copies to `data/.sync-bak/` first).
 - **Remote paths are relative to the volume root**, which is the `/app/data`
   mount — i.e. `/snapshot.json` on the volume is `/app/data/snapshot.json` in the
   container.
+- **Every upload/download needs `--overwrite`.** Without it the CLI aborts as soon
+  as the destination exists, i.e. on every sync after the initial seed.
+- **Upload targets the volume ROOT (`/`), not `/<name>`.** With `--overwrite` the
+  CLI has `cp -r` semantics, so uploading a directory onto an existing one nests it
+  (`/tracking/tracking`) — which then shows up as a phantom set in the UI. The
+  scripts always pass `/` for this reason. If a phantom appears, remove it with
+  `railway volume files delete --volume <vol> /<dir>/<dir>` (agents are blocked
+  from deleting, so this one is manual).
+- **macOS bash is 3.2** — no `mapfile`/`readarray`. The scripts stick to
+  3.2-compatible constructs.
 - **Single replica only.** Never scale past 1 — the app owns one `/app/data`
   volume; a second replica would fight over the writes (see `railway.toml`).
 - **Missing snapshot → no scan.** In serve-only, a missing `snapshot*.json` is not

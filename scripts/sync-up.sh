@@ -38,7 +38,9 @@ fi
 echo "pushing to volume $RAILWAY_VOLUME (/app/data):"
 for it in "${items[@]}"; do
 	echo ">> $it"
-	vf_upload "$it" "/$it"
+	# Upload into the volume ROOT, not "/$it": with --overwrite the CLI has cp -r
+	# semantics, so targeting an existing dir would nest it (/tracking/tracking).
+	vf_upload "$it" "/"
 done
 
 reload_prod

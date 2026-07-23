@@ -5,8 +5,12 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 mkdir -p "$DATA_DIR"
 
-# List the volume root and keep only the portfolio files.
-mapfile -t files < <(vf list / --json 2>/dev/null | python3 -c '
+# List the volume root and keep only the portfolio files. Read with a while loop
+# rather than mapfile/readarray — macOS ships bash 3.2, which lacks both.
+files=()
+while IFS= read -r name; do
+	[ -n "$name" ] && files+=("$name")
+done < <(vf list / --json 2>/dev/null | python3 -c '
 import sys, json, re
 try:
     fs = json.load(sys.stdin).get("files", [])

@@ -45,9 +45,12 @@ vf() { railway volume files -v "$RAILWAY_VOLUME" "$@"; }
 
 # The volume-files transport occasionally flakes with a transient
 # "SSH authentication failed" / SFTP timeout; retry a few times before giving up.
+# Replacing prod's copy is the whole point of a push, so --overwrite is required:
+# without it the CLI aborts as soon as the remote path exists (i.e. every sync
+# after the initial seed).
 vf_upload() {
 	local src="$1" dst="$2" n=0
-	until vf upload "$src" "$dst"; do
+	until vf upload "$src" "$dst" --overwrite; do
 		n=$((n + 1))
 		if [ "$n" -ge 4 ]; then
 			echo "error: upload $src -> $dst failed after $n attempts" >&2
@@ -58,9 +61,12 @@ vf_upload() {
 	done
 }
 
+# Pulls prod's portfolio over the local copy on purpose (sync-down.sh backs the
+# local files up first), so --overwrite is required — without it the CLI aborts
+# whenever the local file already exists.
 vf_download() {
 	local src="$1" dst="$2" n=0
-	until vf download "$src" "$dst"; do
+	until vf download "$src" "$dst" --overwrite; do
 		n=$((n + 1))
 		if [ "$n" -ge 4 ]; then
 			echo "error: download $src -> $dst failed after $n attempts" >&2
