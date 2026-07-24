@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@import "../../shared/arcade.css";
+
+/* The arcade tokens, helpers and keyframes live in shared/arcade.css (shared
+   with the internal dashboard). Only this app's base reset lives here. The
+   raw --font-* families are injected on <html> by next/font (see layout.tsx). */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: var(--color-ink);
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline);
+  border-radius: 999px;
+}
+
+/* Dual-thumb price range: two <input type=range> stacked over one track. The
+   track is inert (pointer-events:none) so both thumbs stay grabbable even when
+   overlapping — only the thumbs receive pointer events. */
+.range-thumb {
+  pointer-events: none;
+  height: 14px;
+}
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 5px;
+  border: 2px solid var(--color-outline);
+  background: #ffffff;
+  cursor: pointer;
+}
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 5px;
+  border: 2px solid var(--color-outline);
+  background: #ffffff;
+  cursor: pointer;
+}

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=DM+Sans:wght@400;500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #141416; font-family: 'DM Sans', sans-serif; }
+  a { color: #F6559B; text-decoration: none; }
+  a:hover { color: #FDC4E5; }
+  ::selection { background: #F6559B; color: #fff; }
+  @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes blink { 0%,60% { opacity: 1; } 61%,100% { opacity: .15; } }
+  @keyframes bob { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-12px) rotate(3deg); } }
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#141416;color:#fff;position:relative;overflow:hidden">
+
+<sc-if value="{{ scanlines }}" hint-placeholder-val="{{ true }}">
+  <div style="position:fixed;inset:0;pointer-events:none;z-index:90;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.20) 0px,rgba(0,0,0,.20) 1px,transparent 1px,transparent 3px);mix-blend-mode:multiply"></div>
+</sc-if>
+
+<!-- ===== TOP BAR ===== -->
+<div style="position:relative;z-index:20;background:#1355B3;border-bottom:4px solid #0b0b0c">
+  <div style="max-width:1360px;margin:0 auto;padding:8px 28px;display:flex;align-items:center;gap:10px;font-family:'Press Start 2P',monospace;font-size:9px;letter-spacing:.5px;color:#FDC4E5">
+    <span style="animation:blink 1.4s steps(1) infinite">●</span>
+    <span>FRETE GRATIS ACIMA DE R$ 250</span>
+    <span style="opacity:.4">|</span>
+    <span>ENVIO EM 24H</span>
+    <span style="opacity:.4">|</span>
+    <span>+18.400 CARTAS NO ESTOQUE</span>
+    <span style="margin-left:auto;color:#fff">P1 · CONVIDADO</span>
+  </div>
+</div>
+
+<div style="position:relative;z-index:20;background:#F6559B;border-bottom:6px solid #0b0b0c">
+  <div style="max-width:1360px;margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:24px">
+    <div onClick="{{ goHome }}" style="display:flex;align-items:center;gap:12px;cursor:pointer">
+      <div style="width:52px;height:52px;border-radius:14px;border:4px solid #0b0b0c;overflow:hidden;background:#1355B3;box-shadow:4px 4px 0 #0b0b0c">
+        <img src="assets/mascot.png" alt="Collecta" style="width:100%;height:100%;object-fit:cover;display:block">
+      </div>
+      <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:34px;line-height:.9;letter-spacing:-1px;color:#fff;text-shadow:3px 3px 0 #1355B3,5px 5px 0 #0b0b0c">COLLECTA</div>
+    </div>
+
+    <div style="flex:1;display:flex;align-items:center;gap:0;background:#fff;border:4px solid #0b0b0c;border-radius:10px;box-shadow:4px 4px 0 #0b0b0c;max-width:520px">
+      <input value="Charizard ex" style="flex:1;border:0;outline:0;padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;color:#141416;background:transparent">
+      <button style="border:0;border-left:4px solid #0b0b0c;background:#FDC4E5;padding:12px 18px;font-family:'Press Start 2P',monospace;font-size:10px;color:#0b0b0c;cursor:pointer">BUSCAR</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:14px;margin-left:auto">
+      <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:#fff;line-height:1.6;text-align:right">
+        <div style="color:#FDC4E5;font-size:8px">SALDO</div>
+        <div>R$ 0,00</div>
+      </div>
+      <button onClick="{{ goCart }}" style="display:flex;align-items:center;gap:10px;background:#1355B3;border:4px solid #0b0b0c;border-radius:10px;box-shadow:4px 4px 0 #0b0b0c;padding:11px 16px;cursor:pointer;font-family:'Press Start 2P',monospace;font-size:10px;color:#fff">
+        CARRINHO
+        <span style="background:#FDC4E5;color:#0b0b0c;border-radius:20px;padding:3px 7px;font-size:9px">{{ cartCount }}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN SELECT ===== -->
+<div style="position:relative;z-index:20;background:#0b0b0c;border-bottom:4px solid #1355B3">
+  <div style="max-width:1360px;margin:0 auto;padding:0 28px;display:flex;gap:0">
+    <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="5">
+      <button onClick="{{ tab.go }}" style="border:0;background:{{ tab.bg }};color:{{ tab.fg }};font-family:'Press Start 2P',monospace;font-size:10px;padding:16px 22px;cursor:pointer;border-right:2px solid #141416">{{ tab.label }}</button>
+    </sc-for>
+    <div style="margin-left:auto;display:flex;align-items:center;font-family:'Press Start 2P',monospace;font-size:9px;color:#F6559B;animation:blink 1.6s steps(1) infinite">INSERT COIN</div>
+  </div>
+</div>
+
+<!-- ============ HOME ============ -->
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div>
+  <!-- HERO -->
+  <div style="position:relative;background:#1355B3;border-bottom:6px solid #0b0b0c;overflow:hidden">
+    <div style="position:absolute;inset:0;background:radial-gradient(120% 150% at 78% 45%,rgba(246,85,155,.55) 0%,rgba(246,85,155,0) 55%)"></div>
+    <div style="position:absolute;inset:0;background-image:linear-gradient(to right,rgba(255,255,255,.06) 1px,transparent 1px);background-size:96px 100%"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(to top,rgba(11,11,12,.35),transparent)"></div>
+    <div style="position:relative;max-width:1360px;margin:0 auto;padding:64px 28px 72px;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center">
+      <div>
+        <div style="display:inline-block;background:#FDC4E5;color:#0b0b0c;border:4px solid #0b0b0c;box-shadow:4px 4px 0 #0b0b0c;padding:7px 12px;font-family:'Press Start 2P',monospace;font-size:10px;margin-bottom:22px">PLAYER 1 · READY</div>
+        <h1 style="margin:0 0 18px;font-family:'Baloo 2',cursive;font-weight:800;font-size:76px;line-height:.92;letter-spacing:-2px;color:#fff;text-shadow:5px 5px 0 #F6559B,9px 9px 0 #0b0b0c;text-wrap:balance">SUA COLEÇÃO<br>COMEÇA AQUI</h1>
+        <p style="margin:0 0 30px;max-width:520px;font-size:19px;line-height:1.5;color:#FDC4E5;text-wrap:pretty">Singles avulsas e produto selado de <strong style="color:#fff">Pokémon</strong>, <strong style="color:#fff">One Piece</strong> e <strong style="color:#fff">Riftbound</strong>. Conferido carta por carta, enviado do Brasil.</p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <button onClick="{{ goBrowse }}" style="background:#F6559B;color:#fff;border:4px solid #0b0b0c;border-radius:10px;box-shadow:6px 6px 0 #0b0b0c;padding:17px 26px;font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer">EXPLORAR SINGLES</button>
+          <button onClick="{{ goSealed }}" style="background:#FDC4E5;color:#0b0b0c;border:4px solid #0b0b0c;border-radius:10px;box-shadow:6px 6px 0 #0b0b0c;padding:17px 26px;font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer">VER SELADOS</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;align-items:center;position:relative">
+        <div style="position:absolute;width:300px;height:300px;border-radius:50%;background:#F6559B;border:6px solid #0b0b0c"></div>
+        <img src="assets/mascot.png" alt="Mascote Collecta" style="position:relative;width:300px;height:300px;object-fit:cover;border-radius:50%;border:6px solid #0b0b0c;animation:bob 4s ease-in-out infinite">
+        <div style="position:absolute;bottom:-6px;right:10px;background:#fff;color:#0b0b0c;border:4px solid #0b0b0c;box-shadow:5px 5px 0 #0b0b0c;padding:10px 14px;font-family:'Press Start 2P',monospace;font-size:10px;transform:rotate(-4deg)">PEGA ESSA!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SELECT -->
+  <div style="max-width:1360px;margin:0 auto;padding:64px 28px 0">
+    <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:26px">
+      <h2 style="margin:0;font-family:'Baloo 2',cursive;font-weight:800;font-size:44px;line-height:1;color:#fff;letter-spacing:-1px">SELECIONE SEU JOGO</h2>
+      <span style="font-family:'Press Start 2P',monospace;font-size:10px;color:#F6559B;padding-bottom:8px">3 UNIVERSOS</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px">
+      <sc-for list="{{ games }}" as="g" hint-placeholder-count="3">
+        <div onClick="{{ goBrowse }}" style="cursor:pointer;background:{{ g.bg }};border:5px solid #0b0b0c;border-radius:18px;box-shadow:8px 8px 0 #0b0b0c;overflow:hidden">
+          <div style="height:186px;background-image:repeating-linear-gradient(135deg,rgba(11,11,12,.14) 0 12px,transparent 12px 24px);display:flex;align-items:center;justify-content:center;border-bottom:5px solid #0b0b0c">
+            <span style="font-family:'Press Start 2P',monospace;font-size:9px;color:#0b0b0c;background:rgba(255,255,255,.75);padding:8px 10px">{{ g.slot }}</span>
+          </div>
+          <div style="padding:20px 22px 22px">
+            <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:30px;line-height:1;color:{{ g.fg }}">{{ g.name }}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:{{ g.fg }};opacity:.75;margin-top:10px">{{ g.count }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- FEATURED SINGLES -->
+  <div style="max-width:1360px;margin:0 auto;padding:64px 28px 0">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:26px;gap:16px">
+      <h2 style="margin:0;font-family:'Baloo 2',cursive;font-weight:800;font-size:44px;line-height:1;color:#fff;letter-spacing:-1px">SINGLES EM DESTAQUE</h2>
+      <a href="#" onClick="{{ goBrowse }}" style="font-family:'Press Start 2P',monospace;font-size:10px;border-bottom:3px solid #F6559B;padding-bottom:4px">VER TODAS ›</a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+      <sc-for list="{{ singles }}" as="c" hint-placeholder-count="8">
+        <div onClick="{{ goSingle }}" style="cursor:pointer;background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;overflow:hidden;display:flex;flex-direction:column">
+          <div style="position:relative;aspect-ratio:5/7;background:{{ c.bg }};background-image:repeating-linear-gradient(90deg,rgba(11,11,12,.12) 0 10px,transparent 10px 20px);display:flex;align-items:center;justify-content:center;border-bottom:4px solid #0b0b0c">
+            <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0b0b0c;background:rgba(255,255,255,.8);padding:7px 8px;text-align:center;line-height:1.5">{{ c.slot }}</span>
+            <span style="position:absolute;top:8px;left:8px;background:#0b0b0c;color:#FDC4E5;font-family:'Press Start 2P',monospace;font-size:8px;padding:5px 6px">{{ c.grade }}</span>
+            <span style="position:absolute;top:8px;right:8px;background:#fff;color:#0b0b0c;font-family:'Press Start 2P',monospace;font-size:8px;padding:5px 6px">{{ c.lang }}</span>
+          </div>
+          <div style="padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1">
+            <div style="font-family:'Baloo 2',cursive;font-weight:700;font-size:19px;line-height:1.1;color:#fff">{{ c.name }}</div>
+            <div style="font-size:12px;color:#9a9aa2;font-family:'DM Sans',sans-serif">{{ c.set }} · {{ c.number }}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:8px">
+              <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:#F6559B">{{ c.price }}</span>
+              <span style="font-size:11px;color:#6f6f77">{{ c.stock }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- SEALED STRIP -->
+  <div style="max-width:1360px;margin:0 auto;padding:64px 28px 0">
+    <h2 style="margin:0 0 26px;font-family:'Baloo 2',cursive;font-weight:800;font-size:44px;line-height:1;color:#fff;letter-spacing:-1px">PRODUTO SELADO</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+      <sc-for list="{{ sealed }}" as="s" hint-placeholder-count="4">
+        <div onClick="{{ goSealedProduct }}" style="cursor:pointer;background:#FDC4E5;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;overflow:hidden">
+          <div style="position:relative;height:196px;background:#1355B3;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 12px,transparent 12px 24px);display:flex;align-items:center;justify-content:center;border-bottom:4px solid #0b0b0c">
+            <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0b0b0c;background:rgba(255,255,255,.85);padding:7px 8px;text-align:center;line-height:1.5">{{ s.slot }}</span>
+            <span style="position:absolute;top:8px;left:8px;background:#F6559B;color:#fff;font-family:'Press Start 2P',monospace;font-size:8px;padding:5px 6px">{{ s.badge }}</span>
+          </div>
+          <div style="padding:16px">
+            <div style="font-family:'Baloo 2',cursive;font-weight:700;font-size:20px;line-height:1.1;color:#0b0b0c">{{ s.name }}</div>
+            <div style="font-size:12px;color:#8a3f68;margin:6px 0 12px">{{ s.meta }}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:12px;color:#1355B3">{{ s.price }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <sc-if value="{{ showRanking }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:1360px;margin:0 auto;padding:64px 28px 0">
+    <div style="background:#0b0b0c;border:5px solid #F6559B;border-radius:18px;padding:30px 32px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px">
+        <h2 style="margin:0;font-family:'Press Start 2P',monospace;font-size:18px;color:#FDC4E5">HIGH SCORES</h2>
+        <span style="font-size:13px;color:#6f6f77">Colecionadores com mais trocas neste mês</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ ranks }}" as="r" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:50px 1fr 130px 110px;gap:16px;align-items:center;padding:14px 12px;background:{{ r.row }};font-family:'Press Start 2P',monospace;font-size:11px;color:#fff">
+            <span style="color:#F6559B">{{ r.pos }}</span>
+            <span>{{ r.name }}</span>
+            <span style="color:#FDC4E5">{{ r.trades }}</span>
+            <span style="text-align:right">{{ r.score }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ============ BROWSE ============ -->
+<sc-if value="{{ isBrowse }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1360px;margin:0 auto;padding:36px 28px 0;display:grid;grid-template-columns:270px 1fr;gap:28px;align-items:start">
+  <div style="background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;padding:22px">
+    <div style="font-family:'Press Start 2P',monospace;font-size:12px;color:#F6559B;margin-bottom:20px">FILTROS</div>
+    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+      <div style="margin-bottom:22px">
+        <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#FDC4E5;margin-bottom:12px">{{ f.title }}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="4">
+            <span style="background:{{ o.bg }};color:{{ o.fg }};border:3px solid #0b0b0c;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer">{{ o.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+    <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#FDC4E5;margin-bottom:12px">PRECO</div>
+    <div style="height:14px;background:#0b0b0c;border:3px solid #F6559B;border-radius:10px;position:relative;margin-bottom:10px">
+      <div style="position:absolute;left:8%;right:34%;top:0;bottom:0;background:#F6559B"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:'Press Start 2P',monospace;font-size:9px;color:#fff">
+      <span>R$ 12</span><span>R$ 900</span>
+    </div>
+  </div>
+
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap">
+      <div>
+        <h2 style="margin:0;font-family:'Baloo 2',cursive;font-weight:800;font-size:38px;line-height:1;color:#fff">Pokémon · Singles</h2>
+        <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#6f6f77;margin-top:8px">1.284 RESULTADOS</div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <sc-for list="{{ sorts }}" as="s" hint-placeholder-count="3">
+          <span style="background:{{ s.bg }};color:{{ s.fg }};border:3px solid #0b0b0c;border-radius:8px;padding:9px 12px;font-family:'Press Start 2P',monospace;font-size:9px;cursor:pointer">{{ s.label }}</span>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+      <sc-for list="{{ browseList }}" as="c" hint-placeholder-count="12">
+        <div onClick="{{ goSingle }}" style="cursor:pointer;background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;overflow:hidden;display:flex;flex-direction:column">
+          <div style="position:relative;aspect-ratio:5/7;background:{{ c.bg }};background-image:repeating-linear-gradient(90deg,rgba(11,11,12,.12) 0 10px,transparent 10px 20px);display:flex;align-items:center;justify-content:center;border-bottom:4px solid #0b0b0c">
+            <span style="font-family:'Press Start 2P',monospace;font-size:8px;color:#0b0b0c;background:rgba(255,255,255,.8);padding:7px 8px;text-align:center;line-height:1.5">{{ c.slot }}</span>
+            <span style="position:absolute;top:8px;left:8px;background:#0b0b0c;color:#FDC4E5;font-family:'Press Start 2P',monospace;font-size:8px;padding:5px 6px">{{ c.grade }}</span>
+          </div>
+          <div style="padding:14px;display:flex;flex-direction:column;gap:7px;flex:1">
+            <div style="font-family:'Baloo 2',cursive;font-weight:700;font-size:18px;line-height:1.1;color:#fff">{{ c.name }}</div>
+            <div style="font-size:12px;color:#9a9aa2">{{ c.set }} · {{ c.number }}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:8px">
+              <span style="font-family:'Press Start 2P',monospace;font-size:11px;color:#F6559B">{{ c.price }}</span>
+              <span style="background:#1355B3;color:#fff;font-family:'Press Start 2P',monospace;font-size:8px;padding:6px 7px;border:2px solid #0b0b0c">+ ADD</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;justify-content:center;gap:10px;margin-top:34px">
+      <sc-for list="{{ pages }}" as="p" hint-placeholder-count="5">
+        <span style="background:{{ p.bg }};color:{{ p.fg }};border:3px solid #0b0b0c;border-radius:8px;padding:10px 14px;font-family:'Press Start 2P',monospace;font-size:10px;cursor:pointer">{{ p.label }}</span>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ SINGLE PRODUCT ============ -->
+<sc-if value="{{ isSingle }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1360px;margin:0 auto;padding:36px 28px 0">
+  <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#6f6f77;margin-bottom:24px">POKEMON > OBSIDIAN FLAMES > CHARIZARD EX</div>
+  <div style="display:grid;grid-template-columns:.9fr 1.1fr;gap:40px;align-items:start">
+    <div>
+      <div style="background:#F6559B;border:5px solid #0b0b0c;border-radius:18px;box-shadow:8px 8px 0 #0b0b0c;padding:24px">
+        <div style="aspect-ratio:5/7;background:#1355B3;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 12px,transparent 12px 24px);border:4px solid #0b0b0c;border-radius:8px;display:flex;align-items:center;justify-content:center">
+          <span style="font-family:'Press Start 2P',monospace;font-size:9px;color:#0b0b0c;background:rgba(255,255,255,.85);padding:9px 10px;text-align:center;line-height:1.6">FOTO REAL DA CARTA<br>SLAB PSA · FRENTE</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px">
+        <sc-for list="{{ thumbs }}" as="t" hint-placeholder-count="4">
+          <div style="aspect-ratio:1;background:#1f1f22;border:3px solid {{ t.border }};border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:7px;color:#8a8a92;text-align:center;padding:6px;cursor:pointer">{{ t.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <span style="background:#FDC4E5;color:#0b0b0c;border:3px solid #0b0b0c;padding:6px 9px;font-family:'Press Start 2P',monospace;font-size:9px">PSA 10 GEM MT</span>
+        <span style="background:#1355B3;color:#fff;border:3px solid #0b0b0c;padding:6px 9px;font-family:'Press Start 2P',monospace;font-size:9px">EN</span>
+        <span style="background:#0b0b0c;color:#F6559B;border:3px solid #F6559B;padding:6px 9px;font-family:'Press Start 2P',monospace;font-size:9px">SO 1 UNIDADE</span>
+      </div>
+      <h1 style="margin:0 0 10px;font-family:'Baloo 2',cursive;font-weight:800;font-size:54px;line-height:.95;letter-spacing:-1px;color:#fff">Charizard ex</h1>
+      <div style="font-size:16px;color:#9a9aa2;margin-bottom:26px">Obsidian Flames · 199/165 · Special Illustration Rare</div>
+
+      <div style="background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;padding:24px;margin-bottom:22px">
+        <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:6px">
+          <span style="font-family:'Press Start 2P',monospace;font-size:34px;color:#F6559B">R$ 420,00</span>
+          <span style="font-size:14px;color:#6f6f77;text-decoration:line-through;padding-bottom:6px">R$ 489,00</span>
+        </div>
+        <div style="font-size:13px;color:#9a9aa2;margin-bottom:22px">ou 12x de R$ 38,90 · média de mercado R$ 455</div>
+        <div style="display:flex;gap:14px;align-items:stretch;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;border:4px solid #0b0b0c;border-radius:10px;overflow:hidden;background:#fff">
+            <button onClick="{{ dec }}" style="border:0;background:#FDC4E5;padding:0 16px;align-self:stretch;font-family:'Press Start 2P',monospace;font-size:14px;color:#0b0b0c;cursor:pointer">-</button>
+            <span style="padding:14px 20px;font-family:'Press Start 2P',monospace;font-size:14px;color:#0b0b0c;min-width:24px;text-align:center">{{ qty }}</span>
+            <button onClick="{{ inc }}" style="border:0;background:#FDC4E5;padding:0 16px;align-self:stretch;font-family:'Press Start 2P',monospace;font-size:14px;color:#0b0b0c;cursor:pointer">+</button>
+          </div>
+          <button onClick="{{ addToCart }}" style="flex:1;min-width:220px;background:#F6559B;color:#fff;border:4px solid #0b0b0c;border-radius:10px;box-shadow:5px 5px 0 #0b0b0c;padding:16px 22px;font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer">ADICIONAR AO CARRINHO</button>
+          <button style="background:#1f1f22;color:#FDC4E5;border:4px solid #FDC4E5;border-radius:10px;padding:16px 18px;font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer">♥</button>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:14px;background:#1355B3;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;padding:18px 20px;margin-bottom:22px">
+        <div style="width:48px;height:48px;border-radius:12px;border:3px solid #0b0b0c;overflow:hidden;flex:none">
+          <img src="assets/mascot.png" alt="Vendedor" style="width:100%;height:100%;object-fit:cover;display:block">
+        </div>
+        <div style="flex:1">
+          <div style="font-family:'Baloo 2',cursive;font-weight:700;font-size:20px;color:#fff;line-height:1.1">Collecta Oficial</div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#FDC4E5;margin-top:6px">99,4% POSITIVO · 4.821 VENDAS</div>
+        </div>
+        <span style="background:#FDC4E5;color:#0b0b0c;font-family:'Press Start 2P',monospace;font-size:9px;padding:8px 10px;border:3px solid #0b0b0c">ENVIA EM 24H</span>
+      </div>
+
+      <div style="background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;padding:22px">
+        <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:#FDC4E5;margin-bottom:18px">HISTORICO DE PRECO - 6 MESES</div>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:110px;margin-bottom:12px">
+          <sc-for list="{{ history }}" as="h" hint-placeholder-count="6">
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:6px">
+              <div style="height:{{ h.h }};background:{{ h.bg }};border:3px solid #0b0b0c;border-radius:4px 4px 0 0"></div>
+              <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:#6f6f77;text-align:center">{{ h.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="margin-top:22px">
+        <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:#F6559B;margin-bottom:14px">OUTROS VENDEDORES</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ offers }}" as="o" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;background:#1f1f22;border:3px solid #0b0b0c;border-radius:10px;padding:14px 16px">
+              <div>
+                <div style="font-weight:700;font-size:15px;color:#fff">{{ o.seller }}</div>
+                <div style="font-size:12px;color:#9a9aa2;margin-top:3px">{{ o.cond }}</div>
+              </div>
+              <span style="font-family:'Press Start 2P',monospace;font-size:12px;color:#FDC4E5">{{ o.price }}</span>
+              <span style="background:#1355B3;color:#fff;border:3px solid #0b0b0c;padding:8px 10px;font-family:'Press Start 2P',monospace;font-size:9px;cursor:pointer">+ ADD</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ SEALED PRODUCT ============ -->
+<sc-if value="{{ isSealed }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1360px;margin:0 auto;padding:36px 28px 0">
+  <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#6f6f77;margin-bottom:24px">ONE PIECE > SELADOS > BOOSTER BOX OP-09</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start">
+    <div style="background:#FDC4E5;border:5px solid #0b0b0c;border-radius:18px;box-shadow:8px 8px 0 #0b0b0c;padding:26px">
+      <div style="aspect-ratio:4/3;background:#1355B3;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 14px,transparent 14px 28px);border:4px solid #0b0b0c;border-radius:8px;display:flex;align-items:center;justify-content:center">
+        <span style="font-family:'Press Start 2P',monospace;font-size:9px;color:#0b0b0c;background:rgba(255,255,255,.85);padding:9px 10px;text-align:center;line-height:1.6">FOTO DA CAIXA<br>LACRE VISÍVEL</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">
+        <sc-for list="{{ sealedThumbs }}" as="t" hint-placeholder-count="3">
+          <div style="aspect-ratio:1;background:#fff;border:3px solid #0b0b0c;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;font-size:7px;color:#0b0b0c;text-align:center;padding:6px">{{ t.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <span style="background:#F6559B;color:#fff;border:3px solid #0b0b0c;padding:6px 9px;font-family:'Press Start 2P',monospace;font-size:9px">PRE-VENDA</span>
+        <span style="background:#FDC4E5;color:#0b0b0c;border:3px solid #0b0b0c;padding:6px 9px;font-family:'Press Start 2P',monospace;font-size:9px">LACRADO</span>
+      </div>
+      <h1 style="margin:0 0 10px;font-family:'Baloo 2',cursive;font-weight:800;font-size:50px;line-height:.95;letter-spacing:-1px;color:#fff">Booster Box OP-09</h1>
+      <div style="font-size:16px;color:#9a9aa2;margin-bottom:24px">Emperors in the New World · 24 packs · Japonês</div>
+
+      <div style="background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;box-shadow:6px 6px 0 #0b0b0c;padding:24px;margin-bottom:22px">
+        <div style="font-family:'Press Start 2P',monospace;font-size:32px;color:#F6559B;margin-bottom:6px">R$ 899,00</div>
+        <div style="font-size:13px;color:#9a9aa2;margin-bottom:20px">12x de R$ 83,20 · lançamento 12/09</div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#FDC4E5;margin-bottom:10px">RESTAM 7 DE 40 CAIXAS</div>
+        <div style="height:18px;background:#0b0b0c;border:3px solid #F6559B;border-radius:10px;overflow:hidden;margin-bottom:22px">
+          <div style="width:82%;height:100%;background:repeating-linear-gradient(90deg,#F6559B 0 10px,#FDC4E5 10px 20px)"></div>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;border:4px solid #0b0b0c;border-radius:10px;overflow:hidden;background:#fff">
+            <button onClick="{{ dec }}" style="border:0;background:#FDC4E5;padding:0 16px;align-self:stretch;font-family:'Press Start 2P',monospace;font-size:14px;color:#0b0b0c;cursor:pointer">-</button>
+            <span style="padding:14px 20px;font-family:'Press Start 2P',monospace;font-size:14px;color:#0b0b0c;min-width:24px;text-align:center">{{ qty }}</span>
+            <button onClick="{{ inc }}" style="border:0;background:#FDC4E5;padding:0 16px;align-self:stretch;font-family:'Press Start 2P',monospace;font-size:14px;color:#0b0b0c;cursor:pointer">+</button>
+          </div>
+          <button onClick="{{ addToCart }}" style="flex:1;min-width:220px;background:#1355B3;color:#fff;border:4px solid #0b0b0c;border-radius:10px;box-shadow:5px 5px 0 #0b0b0c;padding:16px 22px;font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer">GARANTIR PRE-VENDA</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <sc-for list="{{ specs }}" as="s" hint-placeholder-count="4">
+          <div style="background:#0b0b0c;border:3px solid #1355B3;border-radius:10px;padding:16px">
+            <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#FDC4E5;margin-bottom:8px">{{ s.k }}</div>
+            <div style="font-weight:700;font-size:15px;color:#fff">{{ s.v }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ CART ============ -->
+<sc-if value="{{ isCart }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:1100px;margin:0 auto;padding:36px 28px 0">
+  <h1 style="margin:0 0 8px;font-family:'Baloo 2',cursive;font-weight:800;font-size:52px;line-height:1;color:#fff">Carrinho</h1>
+  <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#F6559B;margin-bottom:28px">3 ITENS · 1 FICHA PARA CONTINUAR</div>
+  <div style="display:grid;grid-template-columns:1.4fr .6fr;gap:28px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <sc-for list="{{ cart }}" as="i" hint-placeholder-count="3">
+        <div style="display:grid;grid-template-columns:78px 1fr auto auto;gap:18px;align-items:center;background:#1f1f22;border:4px solid #0b0b0c;border-radius:14px;box-shadow:5px 5px 0 #0b0b0c;padding:16px">
+          <div style="aspect-ratio:5/7;background:{{ i.bg }};background-image:repeating-linear-gradient(90deg,rgba(11,11,12,.14) 0 8px,transparent 8px 16px);border:3px solid #0b0b0c;border-radius:6px"></div>
+          <div>
+            <div style="font-family:'Baloo 2',cursive;font-weight:700;font-size:21px;color:#fff;line-height:1.1">{{ i.name }}</div>
+            <div style="font-size:12px;color:#9a9aa2;margin-top:5px">{{ i.meta }}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#FDC4E5;margin-top:9px">{{ i.seller }}</div>
+          </div>
+          <div style="display:flex;align-items:center;border:3px solid #0b0b0c;border-radius:8px;overflow:hidden;background:#fff">
+            <span style="background:#FDC4E5;padding:8px 11px;font-family:'Press Start 2P',monospace;font-size:11px;color:#0b0b0c;cursor:pointer">-</span>
+            <span style="padding:8px 12px;font-family:'Press Start 2P',monospace;font-size:11px;color:#0b0b0c">{{ i.qty }}</span>
+            <span style="background:#FDC4E5;padding:8px 11px;font-family:'Press Start 2P',monospace;font-size:11px;color:#0b0b0c;cursor:pointer">+</span>
+          </div>
+          <div style="text-align:right;min-width:110px">
+            <div style="font-family:'Press Start 2P',monospace;font-size:13px;color:#F6559B">{{ i.price }}</div>
+            <div style="font-size:12px;color:#6f6f77;margin-top:8px;cursor:pointer">remover</div>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display:flex;align-items:center;gap:16px;background:#1355B3;border:4px solid #0b0b0c;border-radius:14px;padding:16px 20px">
+        <div style="width:44px;height:44px;border-radius:10px;border:3px solid #0b0b0c;overflow:hidden;flex:none">
+          <img src="assets/mascot.png" alt="Mascote" style="width:100%;height:100%;object-fit:cover;display:block">
+        </div>
+        <div style="font-size:15px;color:#fff;line-height:1.4">Faltam <strong style="color:#FDC4E5">R$ 22,00</strong> para o frete grátis. Bora completar o set?</div>
+      </div>
+    </div>
+
+    <div style="background:#0b0b0c;border:5px solid #F6559B;border-radius:16px;padding:26px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:#FDC4E5;margin-bottom:22px">RESUMO</div>
+      <div style="display:flex;flex-direction:column;gap:14px;font-size:15px;color:#c9c9d1">
+        <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span style="color:#fff">R$ 1.228,00</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Frete (Sedex)</span><span style="color:#fff">R$ 28,00</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Cupom ARCADE10</span><span style="color:#F6559B">- R$ 122,80</span></div>
+      </div>
+      <div style="height:3px;background:#F6559B;margin:22px 0"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px">
+        <span style="font-family:'Press Start 2P',monospace;font-size:10px;color:#fff">TOTAL</span>
+        <span style="font-family:'Press Start 2P',monospace;font-size:22px;color:#F6559B">R$ 1.133,20</span>
+      </div>
+      <div style="font-size:12px;color:#6f6f77;margin-bottom:22px">em até 12x de R$ 104,90</div>
+      <button style="width:100%;background:#F6559B;color:#fff;border:4px solid #fff;border-radius:10px;padding:18px;font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer;box-shadow:0 0 0 4px #0b0b0c">INSERIR FICHA - PAGAR</button>
+      <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:#6f6f77;text-align:center;margin-top:16px;line-height:1.8">PIX - CARTAO - BOLETO<br>COMPRA PROTEGIDA COLLECTA</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== FOOTER ===== -->
+<div style="margin-top:80px;background:#F6559B;border-top:6px solid #0b0b0c">
+  <div style="max-width:1360px;margin:0 auto;padding:48px 28px;display:grid;grid-template-columns:1.2fr .6fr .6fr .6fr;gap:32px">
+    <div>
+      <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:36px;color:#fff;text-shadow:3px 3px 0 #1355B3,5px 5px 0 #0b0b0c;line-height:1">COLLECTA</div>
+      <p style="margin:18px 0 0;max-width:300px;font-size:14px;color:#fff;line-height:1.6">Singles e selados de Pokémon, One Piece e Riftbound. Feito por quem coleciona de verdade.</p>
+    </div>
+    <sc-for list="{{ footerCols }}" as="col" hint-placeholder-count="3">
+      <div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:#0b0b0c;margin-bottom:16px">{{ col.title }}</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ col.links }}" as="l" hint-placeholder-count="4">
+            <a href="#" style="color:#fff;font-size:14px">{{ l.label }}</a>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="border-top:3px solid #0b0b0c;padding:16px 28px;text-align:center;font-family:'Press Start 2P',monospace;font-size:8px;color:#0b0b0c">© 2026 COLLECTA · GAME OVER? NUNCA. CONTINUE (9)</div>
+</div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;scanlines&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Arcade&quot;},&quot;showRanking&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Arcade&quot;}}">
+class Component extends DCLogic {
+  state = { screen: 'home', qty: 1, cartCount: 3 };
+
+  go(screen) { this.setState({ screen }); if (typeof window !== 'undefined') window.scrollTo(0, 0); }
+
+  renderVals() {
+    const s = this.state.screen;
+    const PINK = '#F6559B', BLUE = '#1355B3', LT = '#FDC4E5', DK = '#0b0b0c';
+    const tabDefs = [
+      ['home', 'HOME'], ['browse', 'BUSCAR SINGLES'], ['single', 'PAGINA DA CARTA'],
+      ['sealed', 'PRODUTO SELADO'], ['cart', 'CARRINHO']
+    ];
+    const tabs = tabDefs.map(([k, label]) => ({
+      label, go: () => this.go(k),
+      bg: s === k ? PINK : '#0b0b0c',
+      fg: s === k ? '#fff' : '#8a8a92'
+    }));
+
+    const single = (name, set, number, grade, price, lang, stock, bg) =>
+      ({ name, set, number, grade, price, lang, stock, bg, slot: 'FOTO DA CARTA' });
+
+    const singles = [
+      single('Charizard ex', 'Obsidian Flames', '199/165', 'PSA 10', 'R$ 420,00', 'EN', '1 em estoque', PINK),
+      single('Monkey D. Luffy', 'OP-05 Leader', 'OP05-041', 'NM', 'R$ 189,00', 'JP', '3 em estoque', BLUE),
+      single('Umbreon VMAX', 'Evolving Skies', '215/203', 'PSA 9', 'R$ 2.480,00', 'EN', '1 em estoque', LT),
+      single('Viktor, o Arcano', 'Riftbound Origins', 'ORI-088', 'NM', 'R$ 96,00', 'EN', '6 em estoque', BLUE),
+      single('Pikachu VMAX', 'Vivid Voltage', '188/185', 'PSA 8', 'R$ 1.150,00', 'EN', '1 em estoque', LT),
+      single('Roronoa Zoro', 'OP-06 Parallel', 'OP06-118', 'NM', 'R$ 240,00', 'JP', '2 em estoque', PINK),
+      single('Jinx, Estopim', 'Riftbound Origins', 'ORI-101', 'NM', 'R$ 132,00', 'EN', '4 em estoque', PINK),
+      single('Mewtwo ex', 'Paldean Fates', '151/091', 'NM', 'R$ 78,00', 'EN', '9 em estoque', BLUE)
+    ];
+
+    const browseList = singles.concat([
+      single('Gengar ex', 'Prismatic Evolutions', '098/086', 'NM', 'R$ 310,00', 'EN', '2 em estoque', LT),
+      single('Trafalgar Law', 'OP-04 SR', 'OP04-119', 'PSA 10', 'R$ 640,00', 'JP', '1 em estoque', BLUE),
+      single('Sylveon ex', 'Surging Sparks', '187/191', 'NM', 'R$ 205,00', 'EN', '3 em estoque', PINK),
+      single('Ahri, Nove Caudas', 'Riftbound Origins', 'ORI-014', 'NM', 'R$ 118,00', 'EN', '5 em estoque', LT)
+    ]);
+
+    const games = [
+      { name: 'Pokémon', count: '9.812 CARTAS', slot: 'ARTE POKEMON', bg: PINK, fg: '#fff' },
+      { name: 'One Piece', count: '5.140 CARTAS', slot: 'ARTE ONE PIECE', bg: BLUE, fg: '#fff' },
+      { name: 'Riftbound', count: '3.448 CARTAS', slot: 'ARTE RIFTBOUND', bg: LT, fg: '#0b0b0c' }
+    ];
+
+    const sealed = [
+      { name: 'Booster Box OP-09', meta: 'One Piece · 24 packs · JP', price: 'R$ 899,00', badge: 'PRE-VENDA', slot: 'FOTO DA CAIXA' },
+      { name: 'ETB Prismatic Evolutions', meta: 'Pokémon · Elite Trainer Box', price: 'R$ 749,00', badge: 'SO RESTAM 4', slot: 'FOTO DA ETB' },
+      { name: 'Riftbound Starter Duo', meta: 'Riftbound · 2 decks + dados', price: 'R$ 279,00', badge: 'NOVO', slot: 'FOTO DO STARTER' },
+      { name: 'Booster Bundle 151', meta: 'Pokémon · 6 packs', price: 'R$ 329,00', badge: 'HOT', slot: 'FOTO DO BUNDLE' }
+    ];
+
+
+    const ranks = [
+      ['1ST', 'BRUNO_TCG', '312 TROCAS', '98.420'],
+      ['2ND', 'MARI.PULLS', '287 TROCAS', '91.105'],
+      ['3RD', 'DOJO_CARDS', '241 TROCAS', '84.660'],
+      ['4TH', 'RIFT_KID', '198 TROCAS', '72.310'],
+      ['5TH', 'SEALED_SP', '176 TROCAS', '68.940']
+    ].map((r, i) => ({ pos: r[0], name: r[1], trades: r[2], score: r[3], row: i % 2 ? '#141416' : '#1f1f22' }));
+
+    const chip = (label, on) => ({ label, bg: on ? PINK : '#0b0b0c', fg: on ? '#fff' : '#c9c9d1' });
+    const filters = [
+      { title: 'JOGO', options: [chip('Pokémon', true), chip('One Piece', false), chip('Riftbound', false)] },
+      { title: 'TIPO', options: [chip('Singles', true), chip('Selados', false)] },
+      { title: 'ESTADO', options: [chip('PSA 10', true), chip('PSA 9', false), chip('NM', true), chip('LP', false)] },
+      { title: 'IDIOMA', options: [chip('EN', true), chip('JP', false), chip('PT', false)] },
+      { title: 'RARIDADE', options: [chip('SIR', false), chip('Alt Art', true), chip('Holo', false)] }
+    ];
+
+    const sorts = [
+      { label: 'RELEVANCIA', bg: PINK, fg: '#fff' },
+      { label: 'MENOR PRECO', bg: '#1f1f22', fg: '#c9c9d1' },
+      { label: 'NOVIDADES', bg: '#1f1f22', fg: '#c9c9d1' }
+    ];
+    const pages = ['‹', '1', '2', '3', '…', '32', '›'].map((label, i) => ({
+      label, bg: i === 1 ? PINK : '#1f1f22', fg: i === 1 ? '#fff' : '#c9c9d1'
+    }));
+
+    const thumbs = [
+      { label: 'FRENTE', border: PINK }, { label: 'VERSO', border: '#0b0b0c' },
+      { label: 'CANTOS', border: '#0b0b0c' }, { label: 'SELO PSA', border: '#0b0b0c' }
+    ];
+    const sealedThumbs = [{ label: 'LACRE' }, { label: 'LATERAL' }, { label: 'CODIGO' }];
+
+    const history = [
+      ['FEV', '38%'], ['MAR', '52%'], ['ABR', '46%'], ['MAI', '68%'], ['JUN', '84%'], ['JUL', '92%']
+    ].map(([label, h], i) => ({ label, h, bg: i === 5 ? PINK : LT }));
+
+    const offers = [
+      { seller: 'DojoCards SP', cond: 'PSA 10 · envia em 48h', price: 'R$ 439,00' },
+      { seller: 'Bruno TCG', cond: 'PSA 9 · envia em 24h', price: 'R$ 352,00' },
+      { seller: 'Mari Pulls', cond: 'NM sem grade · 72h', price: 'R$ 298,00' }
+    ];
+
+    const specs = [
+      { k: 'CONTEUDO', v: '24 packs de 12 cartas' },
+      { k: 'IDIOMA', v: 'Japonês' },
+      { k: 'LANCAMENTO', v: '12 set 2026' },
+      { k: 'GARANTIA', v: 'Lacre original de fábrica' }
+    ];
+
+    const cart = [
+      { name: 'Charizard ex', meta: 'Obsidian Flames · 199/165 · PSA 10', seller: 'COLLECTA OFICIAL', qty: '1', price: 'R$ 420,00', bg: PINK },
+      { name: 'Booster Box OP-09', meta: 'One Piece · pré-venda 12/09', seller: 'COLLECTA OFICIAL', qty: '1', price: 'R$ 899,00', bg: BLUE },
+      { name: 'Jinx, Estopim', meta: 'Riftbound Origins · ORI-101 · NM', seller: 'RIFT_KID', qty: '2', price: 'R$ 264,00', bg: LT }
+    ];
+
+    const footerCols = [
+      { title: 'COMPRAR', links: [{ label: 'Singles' }, { label: 'Selados' }, { label: 'Pré-vendas' }, { label: 'Promoções' }] },
+      { title: 'AJUDA', links: [{ label: 'Como comprar' }, { label: 'Frete e prazos' }, { label: 'Trocas' }, { label: 'Contato' }] },
+      { title: 'COLLECTA', links: [{ label: 'Vender com a gente' }, { label: 'Grading' }, { label: 'Instagram' }, { label: 'Discord' }] }
+    ];
+
+    return {
+      tabs,
+      isHome: s === 'home', isBrowse: s === 'browse', isSingle: s === 'single',
+      isSealed: s === 'sealed', isCart: s === 'cart',
+      goHome: () => this.go('home'), goBrowse: () => this.go('browse'),
+      goSingle: () => this.go('single'), goSealed: () => this.go('sealed'),
+      goSealedProduct: () => this.go('sealed'), goCart: () => this.go('cart'),
+      qty: this.state.qty, cartCount: this.state.cartCount,
+      inc: () => this.setState(st => ({ qty: st.qty + 1 })),
+      dec: () => this.setState(st => ({ qty: Math.max(1, st.qty - 1) })),
+      addToCart: () => this.setState(st => ({ cartCount: st.cartCount + st.qty })),
+      scanlines: this.props.scanlines ?? true,
+      showRanking: this.props.showRanking ?? true,
+      singles, browseList, games, sealed, ranks, filters, sorts, pages,
+      thumbs, sealedThumbs, history, offers, specs, cart, footerCols
+    };
+  }
+}
+</script>
+</body>
+</html>
