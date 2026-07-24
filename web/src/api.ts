@@ -98,6 +98,7 @@ export interface GameInfo {
   name: string;
   hasDeals: boolean;
   hasMyP: boolean;
+  multiLang: boolean;
 }
 
 let gamesCache: GameInfo[] = [];
@@ -113,6 +114,14 @@ export async function getGames(): Promise<{ default: string; games: GameInfo[] }
 export function gameHasDeals(id: string): boolean {
   const info = gamesCache.find((g) => g.id === id);
   return info ? info.hasDeals : id !== "pokemon";
+}
+
+// gameIsMultiLang reports whether a game's Brazil market prices every language as
+// the same product, making a listing's language worth showing. Before /api/games
+// loads, only Pokémon is assumed multi-language.
+export function gameIsMultiLang(id: string): boolean {
+  const info = gamesCache.find((g) => g.id === id);
+  return info ? info.multiLang : id === "pokemon";
 }
 
 async function getJSON<T>(url: string): Promise<T> {
@@ -186,6 +195,12 @@ export interface CardSeller {
   priceBRL: number;
 }
 
+export interface LangSale {
+  code: string;
+  units: number;
+  revenueBRL: number;
+}
+
 export interface CardSale {
   set?: string;
   number: string;
@@ -194,6 +209,7 @@ export interface CardSale {
   units: number;
   revenueBRL: number;
   sellers?: CardSeller[];
+  languages?: LangSale[];
 }
 
 export interface SnapshotSales {

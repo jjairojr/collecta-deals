@@ -212,6 +212,7 @@ func salesBetween(prev, cur DaySnapshot) []CardSale {
 		units   int
 		rev     float64
 		sellers map[int]*CardSeller
+		langs   map[string]*LangSale
 	}
 	prevQ := indexQuantities(prev)
 	curQ := indexQuantities(cur)
@@ -231,11 +232,17 @@ func salesBetween(prev, cur DaySnapshot) []CardSale {
 		revenue := float64(drop) * salePriceBRL(pq, cq, curLow[key.Number])
 		a := byCard[key.Number]
 		if a == nil {
-			a = &agg{name: curName[key.Number], url: curURL[key.Number], sellers: map[int]*CardSeller{}}
+			a = &agg{
+				name:    curName[key.Number],
+				url:     curURL[key.Number],
+				sellers: map[int]*CardSeller{},
+				langs:   map[string]*LangSale{},
+			}
 			byCard[key.Number] = a
 		}
 		a.units += drop
 		a.rev += revenue
+		addLangSale(a.langs, key.Language, drop, revenue)
 		seller := a.sellers[key.StoreID]
 		if seller == nil {
 			seller = &CardSeller{StoreID: key.StoreID, StoreName: storeLabel(cq)}
@@ -252,13 +259,13 @@ func salesBetween(prev, cur DaySnapshot) []CardSale {
 			sellers = append(sellers, *se)
 		}
 		sortSellers(sellers)
-		out = append(out, CardSale{Number: num, Name: a.name, URL: a.url, Units: a.units, RevenueBRL: a.rev, Sellers: sellers})
+		out = append(out, CardSale{Number: num, Name: a.name, URL: a.url, Units: a.units, RevenueBRL: a.rev, Sellers: sellers, Languages: flattenLangs(a.langs)})
 	}
 	return out
 }
 
 // mergeSales combines per-interval sales into one aggregate per card, summing
-// units and revenue and merging each card's sellers by store.
+// units and revenue and merging each card's sellers by store and units by language.
 func mergeSales(groups [][]CardSale) []CardSale {
 	type agg struct {
 		name    string
@@ -266,17 +273,21 @@ func mergeSales(groups [][]CardSale) []CardSale {
 		units   int
 		rev     float64
 		sellers map[int]*CardSeller
+		langs   map[string]*LangSale
 	}
 	byCard := map[string]*agg{}
 	for _, group := range groups {
 		for _, c := range group {
 			a := byCard[c.Number]
 			if a == nil {
-				a = &agg{name: c.Name, url: c.URL, sellers: map[int]*CardSeller{}}
+				a = &agg{name: c.Name, url: c.URL, sellers: map[int]*CardSeller{}, langs: map[string]*LangSale{}}
 				byCard[c.Number] = a
 			}
 			a.units += c.Units
 			a.rev += c.RevenueBRL
+			for _, l := range c.Languages {
+				addLangSale(a.langs, l.Code, l.Units, l.RevenueBRL)
+			}
 			for _, se := range c.Sellers {
 				seller := a.sellers[se.StoreID]
 				if seller == nil {
@@ -296,8 +307,35 @@ func mergeSales(groups [][]CardSale) []CardSale {
 			sellers = append(sellers, *se)
 		}
 		sortSellers(sellers)
-		out = append(out, CardSale{Number: num, Name: a.name, URL: a.url, Units: a.units, RevenueBRL: a.rev, Sellers: sellers})
+		out = append(out, CardSale{Number: num, Name: a.name, URL: a.url, Units: a.units, RevenueBRL: a.rev, Sellers: sellers, Languages: flattenLangs(a.langs)})
 	}
+	return out
+}
+
+// addLangSale accumulates one language's units and revenue for a card.
+func addLangSale(langs map[string]*LangSale, code string, units int, revenue float64) {
+	l := langs[code]
+	if l == nil {
+		l = &LangSale{Code: code}
+		langs[code] = l
+	}
+	l.Units += units
+	l.RevenueBRL += revenue
+}
+
+// flattenLangs orders a card's language split biggest-first so the UI can show
+// the dominant printing without re-sorting.
+func flattenLangs(langs map[string]*LangSale) []LangSale {
+	out := make([]LangSale, 0, len(langs))
+	for _, l := range langs {
+		out = append(out, *l)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Units != out[j].Units {
+			return out[i].Units > out[j].Units
+		}
+		return out[i].Code < out[j].Code
+	})
 	return out
 }
 

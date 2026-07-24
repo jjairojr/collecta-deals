@@ -53,6 +53,20 @@ type CardSale struct {
 	Units      int          `json:"units"`
 	RevenueBRL float64      `json:"revenueBRL"`
 	Sellers    []CardSeller `json:"sellers,omitempty"`
+	// Languages splits the units across the printings that actually sold. Stock
+	// is diffed per language already (saleKey), so this costs nothing extra and
+	// matters on multi-language markets like Pokémon, where a Portuguese copy and
+	// an English one are different products at different prices.
+	Languages []LangSale `json:"languages,omitempty"`
+}
+
+// LangSale is one language's share of a card's inferred sales. Code is the raw
+// Liga idioma code (2=EN, 6=JP, 8=PT, 11=PT/EN — see game.Game.FloorLangs);
+// naming it is the UI's job, since Liga adds codes we have no label for.
+type LangSale struct {
+	Code       string  `json:"code"`
+	Units      int     `json:"units"`
+	RevenueBRL float64 `json:"revenueBRL"`
 }
 
 type CardSeller struct {

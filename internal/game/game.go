@@ -127,6 +127,14 @@ func (g Game) FloorLangAllowed(lang string) bool {
 	return false
 }
 
+// MultiLanguage reports whether this game's Brazil market prices every language
+// as the same product (no FloorLangs restriction). Only there is a listing's
+// language worth surfacing on its own — elsewhere the floor is English by
+// definition and a JP or PT sale is a footnote, not a distinct market.
+func (g Game) MultiLanguage() bool {
+	return len(g.FloorLangs) == 0
+}
+
 // BuyoutFloorLangs returns the listing languages the buyout/snipe ladders count.
 // It defaults to FloorLangs but a game may narrow it further (e.g. Pokémon drops
 // Japanese from buyout/snipe while JP still counts toward the tracking floor).

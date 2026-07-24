@@ -1,4 +1,4 @@
-import type { CardSale, CardSeller, SnapshotSales } from "./api";
+import type { CardSale, CardSeller, LangSale, SnapshotSales } from "./api";
 
 function cardKey(c: CardSale): string {
   return `${c.set ?? ""}|${c.number}`;
@@ -7,6 +7,7 @@ function cardKey(c: CardSale): string {
 export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
   const byCard = new Map<string, CardSale>();
   const sellersByCard = new Map<string, Map<number, CardSeller>>();
+  const langsByCard = new Map<string, Map<string, LangSale>>();
   for (const snap of snapshots) {
     for (const c of snap.cards ?? []) {
       const key = cardKey(c);
@@ -15,8 +16,9 @@ export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
         existing.units += c.units;
         existing.revenueBRL += c.revenueBRL;
       } else {
-        byCard.set(key, { ...c, sellers: undefined });
+        byCard.set(key, { ...c, sellers: undefined, languages: undefined });
         sellersByCard.set(key, new Map());
+        langsByCard.set(key, new Map());
       }
       const sellers = sellersByCard.get(key);
       if (sellers) {
@@ -30,6 +32,18 @@ export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
           }
         }
       }
+      const langs = langsByCard.get(key);
+      if (langs) {
+        for (const l of c.languages ?? []) {
+          const acc = langs.get(l.code);
+          if (acc) {
+            acc.units += l.units;
+            acc.revenueBRL += l.revenueBRL;
+          } else {
+            langs.set(l.code, { ...l });
+          }
+        }
+      }
     }
   }
   const out: CardSale[] = [];
@@ -37,7 +51,10 @@ export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
     const sellers = [...(sellersByCard.get(key)?.values() ?? [])].sort(
       (a, b) => b.units - a.units || a.storeName.localeCompare(b.storeName),
     );
-    out.push({ ...card, sellers });
+    const languages = [...(langsByCard.get(key)?.values() ?? [])].sort(
+      (a, b) => b.units - a.units || a.code.localeCompare(b.code),
+    );
+    out.push({ ...card, sellers, languages });
   }
   out.sort(
     (a, b) => b.revenueBRL - a.revenueBRL || b.units - a.units || a.number.localeCompare(b.number),

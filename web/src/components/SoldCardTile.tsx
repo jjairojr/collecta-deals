@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { CardSale } from "../api";
+import { gameIsMultiLang, getGame, type CardSale, type LangSale } from "../api";
 import { brl0 } from "../format";
+import { langLabel, langTone } from "../lang";
 import CardArt from "./CardArt";
 import { Card } from "./ui/card";
 
@@ -9,9 +10,31 @@ function cleanName(n: string): string {
   return n.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
+// LanguageSplit shows which printing actually moved. On Pokémon the Portuguese
+// and English copies of a card are separate products at separate prices, so
+// "4 sold" alone hides whether the demand was for the cheap PT print or the
+// imported EN one. Only rendered for markets where the distinction exists.
+function LanguageSplit({ languages }: { languages: LangSale[] }) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {languages.map((l) => (
+        <span
+          key={l.code}
+          title={`${l.units} sold in ${langLabel(l.code)} · ${brl0(l.revenueBRL)}`}
+          className={`rounded px-1 py-px text-[10px] font-medium tabular-nums ring-1 ring-inset ${langTone(l.code)}`}
+        >
+          {langLabel(l.code)} ×{l.units}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function SoldCardTile({ card, set }: { card: CardSale; set: string }) {
   const [open, setOpen] = useState(false);
   const sellers = card.sellers ?? [];
+  const languages = card.languages ?? [];
+  const showLanguages = languages.length > 0 && gameIsMultiLang(getGame());
   return (
     <Card className="flex flex-col overflow-hidden p-0">
       <div className="relative">
@@ -36,6 +59,7 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
           {card.number}
           {card.set ? ` · ${card.set}` : ""}
         </div>
+        {showLanguages && <LanguageSplit languages={languages} />}
         {sellers.length > 0 && (
           <div className="mt-auto pt-1.5">
             <button

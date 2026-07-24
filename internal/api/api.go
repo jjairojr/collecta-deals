@@ -146,18 +146,20 @@ func (s *Server) Handler() http.Handler {
 }
 
 type gameInfo struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	HasDeals bool   `json:"hasDeals"`
-	HasMyP   bool   `json:"hasMyP"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	HasDeals  bool   `json:"hasDeals"`
+	HasMyP    bool   `json:"hasMyP"`
+	MultiLang bool   `json:"multiLang"`
 }
 
 func (s *Server) gameInfoFor(gs *GameStack) gameInfo {
 	return gameInfo{
-		ID:       gs.Game.ID,
-		Name:     gs.Game.Name,
-		HasDeals: gs.Game.HasDeals() && gs.Deals != nil,
-		HasMyP:   gs.Game.MyP != nil && gs.Deals != nil,
+		ID:        gs.Game.ID,
+		Name:      gs.Game.Name,
+		HasDeals:  gs.Game.HasDeals() && gs.Deals != nil,
+		HasMyP:    gs.Game.MyP != nil && gs.Deals != nil,
+		MultiLang: gs.Game.MultiLanguage(),
 	}
 }
 

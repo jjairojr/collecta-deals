@@ -18,6 +18,68 @@ func pricedQty(id int, name string, n int, price float64) StoreQty {
 	return StoreQty{StoreID: id, StoreName: name, Condition: "2", Language: "2", Quantity: n, Known: true, PriceBRL: price, PriceKnown: true}
 }
 
+func langQty(id int, name, lang string, n int, price float64) StoreQty {
+	return StoreQty{StoreID: id, StoreName: name, Condition: "2", Language: lang, Quantity: n, Known: true, PriceBRL: price, PriceKnown: true}
+}
+
+func langFor(c CardSale, code string) (LangSale, bool) {
+	for _, l := range c.Languages {
+		if l.Code == code {
+			return l, true
+		}
+	}
+	return LangSale{}, false
+}
+
+// TestSalesSplitByLanguage covers the multi-language (Pokémon) market: the same
+// store lists a Portuguese and an English copy at different prices, and each
+// language's units and revenue must be attributed separately.
+func TestSalesSplitByLanguage(t *testing.T) {
+	d1 := day("2026-07-01", card("DRI-006", 10, langQty(1, "A", "8", 5, 10), langQty(1, "A", "2", 3, 40)))
+	d2 := day("2026-07-02", card("DRI-006", 10, langQty(1, "A", "8", 2, 10), langQty(1, "A", "2", 2, 40)))
+	snaps := SalesBySnapshot([]DaySnapshot{d1, d2})
+	if len(snaps) != 1 {
+		t.Fatalf("intervals = %d, want 1", len(snaps))
+	}
+	c := snaps[0].Cards[0]
+	if c.Units != 4 || c.RevenueBRL != 70 {
+		t.Fatalf("card = units %d rev %v, want units 4 rev 70 (3 PT @10 + 1 EN @40)", c.Units, c.RevenueBRL)
+	}
+	if len(c.Languages) != 2 {
+		t.Fatalf("languages = %+v, want 2 entries", c.Languages)
+	}
+	// biggest-first: PT sold 3, EN sold 1
+	if c.Languages[0].Code != "8" || c.Languages[0].Units != 3 || c.Languages[0].RevenueBRL != 30 {
+		t.Errorf("languages[0] = %+v, want PT (8) units 3 rev 30", c.Languages[0])
+	}
+	if c.Languages[1].Code != "2" || c.Languages[1].Units != 1 || c.Languages[1].RevenueBRL != 40 {
+		t.Errorf("languages[1] = %+v, want EN (2) units 1 rev 40", c.Languages[1])
+	}
+}
+
+// TestTopSoldMergesLanguages verifies the language split survives merging across
+// snapshot intervals, and that an even split falls back to a stable code order.
+func TestTopSoldMergesLanguages(t *testing.T) {
+	d1 := day("2026-07-01", card("DRI-006", 10, langQty(1, "A", "8", 5, 10), langQty(1, "A", "2", 3, 40)))
+	d2 := day("2026-07-02", card("DRI-006", 10, langQty(1, "A", "8", 2, 10), langQty(1, "A", "2", 2, 40)))
+	d3 := day("2026-07-03", card("DRI-006", 10, langQty(1, "A", "8", 2, 10), langQty(1, "A", "2", 0, 40)))
+	top := TopSoldCards([]DaySnapshot{d1, d2, d3})
+	if len(top) != 1 {
+		t.Fatalf("top = %+v, want single card", top)
+	}
+	pt, ok := langFor(top[0], "8")
+	if !ok || pt.Units != 3 || pt.RevenueBRL != 30 {
+		t.Errorf("PT = %+v, want units 3 rev 30", pt)
+	}
+	en, ok := langFor(top[0], "2")
+	if !ok || en.Units != 3 || en.RevenueBRL != 120 {
+		t.Errorf("EN = %+v, want units 3 rev 120 (1 + 2 @40)", en)
+	}
+	if top[0].Languages[0].Code != "2" {
+		t.Errorf("tie order = %s, want lowest code (2) first on equal units", top[0].Languages[0].Code)
+	}
+}
+
 // TestSalesUsePerStorePrice verifies revenue and the seller price reflect what
 // each store was actually listing at, not the card's floor, when prices are known.
 func TestSalesUsePerStorePrice(t *testing.T) {
