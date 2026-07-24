@@ -20,7 +20,9 @@ function LanguageSplit({ languages }: { languages: LangSale[] }) {
       {languages.map((l) => (
         <span
           key={l.code}
-          title={`${l.units} sold in ${langLabel(l.code)} · ${brl0(l.revenueBRL)}`}
+          title={`${l.units} sold in ${langLabel(l.code)} · ${brl0(l.revenueBRL)} total · ${brl0(
+            l.units > 0 ? l.revenueBRL / l.units : 0,
+          )} avg`}
           className={`rounded px-1 py-px text-[10px] font-medium tabular-nums ring-1 ring-inset ${langTone(l.code)}`}
         >
           {langLabel(l.code)} ×{l.units}
@@ -34,7 +36,11 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
   const [open, setOpen] = useState(false);
   const sellers = card.sellers ?? [];
   const languages = card.languages ?? [];
-  const showLanguages = languages.length > 0 && gameIsMultiLang(getGame());
+  const multiLang = gameIsMultiLang(getGame());
+  const showLanguages = languages.length > 0 && multiLang;
+  // Sellers are split per language, so one store can hold two rows; the header
+  // counts shops, not rows.
+  const storeCount = new Set(sellers.map((s) => s.storeId)).size;
   return (
     <Card className="flex flex-col overflow-hidden p-0">
       <div className="relative">
@@ -68,7 +74,7 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
               className="flex w-full items-center justify-between rounded-md bg-slate-800/60 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-slate-800"
             >
               <span>
-                {sellers.length} store{sellers.length === 1 ? "" : "s"}
+                {storeCount} store{storeCount === 1 ? "" : "s"}
               </span>
               <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
@@ -76,13 +82,21 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
               <ul className="mt-1 space-y-0.5">
                 {sellers.map((s) => (
                   <li
-                    key={s.storeId}
+                    key={`${s.storeId}-${s.language ?? ""}`}
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-0.5 text-[11px] hover:bg-slate-800/40"
                   >
                     <span className="truncate text-slate-400" title={s.storeName}>
                       {s.storeName}
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
+                      {multiLang && s.language && (
+                        <span
+                          className={`rounded px-1 text-[9px] font-medium ring-1 ring-inset ${langTone(s.language)}`}
+                          title={`sold in ${langLabel(s.language)}`}
+                        >
+                          {langLabel(s.language)}
+                        </span>
+                      )}
                       {s.priceBRL > 0 && (
                         <span className="text-emerald-300" title="price this store sold at">
                           {brl0(s.priceBRL)}

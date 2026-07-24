@@ -193,6 +193,7 @@ export interface CardSeller {
   units: number;
   revenueBRL: number;
   priceBRL: number;
+  language?: string;
 }
 
 export interface LangSale {

@@ -4,9 +4,15 @@ function cardKey(c: CardSale): string {
   return `${c.set ?? ""}|${c.number}`;
 }
 
+// sellerKey mirrors the API's per-store, per-language grouping: one store that
+// sold both a PT and an EN copy stays two rows, each with its own price.
+function sellerKey(s: CardSeller): string {
+  return `${s.storeId}|${s.language ?? ""}`;
+}
+
 export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
   const byCard = new Map<string, CardSale>();
-  const sellersByCard = new Map<string, Map<number, CardSeller>>();
+  const sellersByCard = new Map<string, Map<string, CardSeller>>();
   const langsByCard = new Map<string, Map<string, LangSale>>();
   for (const snap of snapshots) {
     for (const c of snap.cards ?? []) {
@@ -23,12 +29,15 @@ export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
       const sellers = sellersByCard.get(key);
       if (sellers) {
         for (const s of c.sellers ?? []) {
-          const se = sellers.get(s.storeId);
+          const se = sellers.get(sellerKey(s));
           if (se) {
             se.units += s.units;
             se.revenueBRL += s.revenueBRL;
+            // Re-average: a store that sold at two different prices across the
+            // range must not keep the first interval's price as its label.
+            se.priceBRL = se.units > 0 ? se.revenueBRL / se.units : se.priceBRL;
           } else {
-            sellers.set(s.storeId, { ...s });
+            sellers.set(sellerKey(s), { ...s });
           }
         }
       }
@@ -49,7 +58,10 @@ export function mergeSnapshotCards(snapshots: SnapshotSales[]): CardSale[] {
   const out: CardSale[] = [];
   for (const [key, card] of byCard) {
     const sellers = [...(sellersByCard.get(key)?.values() ?? [])].sort(
-      (a, b) => b.units - a.units || a.storeName.localeCompare(b.storeName),
+      (a, b) =>
+        b.units - a.units ||
+        a.storeName.localeCompare(b.storeName) ||
+        (a.language ?? "").localeCompare(b.language ?? ""),
     );
     const languages = [...(langsByCard.get(key)?.values() ?? [])].sort(
       (a, b) => b.units - a.units || a.code.localeCompare(b.code),

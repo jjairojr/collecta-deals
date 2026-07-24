@@ -12,6 +12,13 @@ type saleKey struct {
 	Language  string
 }
 
+// sellerKey groups a card's sales per store AND language, so each row reports the
+// price that store actually sold that printing at.
+type sellerKey struct {
+	StoreID  int
+	Language string
+}
+
 func PriceTrends(today, prev DaySnapshot) []CardTrend {
 	prevLow := make(map[string]float64, len(prev.Cards))
 	for _, c := range prev.Cards {
@@ -211,7 +218,7 @@ func salesBetween(prev, cur DaySnapshot) []CardSale {
 		url     string
 		units   int
 		rev     float64
-		sellers map[int]*CardSeller
+		sellers map[sellerKey]*CardSeller
 		langs   map[string]*LangSale
 	}
 	prevQ := indexQuantities(prev)
@@ -235,7 +242,7 @@ func salesBetween(prev, cur DaySnapshot) []CardSale {
 			a = &agg{
 				name:    curName[key.Number],
 				url:     curURL[key.Number],
-				sellers: map[int]*CardSeller{},
+				sellers: map[sellerKey]*CardSeller{},
 				langs:   map[string]*LangSale{},
 			}
 			byCard[key.Number] = a
@@ -243,10 +250,11 @@ func salesBetween(prev, cur DaySnapshot) []CardSale {
 		a.units += drop
 		a.rev += revenue
 		addLangSale(a.langs, key.Language, drop, revenue)
-		seller := a.sellers[key.StoreID]
+		sk := sellerKey{StoreID: key.StoreID, Language: key.Language}
+		seller := a.sellers[sk]
 		if seller == nil {
-			seller = &CardSeller{StoreID: key.StoreID, StoreName: storeLabel(cq)}
-			a.sellers[key.StoreID] = seller
+			seller = &CardSeller{StoreID: key.StoreID, StoreName: storeLabel(cq), Language: key.Language}
+			a.sellers[sk] = seller
 		}
 		seller.Units += drop
 		seller.RevenueBRL += revenue
@@ -272,7 +280,7 @@ func mergeSales(groups [][]CardSale) []CardSale {
 		url     string
 		units   int
 		rev     float64
-		sellers map[int]*CardSeller
+		sellers map[sellerKey]*CardSeller
 		langs   map[string]*LangSale
 	}
 	byCard := map[string]*agg{}
@@ -280,7 +288,7 @@ func mergeSales(groups [][]CardSale) []CardSale {
 		for _, c := range group {
 			a := byCard[c.Number]
 			if a == nil {
-				a = &agg{name: c.Name, url: c.URL, sellers: map[int]*CardSeller{}, langs: map[string]*LangSale{}}
+				a = &agg{name: c.Name, url: c.URL, sellers: map[sellerKey]*CardSeller{}, langs: map[string]*LangSale{}}
 				byCard[c.Number] = a
 			}
 			a.units += c.Units
@@ -289,10 +297,11 @@ func mergeSales(groups [][]CardSale) []CardSale {
 				addLangSale(a.langs, l.Code, l.Units, l.RevenueBRL)
 			}
 			for _, se := range c.Sellers {
-				seller := a.sellers[se.StoreID]
+				sk := sellerKey{StoreID: se.StoreID, Language: se.Language}
+				seller := a.sellers[sk]
 				if seller == nil {
-					seller = &CardSeller{StoreID: se.StoreID, StoreName: se.StoreName}
-					a.sellers[se.StoreID] = seller
+					seller = &CardSeller{StoreID: se.StoreID, StoreName: se.StoreName, Language: se.Language}
+					a.sellers[sk] = seller
 				}
 				seller.Units += se.Units
 				seller.RevenueBRL += se.RevenueBRL
@@ -365,7 +374,10 @@ func sortSellers(sellers []CardSeller) {
 		if sellers[i].Units != sellers[j].Units {
 			return sellers[i].Units > sellers[j].Units
 		}
-		return sellers[i].StoreName < sellers[j].StoreName
+		if sellers[i].StoreName != sellers[j].StoreName {
+			return sellers[i].StoreName < sellers[j].StoreName
+		}
+		return sellers[i].Language < sellers[j].Language
 	})
 }
 

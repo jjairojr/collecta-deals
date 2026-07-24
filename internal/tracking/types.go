@@ -77,6 +77,11 @@ type CardSeller struct {
 	// PriceBRL is the store's own per-unit sale price (revenue / units), i.e. what
 	// this store was actually listing the sold copies at — not the card's floor.
 	PriceBRL float64 `json:"priceBRL"`
+	// Language is the Liga idioma code these copies were listed in. A store that
+	// moved both a Portuguese and an English copy appears once per language: the
+	// two sell at different prices, and one blended per-unit figure would be a
+	// price neither copy was ever offered at.
+	Language string `json:"language,omitempty"`
 }
 
 type SnapshotSales struct {

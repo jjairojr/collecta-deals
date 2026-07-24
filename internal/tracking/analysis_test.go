@@ -57,6 +57,32 @@ func TestSalesSplitByLanguage(t *testing.T) {
 	}
 }
 
+// TestSellersSplitByLanguage covers the reason the split exists: one store moved
+// both printings, and each row must carry the price that printing actually sold
+// at. A single blended row would report R$17.50 — a price neither copy was
+// listed at.
+func TestSellersSplitByLanguage(t *testing.T) {
+	d1 := day("2026-07-01", card("DRI-006", 10, langQty(1, "A", "8", 5, 10), langQty(1, "A", "2", 3, 40)))
+	d2 := day("2026-07-02", card("DRI-006", 10, langQty(1, "A", "8", 2, 10), langQty(1, "A", "2", 2, 40)))
+	c := SalesBySnapshot([]DaySnapshot{d1, d2})[0].Cards[0]
+	if len(c.Sellers) != 2 {
+		t.Fatalf("sellers = %+v, want 2 rows (one store, two languages)", c.Sellers)
+	}
+	byLang := map[string]CardSeller{}
+	for _, s := range c.Sellers {
+		if s.StoreID != 1 {
+			t.Fatalf("seller %+v, want store 1", s)
+		}
+		byLang[s.Language] = s
+	}
+	if pt := byLang["8"]; pt.Units != 3 || pt.PriceBRL != 10 {
+		t.Errorf("PT seller = %+v, want units 3 @10", pt)
+	}
+	if en := byLang["2"]; en.Units != 1 || en.PriceBRL != 40 {
+		t.Errorf("EN seller = %+v, want units 1 @40", en)
+	}
+}
+
 // TestTopSoldMergesLanguages verifies the language split survives merging across
 // snapshot intervals, and that an even split falls back to a stable code order.
 func TestTopSoldMergesLanguages(t *testing.T) {
