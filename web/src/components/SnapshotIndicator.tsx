@@ -33,10 +33,10 @@ export default function SnapshotIndicator() {
       <button
         type="button"
         onClick={toggle}
-        className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-1.5 transition-colors hover:border-slate-700 hover:bg-slate-900"
+        className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5 transition-colors hover:border-slate-700 hover:bg-slate-900"
       >
-        <Clock className="h-3.5 w-3.5 text-sky-300" />
-        <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+        <Clock className="h-3.5 w-3.5 text-brand" />
+        <span className="font-pixel text-[9px] uppercase text-brand-soft">
           Snapshot
         </span>
         <span className="text-sm font-semibold tabular-nums text-slate-200">
@@ -56,8 +56,8 @@ export default function SnapshotIndicator() {
             className="fixed inset-0 z-10 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
-            <div className="border-b border-slate-800 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <div className="absolute right-0 z-20 mt-1 w-56 rounded-[12px] border-2 border-outline bg-surface shadow-xl">
+            <div className="border-b-2 border-outline px-3 py-2 font-pixel text-[9px] uppercase text-brand-soft">
               Recent snapshots
             </div>
             {dates.length === 0 ? (
@@ -71,7 +71,7 @@ export default function SnapshotIndicator() {
                   >
                     <span className="tabular-nums text-slate-200">{stampLabel(d)}</span>
                     {i === 0 && (
-                      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
+                      <span className="rounded-[6px] border-2 border-outline bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
                         latest
                       </span>
                     )}

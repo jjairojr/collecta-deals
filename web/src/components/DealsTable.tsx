@@ -41,7 +41,7 @@ export default function DealsTable({ deals, showDepth = true }: { deals: Deal[];
     backfill(deals.map(dealSelection).filter((c): c is NonNullable<typeof c> => c !== null));
   }, [deals, backfill]);
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+    <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
       <Table className="min-w-[1040px]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -125,7 +125,7 @@ export default function DealsTable({ deals, showDepth = true }: { deals: Deal[];
                     href={d.tcgUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300 ring-1 ring-inset ring-sky-500/30 hover:bg-sky-500/20"
+                    className="rounded-[8px] border-2 border-outline bg-sky-500/15 px-2 py-1 text-xs font-bold text-sky-300 hover:bg-sky-500/25"
                   >
                     TCG
                   </a>
@@ -133,7 +133,7 @@ export default function DealsTable({ deals, showDepth = true }: { deals: Deal[];
                     href={d.buyUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/20"
+                    className="rounded-[8px] border-2 border-outline bg-emerald-500/15 px-2 py-1 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25"
                   >
                     {sourceLabel(d.source)}
                   </a>

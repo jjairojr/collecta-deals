@@ -19,11 +19,11 @@ function BrandHeader({ game }: { game: string }) {
   const BrandIcon = brand.icon;
   return (
     <div className={cn("flex items-center gap-2.5 px-1 pt-1", collapsed && "lg:justify-center lg:px-0")}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500/25 to-accent-500/5 ring-1 ring-inset ring-accent-500/25">
-        <BrandIcon className="h-5 w-5 text-accent-300" />
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border-[3px] border-outline bg-royal shadow-[3px_3px_0_#0b0b0c]">
+        <BrandIcon className="h-5 w-5 text-white" />
       </div>
       <div className={cn("min-w-0", collapsed && "lg:hidden")}>
-        <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-slate-100">{brand.title}</h1>
+        <h1 className="font-display truncate text-lg font-extrabold leading-tight tracking-tight text-white">{brand.title}</h1>
         <p className="truncate text-[11px] leading-tight text-slate-500">{brand.sub}</p>
       </div>
     </div>
@@ -44,7 +44,7 @@ function GameSwitcher({
     return null;
   }
   return (
-    <div className="grid grid-cols-4 gap-1 rounded-xl border border-slate-800 bg-slate-950/40 p-1">
+    <div className="grid grid-cols-4 gap-1 rounded-[10px] border-[3px] border-outline bg-outline p-1">
       {games.map((g) => {
         const active = g.id === game;
         return (
@@ -54,8 +54,8 @@ function GameSwitcher({
             onClick={() => onChange(g.id)}
             title={g.name}
             className={cn(
-              "rounded-lg px-1 py-1.5 text-[11px] font-semibold transition-colors",
-              active ? "bg-accent-500/15 text-accent-200 ring-1 ring-inset ring-accent-500/30" : "text-slate-400 hover:bg-slate-800/70 hover:text-slate-200",
+              "font-pixel rounded-[7px] px-1 py-2 text-[10px] transition-colors",
+              active ? "bg-brand text-white" : "text-slate-400 hover:bg-slate-800/70 hover:text-white",
             )}
           >
             {brandFor(g.id).short}
@@ -74,9 +74,9 @@ function FooterStatus({ status }: { status: Status | null }) {
   const word = refreshing ? "Syncing" : ready ? "Live" : "Waiting";
 
   return (
-    <div className={cn("flex items-center gap-2 px-1 text-[11px] text-slate-500", collapsed && "lg:justify-center lg:px-0")}>
+    <div className={cn("flex items-center gap-2 px-1 text-slate-500", collapsed && "lg:justify-center lg:px-0")}>
       <span className={cn("h-2 w-2 shrink-0 rounded-full", dotClass)} title={word} />
-      <span className={cn(refreshing && "text-amber-400", collapsed && "lg:hidden")}>{word}</span>
+      <span className={cn("font-pixel text-[9px] uppercase", refreshing && "text-amber-400", collapsed && "lg:hidden")}>{word}</span>
     </div>
   );
 }

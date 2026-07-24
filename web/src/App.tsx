@@ -13,6 +13,7 @@ import DealsPage from "./components/DealsPage";
 import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
 import AllPortfolioPage from "./components/AllPortfolioPage";
+import StockPage from "./components/StockPage";
 import BuyoutPage from "./components/BuyoutPage";
 import BrowsePage from "./components/BrowsePage";
 import QuotePage from "./components/QuotePage";
@@ -47,6 +48,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   allportfolio: {
     title: "All Games",
     description: "Combined portfolio across every game.",
+  },
+  estoque: {
+    title: "Estoque",
+    description: "Defina preços e escolha o que aparece na vitrine pública.",
   },
   orcamento: {
     title: "Orçamento",
@@ -173,6 +178,10 @@ export default function App() {
                     }}
                   />
                 </div>
+              ) : activeView === "estoque" ? (
+                <div className="mt-6">
+                  <StockPage />
+                </div>
               ) : activeView === "orcamento" ? (
                 <div className="mt-6">
                   <QuotePage />
@@ -222,7 +231,7 @@ function useView(): [View, (v: View) => void] {
 function Footer({ game, hasDeals }: { game: string; hasDeals: boolean }) {
   const liga = ligaLabels[game] ?? "Liga";
   return (
-    <footer className="mx-auto w-full max-w-7xl border-t border-slate-800/80 px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
+    <footer className="mx-auto w-full max-w-7xl border-t-4 border-outline px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
       {hasDeals ? (
         <>
           Margin is an FX-adjusted gross price gap (lowest current TCGPlayer listing vs cheapest {liga} price). It does

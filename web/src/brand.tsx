@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   LineChart,
   Sparkles,
+  Store,
   Swords,
   Wallet,
   Wand2,
@@ -21,6 +22,7 @@ export type View =
   | "sealed"
   | "portfolio"
   | "allportfolio"
+  | "estoque"
   | "orcamento"
   | "buyout";
 
@@ -57,6 +59,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { key: "portfolio", label: "Portfolio", icon: Wallet },
       { key: "allportfolio", label: "All Games", icon: Layers },
+      { key: "estoque", label: "Estoque", icon: Store },
       { key: "orcamento", label: "Orçamento", icon: FileText },
       { key: "buyout", label: "Buyout", icon: HandCoins },
     ],

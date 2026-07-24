@@ -131,7 +131,7 @@ export default function QuotePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">Orçamentos</h1>
+          <h1 className="font-display text-lg font-extrabold text-white">Orçamentos</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Monte orçamentos de compra de coleções: pesquise as cartas, ajuste quantidades e
             preços, aplique o deságio e copie a oferta pronta pro WhatsApp.
@@ -155,7 +155,7 @@ export default function QuotePage() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
+        <div className="rounded-[14px] border-2 border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -165,15 +165,15 @@ export default function QuotePage() {
       ) : quotes.length === 0 ? (
         <Panel>Nenhum orçamento salvo. Clique em “Novo orçamento” pra montar o primeiro.</Panel>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+        <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="w-full px-3 py-2 font-medium">Orçamento</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Cartas</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Mercado</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Oferta</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Atualizado</th>
+              <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+                <th className="w-full px-3 py-2 font-bold">Orçamento</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Cartas</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Mercado</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Oferta</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Atualizado</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -182,7 +182,7 @@ export default function QuotePage() {
                 const total = quoteTotal(q.items);
                 const units = q.items.reduce((sum, it) => sum + it.qty, 0);
                 return (
-                  <tr key={q.id} className="border-b border-slate-800/60 last:border-0">
+                  <tr key={q.id} className="border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40">
                     <td className="w-full max-w-0 px-3 py-2">
                       <button
                         onClick={() => setEditing(q)}
@@ -212,7 +212,7 @@ export default function QuotePage() {
                               deleteQuote(q.id).then(load);
                             }
                           }}
-                          className="rounded-md border border-slate-700 bg-slate-800/60 p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+                          className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
                           title="Excluir"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -402,7 +402,7 @@ function QuoteEditor({
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
+        <div className="rounded-[14px] border-2 border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -412,24 +412,24 @@ function QuoteEditor({
       {items.length === 0 ? (
         <Panel>Pesquise uma carta acima pra começar o orçamento.</Panel>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+        <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="w-full px-3 py-2 font-medium">Carta</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Qtd</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Liga R$</th>
-                {!brOnly && <th className="whitespace-nowrap px-3 py-2 text-right font-medium">TCG</th>}
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Unitário R$</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">%</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Total</th>
-                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Oferta</th>
+              <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+                <th className="w-full px-3 py-2 font-bold">Carta</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Qtd</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Liga R$</th>
+                {!brOnly && <th className="whitespace-nowrap px-3 py-2 text-right font-bold">TCG</th>}
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Unitário R$</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">%</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Total</th>
+                <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Oferta</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
               {items.map((it, idx) => (
-                <tr key={`${it.number}-${it.name}`} className="border-b border-slate-800/60 last:border-0">
+                <tr key={`${it.number}-${it.name}`} className="border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40">
                   <td className="w-full max-w-0 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <CardArt set={it.set} number={it.number} name={it.name} productID={it.productID} className="h-12 w-[34px] shrink-0 rounded" />
@@ -503,7 +503,7 @@ function QuoteEditor({
                           href={it.ligaUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300 ring-1 ring-inset ring-amber-500/30 hover:bg-amber-500/20"
+                          className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-300 hover:bg-amber-500/20"
                           title="Ver na Liga"
                         >
                           Liga <ExternalLink className="h-3 w-3" />
@@ -514,7 +514,7 @@ function QuoteEditor({
                           href={tcgProductURL(it.productID)}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center gap-1 rounded-md bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300 ring-1 ring-inset ring-sky-500/30 hover:bg-sky-500/20"
+                          className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-sky-500/10 px-2 py-1 text-xs font-bold text-sky-300 hover:bg-sky-500/20"
                           title="Ver no TCGplayer"
                         >
                           TCG <ExternalLink className="h-3 w-3" />
@@ -522,7 +522,7 @@ function QuoteEditor({
                       ) : null}
                       <button
                         onClick={() => removeItem(idx)}
-                        className="rounded-md border border-slate-700 bg-slate-800/60 p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+                        className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
                         title="Remover"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -606,7 +606,7 @@ function CardSearch({
         />
       </Field>
       {matches.length > 0 && (
-        <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+        <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
           {matches.map((m) => (
             <li key={`${m.number}-${m.name}`}>
               <button
@@ -662,7 +662,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-10 text-center text-slate-400">
+    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
       {children}
     </div>
   );

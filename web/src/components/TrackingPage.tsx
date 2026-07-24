@@ -190,26 +190,26 @@ export default function TrackingPage({ mode = "singles" }: { mode?: "singles" | 
         <div className="flex flex-wrap items-center gap-3">
           {!isSealed && <SetSelect sets={sets} value={set} onChange={setSet} allowAll />}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            <span className="font-pixel text-[9px] uppercase text-brand-soft">
               Range
             </span>
             <ToggleGroup value={win} onChange={(v) => isWindow(v) && setWin(v)} options={windowOptions} />
           </div>
           {isAll && (
-            <span className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400">
+            <span className="rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5 text-xs text-slate-400">
               <span className="font-semibold text-slate-200">{sets.length}</span> collections pooled
             </span>
           )}
           {isSealed && (
-            <span className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400">
+            <span className="rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5 text-xs text-slate-400">
               Boxes · packs · decks
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-1.5">
-            <Clock className="h-3.5 w-3.5 text-sky-300" />
-            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <div className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5">
+            <Clock className="h-3.5 w-3.5 text-brand" />
+            <span className="font-pixel text-[9px] uppercase text-brand-soft">
               Last snapshot
             </span>
             {snapshot ? (
@@ -231,7 +231,7 @@ export default function TrackingPage({ mode = "singles" }: { mode?: "singles" | 
       </Card>
 
       {error && (
-        <div className="rounded-xl border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
+        <div className="rounded-[14px] border-2 border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
           Could not load tracking data: {error}
         </div>
       )}
@@ -255,10 +255,10 @@ export default function TrackingPage({ mode = "singles" }: { mode?: "singles" | 
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-sky-300">
+          <span className="text-brand">
             <Boxes className="h-4 w-4" />
           </span>
-          <h2 className="text-sm font-semibold text-slate-200">Collection inventory</h2>
+          <h2 className="font-display text-base font-extrabold text-white">Collection inventory</h2>
           <span className="text-xs text-slate-500">· who holds what, and the chase cards</span>
         </div>
         <InventoryPanel key={set} set={set} />

@@ -11,16 +11,16 @@ export function UsTrust({ listings, qty }: { listings: number; qty: number }) {
   const thin = listings === 1;
   const deep = listings >= 5;
   const tone = thin
-    ? "text-amber-300 ring-amber-500/30 bg-amber-500/10"
+    ? "text-amber-300 bg-amber-500/15"
     : deep
-      ? "text-emerald-300 ring-emerald-500/30 bg-emerald-500/10"
-      : "text-sky-300 ring-sky-500/30 bg-sky-500/10";
+      ? "text-emerald-300 bg-emerald-500/15"
+      : "text-sky-300 bg-sky-500/15";
   return (
     <span
       title={`US floor backed by ${listings} gold-star NM listing${listings === 1 ? "" : "s"}${
         qty > 0 ? `, ${qty} copies available` : ""
       }${thin ? " — one seller, treat the gap with caution" : ""}`}
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums ring-1 ring-inset ${tone}`}
+      className={`inline-flex items-center gap-1 rounded-[8px] border-2 border-outline px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${tone}`}
     >
       {thin ? <AlertTriangle className="h-3 w-3" /> : <Layers className="h-3 w-3" />}
       {thin ? "thin · 1 US listing" : deep ? `deep · ${listings} US` : `${listings} US listings`}

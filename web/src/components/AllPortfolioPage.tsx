@@ -40,7 +40,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">All Portfolios</h1>
+        <h1 className="font-display text-lg font-extrabold text-white">All Portfolios</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Every game's holdings and sales combined in reais. Click a game to open its portfolio.
         </p>
@@ -60,17 +60,17 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
         <PnlKpi icon={<TrendingUp className="h-5 w-5" />} label="Total P&L" value={total.totalPnLBRL} strong />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
-            <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="px-3 py-2 font-medium">Game</th>
-              <th className="px-3 py-2 text-right font-medium">Holding</th>
-              <th className="px-3 py-2 text-right font-medium">Total invested</th>
-              <th className="px-3 py-2 text-right font-medium">Current value</th>
-              <th className="px-3 py-2 text-right font-medium">Unrealized</th>
-              <th className="px-3 py-2 text-right font-medium">Realized</th>
-              <th className="px-3 py-2 text-right font-medium">Total P&L</th>
+            <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+              <th className="px-3 py-2 font-bold">Game</th>
+              <th className="px-3 py-2 text-right font-bold">Holding</th>
+              <th className="px-3 py-2 text-right font-bold">Total invested</th>
+              <th className="px-3 py-2 text-right font-bold">Current value</th>
+              <th className="px-3 py-2 text-right font-bold">Unrealized</th>
+              <th className="px-3 py-2 text-right font-bold">Realized</th>
+              <th className="px-3 py-2 text-right font-bold">Total P&L</th>
             </tr>
           </thead>
           <tbody>
@@ -80,7 +80,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                 <Fragment key={g.game.id}>
                   <tr
                     onClick={() => onOpenGame(g.game.id)}
-                    className="cursor-pointer border-b border-slate-800/60 transition-colors hover:bg-slate-800/40"
+                    className="cursor-pointer border-b-2 border-outline/40 transition-colors hover:bg-slate-800/40"
                   >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -111,7 +111,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                     <PnlCell value={g.summary.totalPnLBRL} strong />
                   </tr>
                   {open && (
-                    <tr className="border-b border-slate-800/60 bg-slate-950/40">
+                    <tr className="border-b-2 border-outline/40 bg-slate-950/40">
                       <td colSpan={7} className="px-3 py-4">
                         <GameDetails summary={g.summary} />
                       </td>
@@ -144,8 +144,8 @@ function GameDetails({ summary }: { summary: PortfolioSummary }) {
 
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+    <div className="rounded-[10px] border-2 border-outline bg-surface px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-0.5 font-semibold tabular-nums text-slate-100">{value}</div>
       {hint && <div className="text-[10px] text-slate-500">{hint}</div>}
     </div>
@@ -155,8 +155,8 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
 function PnlMetric({ label, value }: { label: string; value: number }) {
   const up = value >= 0;
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+    <div className="rounded-[10px] border-2 border-outline bg-surface px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
       <div className={`mt-0.5 font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
         {up ? "+" : "−"}
         {brl0(Math.abs(value))}
@@ -177,7 +177,7 @@ function PnlCell({ value, strong }: { value: number; strong?: boolean }) {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-10 text-center text-slate-400">
+    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
       {children}
     </div>
   );

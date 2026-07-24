@@ -389,7 +389,7 @@ export default function PortfolioPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">Portfolio</h1>
+          <h1 className="font-display text-lg font-extrabold text-white">Portfolio</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {isSealed
               ? "Your sealed buys and sales, valued at your own current-value estimate — no TCGplayer or Liga comparison."
@@ -464,7 +464,7 @@ export default function PortfolioPage() {
       )}
 
       {error && (
-        <div className="rounded-xl border border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
+        <div className="rounded-[14px] border-2 border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
           {error}
         </div>
       )}
@@ -581,7 +581,7 @@ export default function PortfolioPage() {
         <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-slate-200">
+              <h2 className="font-display text-base font-extrabold text-white">
                 Holdings <span className="font-normal text-slate-500">· {visibleHoldings.length}</span>
               </h2>
               <span className="ml-auto tabular-nums text-xs font-medium text-slate-400">
@@ -637,7 +637,7 @@ export default function PortfolioPage() {
                 <ChevronDown
                   className={`h-4 w-4 text-slate-500 transition-transform ${soldOpen ? "" : "-rotate-90"}`}
                 />
-                <h2 className="text-sm font-semibold text-slate-200">
+                <h2 className="font-display text-base font-extrabold text-white">
                   Sold <span className="font-normal text-slate-500">· {soldVisible.length}</span>
                 </h2>
                 <span
@@ -681,14 +681,14 @@ export default function PortfolioPage() {
 
 export function Kpi({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800/70 text-sky-300">{icon}</div>
+    <div className="sticker flex items-center gap-3 rounded-[14px] bg-surface p-4">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">{icon}</div>
       <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-        <div className="truncate text-lg font-semibold tabular-nums text-slate-100">{value}</div>
+        <div className="font-pixel truncate text-[8px] uppercase text-brand-soft">{label}</div>
+        <div className="mt-1 truncate text-xl font-bold tabular-nums text-white">{value}</div>
         {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -696,16 +696,16 @@ export function PnlKpi({ icon, label, value, strong }: { icon: React.ReactNode; 
   const up = value >= 0;
   const tone = up ? "text-emerald-300" : "text-rose-300";
   return (
-    <Card className={`flex items-center gap-3 p-4 ${strong ? "ring-1 ring-inset ring-sky-500/20" : ""}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800/70 ${tone}`}>{icon}</div>
+    <div className={`sticker flex items-center gap-3 rounded-[14px] bg-surface p-4 ${strong ? "ring-2 ring-inset ring-brand/40" : ""}`}>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">{icon}</div>
       <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-        <div className={`truncate text-lg font-semibold tabular-nums ${tone}`}>
+        <div className="font-pixel truncate text-[8px] uppercase text-brand-soft">{label}</div>
+        <div className={`mt-1 truncate text-xl font-bold tabular-nums ${tone}`}>
           {up ? "+" : "−"}
           {brl0(Math.abs(value))}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -723,8 +723,8 @@ function Insight({
   const toneCls = tone === "up" ? "text-emerald-300" : tone === "down" ? "text-rose-300" : "text-slate-100";
   return (
     <Card className="p-3">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-0.5 truncate text-sm font-semibold ${toneCls}`} title={primary}>
+      <div className="font-pixel truncate text-[9px] uppercase text-brand-soft">{label}</div>
+      <div className={`mt-1 truncate text-sm font-semibold ${toneCls}`} title={primary}>
         {primary}
       </div>
       {secondary && <div className="truncate text-[11px] tabular-nums text-slate-500">{secondary}</div>}
@@ -736,10 +736,10 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-colors ${
+      className={`rounded-[8px] border-2 border-outline px-3 py-1 text-xs font-bold transition-colors ${
         active
-          ? "bg-sky-500/20 text-sky-200 ring-sky-500/30"
-          : "bg-slate-900 text-slate-400 ring-slate-700 hover:text-slate-200"
+          ? "bg-sky-500/20 text-sky-200"
+          : "bg-surface text-slate-400 hover:text-slate-200"
       }`}
     >
       {children}
@@ -767,7 +767,7 @@ function GroupBlock({
   const up = g.pnl >= 0;
   const noun = isSealed ? (g.count === 1 ? "item" : "items") : g.count === 1 ? "card" : "cards";
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
+    <div className="overflow-hidden rounded-[14px] border-[3px] border-outline bg-surface">
       <button
         onClick={onToggle}
         className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-800/40"
@@ -794,7 +794,7 @@ function GroupBlock({
         </div>
       </button>
       {open && (
-        <div className="border-t border-slate-800">
+        <div className="border-t-2 border-outline">
           {isSealed ? (
             <SealedTable trades={g.trades} onChanged={onChanged} empty="" sort={sort} onSort={onSort} maxValue={maxValue} bare />
           ) : (
@@ -821,7 +821,7 @@ function SortableTh({
   const activeCol = sort.key === sortKey;
   return (
     <th
-      className={`px-3 py-2 font-medium ${align === "right" ? "text-right" : "text-left"}`}
+      className={`px-3 py-2 font-bold ${align === "right" ? "text-right" : "text-left"}`}
     >
       <button
         type="button"
@@ -852,10 +852,10 @@ function TradeTable({
     return empty ? <Panel>{empty}</Panel> : null;
   }
   return (
-    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40"}>
+    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface"}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
             <SortableTh label="Card" sortKey="name" sort={sort} onSort={onSort} align="left" />
             <SortableTh label="Cost" sortKey="cost" sort={sort} onSort={onSort} />
             <SortableTh label={isBRGame() ? "Floor" : "TCG"} sortKey="market" sort={sort} onSort={onSort} />
@@ -892,10 +892,10 @@ function DeliveryToggle({ t, onChanged }: { t: TradeView; onChanged: () => void 
       onClick={toggle}
       disabled={saving}
       title={t.delivered ? "Delivered — click to mark in transit" : "In transit — click to mark delivered"}
-      className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset disabled:opacity-50 ${
+      className={`flex items-center gap-1 rounded-[8px] border-2 border-outline px-2 py-1 text-xs font-bold disabled:opacity-50 ${
         t.delivered
-          ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30 hover:bg-emerald-500/20"
-          : "bg-amber-500/10 text-amber-300 ring-amber-500/30 hover:bg-amber-500/20"
+          ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+          : "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
       }`}
     >
       {t.delivered ? <Check className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
@@ -924,10 +924,10 @@ function ValueCell({ t, maxValue }: { t: TradeView; maxValue: number }) {
 function MarginPill({ pct, up }: { pct: number; up: boolean }) {
   return (
     <span
-      className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${
+      className={`inline-flex rounded-[6px] border-2 border-outline px-1.5 py-0.5 text-xs font-bold tabular-nums ${
         up
-          ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/20"
-          : "bg-rose-500/10 text-rose-300 ring-rose-500/20"
+          ? "bg-emerald-500/10 text-emerald-300"
+          : "bg-rose-500/10 text-rose-300"
       }`}
     >
       {up ? "+" : ""}
@@ -942,7 +942,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
   const up = t.profitBRL >= 0;
   return (
     <>
-      <tr className={`border-b border-slate-800/60 last:border-0 ${t.realized ? "opacity-60" : ""}`}>
+      <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             <CardArt set={t.set} number={t.number} name={t.name} productID={productIDFromTcgURL(t.tcgUrl)} className="h-12 w-[34px] shrink-0 rounded" />
@@ -978,7 +978,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                 href={t.tcgUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1 rounded-md bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300 ring-1 ring-inset ring-sky-500/30 hover:bg-sky-500/20"
+                className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-sky-500/10 px-2 py-1 text-xs font-bold text-sky-300 hover:bg-sky-500/20"
                 title="See on TCGplayer"
               >
                 TCG <ExternalLink className="h-3 w-3" />
@@ -994,7 +994,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                     setEditing((e) => !e);
                     setSelling(false);
                   }}
-                  className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
                   title="Edit what you paid and the trade details"
                 >
                   <Pencil className="h-3 w-3" /> Edit
@@ -1004,7 +1004,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                     setSelling((s) => !s);
                     setEditing(false);
                   }}
-                  className="rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  className="rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
                 >
                   Sell
                 </button>
@@ -1016,7 +1016,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                   deleteTrade(t.id).then(onChanged);
                 }
               }}
-              className="rounded-md border border-slate-700 bg-slate-800/60 p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+              className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
               title="Delete"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1209,7 +1209,7 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
           />
         </Field>
         {matches.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
             {matches.map((m) => (
               <li key={`${m.number}-${m.name}`}>
                 <button
@@ -1290,10 +1290,10 @@ function SealedTable({
     return empty ? <Panel>{empty}</Panel> : null;
   }
   return (
-    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40"}>
+    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface"}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
             <SortableTh label="Product" sortKey="name" sort={sort} onSort={onSort} align="left" />
             <SortableTh label="Cost" sortKey="cost" sort={sort} onSort={onSort} />
             <SortableTh label="Current R$" sortKey="market" sort={sort} onSort={onSort} />
@@ -1320,10 +1320,10 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
   const up = t.profitBRL >= 0;
   return (
     <>
-      <tr className={`border-b border-slate-800/60 last:border-0 ${t.realized ? "opacity-60" : ""}`}>
+      <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-12 w-[34px] shrink-0 items-center justify-center rounded bg-slate-800/70 text-slate-400">
+            <div className="art-stripes-90 flex h-12 w-[34px] shrink-0 items-center justify-center rounded bg-brand text-white">
               <Package className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -1363,7 +1363,7 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                     setEditing((e) => !e);
                     setSelling(false);
                   }}
-                  className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
                   title="Edit current value and what you paid"
                 >
                   <Pencil className="h-3 w-3" /> Edit
@@ -1373,7 +1373,7 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                     setSelling((s) => !s);
                     setEditing(false);
                   }}
-                  className="rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  className="rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
                 >
                   Sell
                 </button>
@@ -1385,7 +1385,7 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                   deleteTrade(t.id).then(onChanged);
                 }
               }}
-              className="rounded-md border border-slate-700 bg-slate-800/60 p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+              className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
               title="Delete"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1573,7 +1573,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
           />
         </Field>
         {matches.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
             {matches.map((m) => (
               <li key={`${m.number}-${m.name}`}>
                 <button
@@ -1634,7 +1634,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-10 text-center text-slate-400">
+    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
       {children}
     </div>
   );

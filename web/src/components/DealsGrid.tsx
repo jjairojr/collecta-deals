@@ -65,11 +65,11 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
   const { has, toggle } = useSelection();
   const pick = dealSelection(deal);
   return (
-    <Card className="group flex flex-col overflow-hidden p-0 transition hover:border-slate-600">
+    <Card className="group flex flex-col overflow-hidden p-0 transition hover:border-brand">
       <div className="relative">
         <DealArt deal={deal} />
         {pick && (
-          <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-slate-950/80 ring-1 ring-inset ring-slate-700 backdrop-blur">
+          <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] border-2 border-outline bg-ink">
             <Checkbox
               accent="emerald"
               checked={has(pick.set, pick.number)}
@@ -78,7 +78,7 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
           </label>
         )}
         <div
-          className={`absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-slate-950/85 px-2 py-1 text-sm font-bold tabular-nums ring-1 ring-inset backdrop-blur ${tier.text} ${tier.ring}`}
+          className={`absolute right-2 top-2 flex items-center gap-1 rounded-[8px] border-2 border-outline bg-ink px-2 py-1 text-sm font-bold tabular-nums ${tier.text}`}
         >
           <TrendingUp className="h-3.5 w-3.5" />
           {rounded > 0 ? "+" : ""}
@@ -93,7 +93,7 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
             {deal.verified && (
               <span
                 title={`Stock verified live on ${sourceLabel(deal.source)}`}
-                className="ml-auto flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30"
+                className="ml-auto flex items-center gap-1 rounded-[5px] border-2 border-outline bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300"
               >
                 <BadgeCheck className="h-3 w-3" />
                 Stock
@@ -129,8 +129,8 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
           </div>
         </div>
 
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
-          <div className={`h-full rounded-full ${tier.bar}`} style={{ width: `${barWidth}%` }} />
+        <div className="h-2.5 overflow-hidden rounded-[4px] border-2 border-outline bg-outline">
+          <div className={`h-full ${tier.bar}`} style={{ width: `${barWidth}%` }} />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
@@ -143,7 +143,7 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
             href={deal.buyUrl}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/20"
+            className="flex flex-1 items-center justify-center gap-1 rounded-[8px] border-2 border-outline bg-emerald-500/15 px-2 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25"
           >
             Buy · {sourceLabel(deal.source)}
           </a>
@@ -151,7 +151,7 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
             href={deal.tcgUrl}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-sky-500/10 px-2 py-1.5 text-xs font-medium text-sky-300 ring-1 ring-inset ring-sky-500/30 hover:bg-sky-500/20"
+            className="flex flex-1 items-center justify-center gap-1 rounded-[8px] border-2 border-outline bg-sky-500/15 px-2 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/25"
           >
             Sell · TCG <ExternalLink className="h-3 w-3" />
           </a>

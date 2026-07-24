@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,6 +119,43 @@ func (s *Store) Update(id string, mut func(*Trade)) (Trade, error) {
 	return Trade{}, ErrNotFound
 }
 
+// Listing is the storefront state for one holding: its per-unit asking price and
+// whether it is shown on the public catalog.
+type Listing struct {
+	AskBRL float64
+	Listed bool
+}
+
+// SetListings applies storefront listing state to many trades in a single
+// load/persist cycle. Unknown ids are ignored; returns the count updated.
+func (s *Store) SetListings(updates map[string]Listing) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now()
+	n := 0
+	for i := range all {
+		u, ok := updates[all[i].ID]
+		if !ok {
+			continue
+		}
+		all[i].AskBRL = u.AskBRL
+		all[i].Listed = u.Listed
+		all[i].UpdatedAt = now
+		n++
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	if err := s.persist(all); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 type Sale struct {
 	Qty          int
 	SellPrice    float64
@@ -180,6 +218,104 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 
 func round2(v float64) float64 {
 	return math.Round(v*100) / 100
+}
+
+// Merge collapses two or more holdings into a single record. Quantity and
+// shipping are summed; the per-unit buy price becomes the quantity-weighted
+// average, so the combined cost basis equals the sum of the originals (portfolio
+// P&L is unchanged). The oldest selected holding is the primary: it keeps its id
+// (so its asking price, listed flag and any references survive) along with its
+// card identity, store, price and listed state. The buy date becomes the
+// earliest, notes are concatenated, and the lot counts as delivered only when
+// every part was. Sold trades cannot be merged.
+func (s *Store) Merge(ids []string) (Trade, error) {
+	if len(ids) < 2 {
+		return Trade{}, errors.New("select at least two holdings to merge")
+	}
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return Trade{}, err
+	}
+	parts := make([]Trade, 0, len(ids))
+	for _, t := range all {
+		if !want[t.ID] {
+			continue
+		}
+		if t.Status == "sold" {
+			return Trade{}, errors.New("cannot merge a sold trade")
+		}
+		parts = append(parts, t)
+	}
+	if len(parts) != len(want) {
+		return Trade{}, ErrNotFound
+	}
+
+	primary := parts[0]
+	for _, t := range parts[1:] {
+		if t.CreatedAt.Before(primary.CreatedAt) {
+			primary = t
+		}
+	}
+
+	merged := primary
+	totalQty := 0
+	weightedBuy := 0.0
+	shipping := 0.0
+	delivered := true
+	notes := make([]string, 0, len(parts))
+	seenNotes := make(map[string]bool, len(parts))
+	for _, t := range parts {
+		qty := t.Qty
+		if qty <= 0 {
+			qty = 1
+		}
+		totalQty += qty
+		weightedBuy += float64(qty) * t.BuyBRL
+		shipping += t.ShippingBRL
+		if !t.Delivered {
+			delivered = false
+		}
+		if t.BuyDate != "" && (merged.BuyDate == "" || t.BuyDate < merged.BuyDate) {
+			merged.BuyDate = t.BuyDate
+		}
+		if n := t.Notes; n != "" && !seenNotes[n] {
+			seenNotes[n] = true
+			notes = append(notes, n)
+		}
+	}
+
+	merged.ID = primary.ID
+	merged.Qty = totalQty
+	merged.BuyBRL = round2(weightedBuy / float64(totalQty))
+	merged.ShippingBRL = round2(shipping)
+	merged.Delivered = delivered
+	merged.CreatedAt = primary.CreatedAt
+	merged.UpdatedAt = time.Now()
+	if len(notes) > 0 {
+		merged.Notes = strings.Join(notes, "; ")
+	}
+
+	out := make([]Trade, 0, len(all)-len(parts)+1)
+	for _, t := range all {
+		if t.ID == primary.ID {
+			out = append(out, merged)
+			continue
+		}
+		if want[t.ID] {
+			continue
+		}
+		out = append(out, t)
+	}
+	if err := s.persist(out); err != nil {
+		return Trade{}, err
+	}
+	return merged, nil
 }
 
 func (s *Store) Delete(id string) error {

@@ -20,7 +20,7 @@ export function ToggleGroup({
   return (
     <div
       className={cn(
-        "inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5",
+        "inline-flex rounded-[8px] border-[3px] border-outline bg-outline p-0.5",
         className,
       )}
     >
@@ -30,10 +30,10 @@ export function ToggleGroup({
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+            "rounded-[6px] px-3 py-1.5 text-xs font-bold transition-colors",
             value === o.value
-              ? "bg-sky-500/20 text-sky-200"
-              : "text-slate-400 hover:text-slate-200",
+              ? "bg-brand text-white"
+              : "text-slate-400 hover:text-white",
           )}
         >
           {o.label}

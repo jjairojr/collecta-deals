@@ -23,7 +23,7 @@ function SnapshotRow({ snap, set }: { snap: SnapshotSales; set: string }) {
     (a, b) => b.revenueBRL - a.revenueBRL || b.units - a.units || a.number.localeCompare(b.number),
   );
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40">
+    <div className="rounded-[14px] border-2 border-outline bg-surface">
       <button
         type="button"
         disabled={!hasSales}
@@ -72,7 +72,7 @@ function SnapshotRow({ snap, set }: { snap: SnapshotSales; set: string }) {
         )}
       </button>
       {open && hasSales && (
-        <div className="border-t border-slate-800 p-3">
+        <div className="border-t-2 border-outline p-3">
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
             {cards.map((c) => (
               <SoldCardTile key={`${c.set ?? ""}${c.number}`} card={c} set={set} />
@@ -93,7 +93,7 @@ export default function SalesBySnapshot({
 }) {
   if (snapshots.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-4 py-8 text-center text-sm text-slate-500">
+      <div className="rounded-[14px] border-2 border-outline bg-slate-900/30 px-4 py-8 text-center text-sm text-slate-500">
         No snapshot intervals in this range yet.
       </div>
     );

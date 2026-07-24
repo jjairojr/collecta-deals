@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ImageOff } from "lucide-react";
 import { cardImageURL, tcgProductImageURL } from "../api";
 
 export default function CardArt({
@@ -25,9 +26,13 @@ export default function CardArt({
   if (sourceIdx >= sources.length) {
     return (
       <div
-        className={`flex items-center justify-center bg-slate-800 text-center ${className}`}
+        className={`relative flex flex-col items-center justify-center overflow-hidden bg-surface text-center ${className}`}
       >
-        <span className="px-2 font-mono text-[11px] text-slate-500">{number}</span>
+        <div aria-hidden className="art-stripes-45 pointer-events-none absolute inset-0 opacity-70" />
+        <ImageOff aria-hidden className="relative h-auto w-1/3 max-w-[34px] text-brand-soft/60" />
+        <span className="relative mt-1 max-w-full truncate px-1 font-mono text-[10px] leading-tight text-slate-400">
+          {number}
+        </span>
       </div>
     );
   }

@@ -19,12 +19,12 @@ export default function PageHeader({
     <div className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="flex items-center gap-3">
         {IconCmp && (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-800 bg-gradient-to-br from-accent-500/20 to-accent-500/5 text-accent-300 ring-1 ring-inset ring-accent-500/20">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border-[3px] border-outline bg-brand text-white shadow-[3px_3px_0_#0b0b0c]">
             <IconCmp className="h-5 w-5" />
           </div>
         )}
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-100">{title}</h1>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">{title}</h1>
           {description && <p className="mt-0.5 text-sm text-slate-400">{description}</p>}
         </div>
       </div>

@@ -22,7 +22,7 @@ function MoverTile({ trend, set }: { trend: CardTrend; set: string }) {
           className="aspect-[350/489] w-full"
         />
         <div
-          className={`absolute left-2 top-2 flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold tabular-nums shadow ${
+          className={`absolute left-2 top-2 flex items-center gap-1 rounded-[6px] border-2 border-outline px-2 py-0.5 text-xs font-bold tabular-nums ${
             up ? "bg-emerald-400 text-slate-950" : "bg-rose-400 text-slate-950"
           }`}
         >
@@ -72,10 +72,10 @@ export default function PriceMovers({
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-sky-300">
+        <span className="text-brand">
           <TrendingUp className="h-4 w-4" />
         </span>
-        <h2 className="text-sm font-semibold text-slate-200">Biggest price movers</h2>
+        <h2 className="font-display text-base font-extrabold text-white">Biggest price movers</h2>
         <span className="text-xs text-slate-500">
           · {prevDate ? `floor change vs ${stampLabel(prevDate)}` : "floor-price changes"}
         </span>

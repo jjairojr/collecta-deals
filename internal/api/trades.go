@@ -199,6 +199,33 @@ func (s *Server) handleTradesDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
+// handleTradesMerge collapses several holdings of the active game into one,
+// summing quantity/shipping and averaging the buy price (see trades.Store.Merge).
+func (s *Server) handleTradesMerge(w http.ResponseWriter, r *http.Request) {
+	gs := s.stackFor(r.URL.Query())
+	if gs.Trades == nil {
+		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var in struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	merged, err := gs.Trades.Merge(in.IDs)
+	if errors.Is(err, trades.ErrNotFound) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, merged)
+}
+
 type quoteMatch struct {
 	Number     string  `json:"number"`
 	Name       string  `json:"name"`

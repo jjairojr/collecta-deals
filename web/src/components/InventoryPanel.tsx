@@ -65,11 +65,11 @@ function Kpi({
 }) {
   return (
     <Card className="flex items-center gap-3 p-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800/70 text-sky-300">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+        <div className="font-pixel text-[8px] uppercase text-brand-soft">{label}</div>
         <div className="truncate text-lg font-semibold tabular-nums text-slate-100">{value}</div>
         {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
       </div>
@@ -95,7 +95,7 @@ function ChaseCard({ set, card }: { set: string; card: ExpensiveCard }) {
             className="aspect-[350/489] w-full bg-slate-800 object-cover"
           />
         )}
-        <div className="absolute right-2 top-2 rounded-lg bg-slate-950/85 px-2 py-1 text-sm font-bold tabular-nums text-emerald-300 ring-1 ring-inset ring-emerald-500/30 backdrop-blur">
+        <div className="absolute right-2 top-2 rounded-[8px] border-2 border-outline bg-slate-950/85 px-2 py-1 text-sm font-bold tabular-nums text-emerald-300 backdrop-blur">
           {brl0(card.lowBRL)}
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-slate-200">Stores by holdings</h3>
+        <h3 className="font-display text-base font-extrabold text-white">Stores by holdings</h3>
         <ToggleGroup
           value={sort}
           onChange={(v) => {
@@ -249,7 +249,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
         </Card>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-[14px] border-2 border-outline bg-surface">
         <Table className="min-w-[620px]">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -286,8 +286,8 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
       </div>
 
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-slate-200">
-          Most expensive cards <span className="font-normal text-slate-500">& who holds them</span>
+        <h3 className="mb-3 font-display text-base font-extrabold text-white">
+          Most expensive cards <span className="text-sm font-normal text-slate-500">& who holds them</span>
         </h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {summary.expensive.map((c) => (
@@ -301,7 +301,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-10 text-center text-slate-400">
+    <div className="rounded-[14px] border-2 border-outline bg-surface px-4 py-10 text-center text-slate-400">
       {children}
     </div>
   );

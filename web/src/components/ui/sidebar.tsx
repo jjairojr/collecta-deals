@@ -99,7 +99,7 @@ export function Sidebar({ className, children }: { className?: string; children:
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-slate-900/85 backdrop-blur-xl",
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r-4 border-outline bg-surface",
           "transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
           collapsed ? COLLAPSED : EXPANDED,
           mobileOpen ? "translate-x-0" : "-translate-x-full",
@@ -142,7 +142,7 @@ export function SidebarContent({ className, ...props }: HTMLAttributes<HTMLDivEl
 }
 
 export function SidebarFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mt-auto flex flex-col gap-2 border-t border-slate-800/80 p-3", className)} {...props} />;
+  return <div className={cn("mt-auto flex flex-col gap-2 border-t-4 border-outline p-3", className)} {...props} />;
 }
 
 export function SidebarGroup({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -154,7 +154,7 @@ export function SidebarGroupLabel({ className, children }: { className?: string;
   return (
     <span
       className={cn(
-        "px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 transition-opacity duration-200",
+        "font-pixel px-3 pb-1.5 text-[9px] uppercase tracking-normal text-brand-soft transition-opacity duration-200",
         collapsed ? "pointer-events-none h-0 select-none overflow-hidden pb-0 opacity-0 lg:h-0" : "opacity-100",
         className,
       )}
@@ -178,33 +178,25 @@ export function SidebarNavItem({ icon: IconCmp, label, active, badge, className,
       type="button"
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group/item relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium outline-none transition-colors",
-        "focus-visible:ring-2 focus-visible:ring-accent-500/50",
+        "group/item relative flex h-10 items-center gap-3 rounded-[8px] border-2 px-3 text-sm font-medium outline-none transition-colors",
         active
-          ? "bg-accent-500/12 text-accent-200"
-          : "text-slate-400 hover:bg-slate-800/70 hover:text-slate-100",
+          ? "border-outline bg-brand text-white"
+          : "border-transparent text-slate-400 hover:bg-slate-800/70 hover:text-white",
         collapsed && "lg:justify-center lg:px-0",
         className,
       )}
       {...props}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent-400 transition-opacity",
-          active ? "opacity-100" : "opacity-0",
-        )}
-      />
       <IconCmp
         className={cn(
           "h-[18px] w-[18px] shrink-0 transition-colors",
-          active ? "text-accent-300" : "text-slate-500 group-hover/item:text-slate-200",
+          active ? "text-white" : "text-slate-500 group-hover/item:text-slate-200",
         )}
       />
       <span className={cn("flex-1 truncate text-left", collapsed && "lg:hidden")}>{label}</span>
       {badge !== undefined && badge !== null && <span className={cn(collapsed && "lg:hidden")}>{badge}</span>}
       {collapsed && (
-        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs font-medium text-slate-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover/item:opacity-100 lg:block lg:group-hover/item:opacity-100">
+        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-medium text-white opacity-0 shadow-[3px_3px_0_#0b0b0c] transition-opacity duration-150 group-hover/item:opacity-100 lg:block lg:group-hover/item:opacity-100">
           {label}
         </span>
       )}
@@ -239,7 +231,7 @@ export function SidebarMobileTrigger({ className }: { className?: string }) {
       onClick={() => setMobileOpen(true)}
       aria-label="Open navigation"
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/50 lg:hidden",
+        "inline-flex h-9 w-9 items-center justify-center rounded-[8px] border-2 border-outline bg-surface text-slate-300 transition-colors hover:bg-slate-800 hover:text-white lg:hidden",
         className,
       )}
     >

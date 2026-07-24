@@ -23,7 +23,7 @@ const TableRow = forwardRef<HTMLTableRowElement, HTMLAttributes<HTMLTableRowElem
     <tr
       ref={ref}
       className={cn(
-        "border-b border-slate-800/60 transition-colors last:border-0 hover:bg-slate-800/30",
+        "border-b-2 border-outline/40 transition-colors last:border-0 hover:bg-slate-800/40",
         className,
       )}
       {...props}
@@ -37,7 +37,7 @@ const TableHead = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCel
     <th
       ref={ref}
       className={cn(
-        "px-4 py-3 text-left align-middle text-xs font-medium uppercase tracking-wide text-slate-400",
+        "px-4 py-2.5 text-left align-middle text-[10px] font-bold uppercase tracking-wide text-muted",
         className,
       )}
       {...props}

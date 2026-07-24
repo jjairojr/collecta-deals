@@ -50,10 +50,10 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
           name={card.name}
           className="aspect-[350/489] w-full"
         />
-        <div className="absolute left-2 top-2 rounded-lg bg-emerald-400 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-950 shadow">
+        <div className="absolute left-2 top-2 rounded-[8px] border-2 border-outline bg-emerald-400 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-950">
           {brl0(card.revenueBRL)}
         </div>
-        <div className="absolute right-2 top-2 rounded-lg bg-slate-950/85 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-sky-200 ring-1 ring-inset ring-sky-500/30 backdrop-blur">
+        <div className="absolute right-2 top-2 rounded-[8px] border-2 border-outline bg-slate-950/85 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-sky-200 backdrop-blur">
           ×{card.units}
         </div>
       </div>
@@ -71,7 +71,7 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-md bg-slate-800/60 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-slate-800"
+              className="flex w-full items-center justify-between rounded-[6px] border-2 border-outline bg-slate-800/60 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-slate-800"
             >
               <span>
                 {storeCount} store{storeCount === 1 ? "" : "s"}

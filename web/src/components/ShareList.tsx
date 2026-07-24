@@ -207,7 +207,7 @@ export default function ShareList({
     <Card className="space-y-4 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-100">Share list</h3>
+          <h3 className="font-display text-sm font-bold text-white">Share list</h3>
           <p className="mt-0.5 text-xs text-slate-400">
             Pick cards, then Share to WhatsApp. Asking prices are a % of the live
             TCGplayer price, in US$ or R$ — edit any of them. Long lists split into
@@ -216,7 +216,7 @@ export default function ShareList({
         </div>
         <button
           onClick={onClose}
-          className="rounded-md border border-slate-700 bg-slate-800/60 p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+          className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
           title="Close"
         >
           <X className="h-3.5 w-3.5" />
@@ -243,7 +243,7 @@ export default function ShareList({
         )}
         {includeAsking && (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            <span className="font-pixel text-[9px] uppercase text-brand-soft">
               % of TCG
             </span>
             <ToggleGroup
@@ -258,11 +258,11 @@ export default function ShareList({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
-            <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="px-3 py-2 font-medium">
+            <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+              <th className="px-3 py-2 font-bold">
                 <input
                   type="checkbox"
                   aria-label={allSelected ? "Unmark all" : "Mark all"}
@@ -275,16 +275,16 @@ export default function ShareList({
                   className="h-4 w-4 accent-accent-500"
                 />
               </th>
-              <th className="px-3 py-2 font-medium">Card</th>
-              <th className="px-3 py-2 text-right font-medium">TCG</th>
-              {includePaid && <th className="px-3 py-2 text-right font-medium">Paid /ea</th>}
-              {includeAsking && <th className="px-3 py-2 text-right font-medium">%</th>}
+              <th className="px-3 py-2 font-bold">Card</th>
+              <th className="px-3 py-2 text-right font-bold">TCG</th>
+              {includePaid && <th className="px-3 py-2 text-right font-bold">Paid /ea</th>}
+              {includeAsking && <th className="px-3 py-2 text-right font-bold">%</th>}
               {includeAsking && (
-                <th className="px-3 py-2 text-right font-medium">
+                <th className="px-3 py-2 text-right font-bold">
                   Asking {currency === "USD" ? "US$" : "R$"} /ea
                 </th>
               )}
-              {showProfitCol && <th className="px-3 py-2 text-right font-medium">My profit</th>}
+              {showProfitCol && <th className="px-3 py-2 text-right font-bold">My profit</th>}
             </tr>
           </thead>
           <tbody>
@@ -293,7 +293,7 @@ export default function ShareList({
               const paidUnit = t.costBRL / Math.max(t.qty, 1);
               const tcgInCurrency = marketInCurrency(t, currency, fxRate);
               return (
-                <tr key={t.id} className="border-b border-slate-800/60 last:border-0">
+                <tr key={t.id} className="border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40">
                   <td className="px-3 py-2">
                     <input
                       type="checkbox"
@@ -377,7 +377,7 @@ export default function ShareList({
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <span className="font-pixel text-[9px] uppercase text-brand-soft">
             Preview
           </span>
           <ToggleGroup
@@ -387,7 +387,7 @@ export default function ShareList({
           />
         </div>
         {previewMode === "text" ? (
-          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-300">
+          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-[14px] border-[3px] border-outline bg-ink p-3 text-xs text-slate-300">
             {preview || "Select at least one card to build your list."}
           </pre>
         ) : (
@@ -898,14 +898,14 @@ function ImagePreview({
 
   if (selected.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-6 text-center text-xs text-slate-500">
+      <div className="rounded-[14px] border-[3px] border-outline bg-ink p-6 text-center text-xs text-slate-500">
         Select at least one card to build your list.
       </div>
     );
   }
 
   return (
-    <div className="max-h-[36rem] space-y-4 overflow-auto rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+    <div className="max-h-[36rem] space-y-4 overflow-auto rounded-[14px] border-[3px] border-outline bg-ink p-3">
       {pages.map((_, p) => (
         <div key={p} className="space-y-1.5">
           {pages.length > 1 && (
@@ -971,7 +971,7 @@ function SummaryStat({
           : "text-accent-300";
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="font-pixel text-[9px] uppercase text-brand-soft">{label}</span>
       <span className={`font-semibold tabular-nums ${color}`}>{value}</span>
     </div>
   );
@@ -989,15 +989,15 @@ function Toggle({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`flex items-center gap-1.5 rounded-[8px] border-2 px-3 py-1.5 text-xs font-bold transition-colors ${
         on
-          ? "border-accent-500/40 bg-accent-500/15 text-accent-200"
-          : "border-slate-700 bg-slate-800/40 text-slate-400 hover:bg-slate-800"
+          ? "border-outline bg-brand/20 text-brand-soft"
+          : "border-outline bg-surface text-slate-400 hover:bg-slate-800"
       }`}
     >
       <span
-        className={`flex h-3.5 w-3.5 items-center justify-center rounded ${
-          on ? "bg-accent-500 text-slate-950" : "border border-slate-600"
+        className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] ${
+          on ? "bg-brand text-white" : "border-2 border-outline"
         }`}
       >
         {on && <Check className="h-3 w-3" />}

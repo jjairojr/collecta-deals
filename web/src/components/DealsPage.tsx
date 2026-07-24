@@ -248,10 +248,10 @@ function Filters({
                 key={p}
                 type="button"
                 onClick={() => onChange({ ...filters, minMargin: p })}
-                className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-[8px] border-2 border-outline px-2 py-1.5 text-xs font-bold transition-colors ${
                   filters.minMargin === p
-                    ? "bg-accent-500/20 text-accent-200"
-                    : "bg-slate-800/60 text-slate-400 hover:text-slate-200"
+                    ? "bg-brand/20 text-brand-soft"
+                    : "bg-surface text-slate-400 hover:text-slate-200"
                 }`}
               >
                 {p}%
@@ -392,12 +392,12 @@ function Results({
         </span>
         <div className="flex items-center gap-3">
           {loading && <span className="text-xs text-slate-500">updating…</span>}
-          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+          <div className="inline-flex rounded-[8px] border-2 border-outline bg-surface p-0.5">
             <button
               onClick={() => setLayout("grid")}
               aria-label="Grid view"
-              className={`rounded-md p-1.5 transition-colors ${
-                layout === "grid" ? "bg-accent-500/20 text-accent-200" : "text-slate-400 hover:text-slate-200"
+              className={`rounded-[6px] p-1.5 transition-colors ${
+                layout === "grid" ? "bg-brand/20 text-brand-soft" : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -405,8 +405,8 @@ function Results({
             <button
               onClick={() => setLayout("table")}
               aria-label="Table view"
-              className={`rounded-md p-1.5 transition-colors ${
-                layout === "table" ? "bg-accent-500/20 text-accent-200" : "text-slate-400 hover:text-slate-200"
+              className={`rounded-[6px] p-1.5 transition-colors ${
+                layout === "table" ? "bg-brand/20 text-brand-soft" : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <List className="h-4 w-4" />
@@ -426,7 +426,7 @@ function Results({
 function FirstRun({ refreshing }: { refreshing: boolean }) {
   return (
     <Card className="flex flex-col items-center gap-4 py-16 text-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-accent-400" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-outline border-t-brand" />
       <div>
         <p className="font-medium text-slate-200">
           {refreshing ? "Scanning marketplaces…" : "Waiting for first scan…"}

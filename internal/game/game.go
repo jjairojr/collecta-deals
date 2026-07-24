@@ -60,8 +60,8 @@ type Game struct {
 
 	// Challenged reports whether this game's Liga host sits behind Cloudflare's
 	// Managed Challenge and must be fetched through FlareSolverr (a headless
-	// browser) rather than the direct HTTP client. onepiece/riftbound/lorcana are
-	// challenged; pokemon is currently open. Flip if Liga's protection changes.
+	// browser) rather than the direct HTTP client. Every Liga host is currently
+	// challenged, pokemon included since 2026-07-21. Flip if protection changes.
 	Challenged bool
 
 	// MyP configures mypcards.com as a second Brazilian source; nil means the
@@ -352,6 +352,7 @@ func Pokemon() Game {
 			"PBL", "M5", "CRI", "POR", "M4", "ASC", "M3", "M2a", "PFL", "m2", "MEG",
 			"M1S", "M1L", "WHT", "BLK", "DRI", "SV10", "JTG",
 		},
+		Challenged: true,
 	}
 }
 

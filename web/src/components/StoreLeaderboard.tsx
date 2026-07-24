@@ -18,11 +18,11 @@ export default function StoreLeaderboard({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-200">Top selling stores</h2>
-        <div className="inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5 text-xs">
+        <h2 className="font-display text-base font-extrabold text-white">Top selling stores</h2>
+        <div className="inline-flex rounded-[8px] border-2 border-outline bg-surface p-0.5 text-xs">
           <button
             onClick={() => onSortChange("units")}
-            className={`rounded-md px-3 py-1 font-medium transition-colors ${
+            className={`rounded-[6px] px-3 py-1 font-bold transition-colors ${
               sort === "units" ? "bg-sky-500/20 text-sky-200" : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -30,7 +30,7 @@ export default function StoreLeaderboard({
           </button>
           <button
             onClick={() => onSortChange("revenue")}
-            className={`rounded-md px-3 py-1 font-medium transition-colors ${
+            className={`rounded-[6px] px-3 py-1 font-bold transition-colors ${
               sort === "revenue"
                 ? "bg-sky-500/20 text-sky-200"
                 : "text-slate-400 hover:text-slate-200"
@@ -41,11 +41,11 @@ export default function StoreLeaderboard({
         </div>
       </div>
       {stores.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-10 text-center text-slate-400">
+        <div className="rounded-[14px] border-2 border-outline bg-surface px-4 py-10 text-center text-slate-400">
           No sales inferred yet in this range.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+        <div className="overflow-x-auto rounded-[14px] border-2 border-outline bg-surface">
           <Table className="min-w-[520px]">
             <TableHeader>
               <TableRow className="hover:bg-transparent">

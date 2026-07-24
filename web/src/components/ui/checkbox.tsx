@@ -11,7 +11,7 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
       ref={ref}
       type="checkbox"
       className={cn(
-        "h-4 w-4 cursor-pointer rounded border-slate-600",
+        "h-4 w-4 cursor-pointer rounded-[4px] border-2 border-outline",
         accent === "emerald" ? "accent-emerald-500" : "accent-sky-500",
         className,
       )}

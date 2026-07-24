@@ -60,7 +60,7 @@ export default function BrowsePage() {
   return (
     <div className="space-y-4 pb-24">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Browse cards</h1>
+        <h1 className="font-display text-lg font-extrabold text-white">Browse cards</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Tap cards you want to buy, then export a flyer image and copy the message from the bar
           below to post in your WhatsApp group.
@@ -95,10 +95,10 @@ export default function BrowsePage() {
               key={c.number}
               onClick={() => toggle({ set, number: c.number, name: c.name, priceBRL: c.lowBRL })}
               title={c.name}
-              className={`group relative overflow-hidden rounded-lg border bg-slate-900 text-left transition ${
+              className={`group relative overflow-hidden rounded-[12px] border-2 bg-surface text-left transition ${
                 picked
                   ? "border-emerald-400 ring-2 ring-emerald-400/40"
-                  : "border-slate-800 hover:border-slate-600"
+                  : "border-outline hover:border-brand"
               }`}
             >
               <img
@@ -108,10 +108,10 @@ export default function BrowsePage() {
                 className="aspect-[350/489] w-full bg-slate-800 object-cover"
               />
               <span
-                className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border ${
+                className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-[6px] border-2 ${
                   picked
                     ? "border-emerald-400 bg-emerald-400 text-slate-950"
-                    : "border-slate-500 bg-slate-900/70 text-transparent group-hover:text-slate-500"
+                    : "border-outline bg-ink text-transparent group-hover:text-slate-500"
                 }`}
               >
                 <Check className="h-3 w-3" strokeWidth={3} />

@@ -559,6 +559,8 @@ export interface Trade {
   delivered?: boolean;
   refUSD?: number;
   manualBRL?: number;
+  askBRL?: number;
+  listed?: boolean;
   status: "holding" | "sold";
   sellPrice?: number;
   sellCurrency?: "BRL" | "USD";
@@ -708,6 +710,22 @@ export async function deleteQuote(id: string): Promise<void> {
   }
 }
 
+export interface ListingInput {
+  id: string;
+  askBRL: number;
+  listed: boolean;
+}
+
+// setListings persists storefront state (asking price + listed flag) for one or
+// more holdings of the active game in a single batch write.
+export function setListings(items: ListingInput[]): Promise<{ updated: number }> {
+  return sendJSON<{ updated: number }>(
+    `${base}/trades/listings?${gp(new URLSearchParams()).toString()}`,
+    "POST",
+    { items },
+  );
+}
+
 export function createTrade(t: Partial<Trade>): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades?${gp(new URLSearchParams()).toString()}`, "POST", t);
 }
@@ -733,4 +751,8 @@ export async function deleteTrade(id: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`delete failed: ${res.status}`);
   }
+}
+
+export function mergeTrades(ids: string[]): Promise<Trade> {
+  return sendJSON<Trade>(`${base}/trades/merge?${gp(new URLSearchParams()).toString()}`, "POST", { ids });
 }

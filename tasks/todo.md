@@ -393,3 +393,220 @@ Plan: ~/.claude/plans/cheeky-twirling-snowglobe.md
   extension was disconnected so used `Google Chrome --headless --screenshot`.
 - Known minor: PageHeader "Portfolio" sits above the PortfolioPage's own "Portfolio" heading (app
   title + section subtitle). Left as-is per "view internals untouched"; tr­im in a follow-up if wanted.
+
+# MyP re-populate + prod deploy (2026-07-24)
+
+Today's snapshots were re-scraped by the local `-schedule` Docker container → all MyP dropped
+(OP + RFT both 0 mypcards). Task: run MyP for both, then single prod deploy of enriched snapshots.
+
+- [x] Build host `opdeals-server` binary to scratch
+- [x] Throwaway FlareSolverr on host :8191 (existing FS not host-published)
+- [x] Run 1 — OP (~16m): 9877 listings = 5822 ligaonepiece + 4055 mypcards
+- [x] Run 2 — RFT (~16m): 2366 listings = 1307 ligariftbound + 1059 mypcards (OP held idle via ready-copy)
+- [x] Verified both scratch snapshots: liga + mypcards sources, fresh updatedAt (16:30 / 16:47)
+- [x] Backed up (`.bak-nomyp-1648`) + atomically swapped into data/snapshot.json + data/snapshot-rft.json
+- [x] `scripts/sync-up.sh -s` → uploaded all 4 snapshots to prod volume + reload `{"reloaded":4}`
+- [x] Verified prod: OP deals 100% mypcards; RFT deals 74 mypcards + 26 liga
+- [x] Cleanup: dev servers killed, `opdeals-fs-dev` removed
+- [ ] (optional, NOT done — user's running local :8080) `docker restart opdeals` so local also serves MyP
+
+# Vitrine pública (storefront) — plano (2026-07-24)
+
+Objetivo: um site público que o usuário manda o link e a pessoa vê o estoque
+(baseado no portfolio/holdings), monta um carrinho e finaliza no WhatsApp.
+
+## Decisões (fechadas com o usuário)
+- Site **separado em Next.js**, hospedado na **Vercel** (isolamento total do admin;
+  SSR dá preview de link bonito no WhatsApp).
+- Go continua **fonte da verdade**: expõe API read-only, Next só lê (sem migração de DB;
+  "compartilhar o DB" = consumir a API, não acoplar no storage JSON).
+- **Catálogo unificado** (todos os jogos num link, filtrável por jogo/set/busca).
+- Comprador: **carrinho → WhatsApp** (marca várias, manda tudo de uma vez).
+- Limite de segurança: o JSON público **nunca** carrega custo/lucro.
+
+## Fase 1 — Backend Go: `GET /api/storefront`
+- [ ] `internal/api/storefront.go` — handler espelhando `handlePortfolioAll`
+      (itera `orderedGameIDs()`, `gs.Trades.List()`, filtra `Status=="holding" && Qty>0`,
+      `priceLookup(gs)` p/ market). Preço venda = market × pct (default 90).
+- [ ] Struct de resposta **dedicada** (NÃO `TradeView` — ele tem `costBRL`/lucro):
+      `storefrontItem{game,gameLabel,number,name,set,variant,condition,qty,productID,
+      imageURL,askUSD,askBRL,marketKnown}` + `{fxRate,updatedAt,pct,items[]}`.
+- [ ] Arte: URL pública direta — productID → product-images.tcgplayer.com; fallback
+      `{GO}/api/card-image?...` (img cross-origin carrega sem CORS).
+- [ ] Rota + middleware CORS (env `STOREFRONT_ORIGIN`) em /api/storefront (+ /api/card-image).
+- [ ] Funciona em serve-only (GET). Teste garantindo ZERO campo de custo na resposta.
+
+## Fase 2 — Frontend Next.js (`storefront/`)
+- [ ] Scaffold Next App Router + TS + Tailwind. Env: API URL + número WhatsApp.
+- [ ] `/` Server Component (revalidate 60): grid + filtros (jogo/set/busca) + toggle US$/R$.
+- [ ] Carrinho (context + localStorage) → botão "Finalizar no WhatsApp" (wa.me pré-preenchido).
+- [ ] OG meta tags (preview no WhatsApp). Design dark alinhado ao app.
+
+## Fase 3 — Deploy + verificação
+- [ ] Deploy Vercel apontando pro Railway; setar STOREFRONT_ORIGIN no Railway.
+- [ ] Verificar catálogo/filtros/carrinho/WhatsApp/preview e que NENHUM custo vaza (Network).
+
+## Fora do escopo v1
+- Pedido gravando no banco, reserva/checkout/pagamento, preço por-carta international em US$ (v1 guarda R$, deriva US$ pelo câmbio).
+
+## Review (2026-07-24)
+- **Modelo de preço mudou** (pedido do usuário): preços definidos manualmente numa
+  aba "Estoque" no app atual, não % global automático. Campos `AskBRL`+`Listed` no
+  `trades.Trade`; uma carta entra na vitrine só quando `holding && Listed && AskBRL>0`.
+- **Backend:** `internal/api/storefront.go` — `GET /api/storefront` (struct dedicada
+  storefrontItem, SEM custo/lucro — testado em storefront_test.go) agrega holdings de
+  todos os jogos, deriva askUSD por um FX único (primeiro jogo com deals). Arte: tcg CDN
+  via productID do tcgUrl, senão fallback card-image. `POST /api/trades/listings` (batch)
+  + `trades.Store.SetListings`. cors global já é `*`, sem trabalho extra.
+- **Aba Estoque:** `web/src/components/StockPage.tsx` (nav "Estoque" em brand.tsx/App.tsx).
+  Tabela de holdings: preço R$ editável, toggle à venda, "Sugerir %" (do TCG/floor),
+  "Listar/Ocultar todas", Salvar em batch. api.ts: askBRL/listed em Trade + setListings().
+- **Vitrine Collecta:** `storefront/` — Next 15 + React 19 + Tailwind v4, marca Collecta
+  (rosa #F6559B, azul #1355B3, rosa-claro #FDC4E5, fundo #141416). SSR fetch server-only
+  (`STOREFRONT_API`, host do Go NÃO vaza no browser); `/img` proxy pra arte fallback.
+  Catálogo unificado filtrável (jogo/set/busca), toggle R$/US$, carrinho localStorage-less
+  (client state) → "Finalizar no WhatsApp" (`NEXT_PUBLIC_WHATSAPP` placeholder). OG tags.
+- **Verificado:** go build/vet/test ./... limpo; web `npm run build` limpo; storefront
+  `next build` limpo (5 rotas). Screenshot ao vivo pendente (precisa marcar cartas à venda
+  + rodar os 2 servers; não mexi nos trades reais do usuário).
+- **Pendente pra ir ao ar:** deploy `storefront/` na Vercel (env STOREFRONT_API →
+  Railway, NEXT_PUBLIC_WHATSAPP → número real), e o usuário marca as cartas na aba Estoque.
+
+# Collecta Marketplace — arcade redesign (design handoff) (2026-07-24)
+
+Recriar as 5 telas do handoff `storefront/design/design_handoff_collecta_marketplace`
+(Home, Browse singles, Página da carta, Selado, Carrinho) no stack existente.
+Decisões (fechadas com o usuário): **design-first tudo mock**, **rotas reais Next
+(App Router)**, checkout continua **WhatsApp**.
+
+## Fundação
+- [x] globals.css — tokens arcade exatos (#0b0b0c outline, #1f1f22 surface, text sec/ter,
+      on-light-pink), helpers sticker/arcade-press/hard-shadow, keyframes blink/bob/rise,
+      scanlines, prefers-reduced-motion, overflow-x guard
+- [x] next/font — Baloo 2, Press Start 2P, DM Sans como CSS vars
+- [x] lib/mock.ts (games, featured singles, selados, sellers, price history, high scores),
+      extend lib/types.ts, lib/cart.tsx (context + localStorage), money() em centavos
+- [x] layout.tsx — chrome persistente: AnnouncementBar, Header (busca+SALDO+CARRINHO),
+      TabBar (links de rota), Footer, Scanlines
+
+## Entrega 1 (comece aqui — Home + card de single) — FEITO
+- [x] Componentes: SingleCard, SealedCard, Stepper, ArtPlaceholder, SectionHead, Container,
+      GameCabinet, HighScores, ComingSoon (placeholder das rotas ainda-não-feitas)
+- [x] Home (/): hero, game select, singles em destaque, produto selado, HIGH SCORES
+- [x] Verificado: next build limpo (8 rotas), screenshot desktop 1440 + small 500 sem overflow
+      (headless piso em 500px; <390 usa flex-wrap). Storefront.tsx antigo removido.
+
+## Telas restantes — FEITO
+- [x] /singles (SinglesBrowse): sidebar de filtros (JOGO/TIPO/ESTADO/IDIOMA/RARIDADE + track
+      de PREÇO), toolbar com sort (RELEVANCIA/MENOR PRECO/NOVIDADES), grid 4-col, paginação.
+      JOGO/ESTADO/IDIOMA/busca/sort funcionam; RARIDADE+PREÇO são visuais (design-first).
+      useSearchParams (jogo/q) sob <Suspense>. Filtros viram sheet inline no mobile (botão FILTROS).
+- [x] /carta/[slug] (SingleDetailView): galeria (frame rosa + 4 thumbs), badges, buy box
+      (preço+parcelas+stepper+ADICIONAR+♥), seller bar, histórico de preço (6 barras), outros
+      vendedores. generateStaticParams sobre CATALOG (16 cartas). Fallback buildSingleDetail
+      pra qualquer slug.
+- [x] /selado (index grid) + /selado/[slug] (SealedDetailView): frame rosa-claro, badges
+      PRE-VENDA/LACRADO, buy box com barra de estoque, spec grid 2×2. Fallback buildSealedDetail.
+- [x] /carrinho (CartView): line items + stepper + remover, nudge de frete (< R$250), resumo
+      (subtotal/frete/cupom ARCADE10 -10%/total), botão double-ring INSERIR FICHA → WhatsApp.
+      Carrinho persiste em localStorage (lib/cart).
+
+## Verificação final
+- [x] next build limpo — 5 rotas + 16 /carta + 4 /selado prerender (SSG), lint ok
+- [x] Screenshots desktop 1440 de todas as telas; cart com itens + cupom aplicado (−R$158,30);
+      barras do histórico renderizam (fix: % height precisa de flex item com altura definida)
+- [x] Checkout = WhatsApp handoff (decisão do usuário); cupom/frete/pagamento são visuais
+
+## Ligar catálogo REAL de singles (2026-07-24) — FEITO
+- [x] `lib/catalog.ts` (server-only): fetch `${STOREFRONT_API}/api/storefront`, mapeia
+      storefrontItem→Single (askBRL reais → centavos, slug estável game-name-number-variant-cond,
+      dedup somando qty, grade derivada de condition PSA*), **fallback pro mock** se a API não
+      responder JSON (prod ainda serve o SPA em /api/storefront → cai no mock). `loadSingleDetail`
+      (curated → build sobre catálogo real → 404).
+- [x] `lib/games.ts`: hue/pixel generalizados p/ 5 jogos (pokemon/onepiece/riftbound/lorcana/gundam);
+      `GameId` virou `string`. Removidos GAMES/GAME_LABEL/GAME_PIXEL/singleBySlug (mortos).
+- [x] Home + /singles (server) fazem loadCatalog (revalidate 60); jogos derivados dos dados
+      (eyebrow "N UNIVERSOS", cabinets por jogo em estoque). /carta/[slug] agora **dinâmico**.
+      SinglesBrowse recebe catalog+games por prop; ESTADO derivado das condições reais, IDIOMA
+      só aparece se houver idioma (backend não manda), JOGO por jogo em estoque.
+- [x] Selado/sellers/histórico/high-scores **continuam mock** (backend não fornece).
+- [x] Verificado com backend fake local (shape exato do Go): 12 itens/5 jogos → Home mostra
+      "5 UNIVERSOS" + 5 cabinets com contagem; Browse ESTADO=LP/MP/NM/PSA10/PSA9 (MP veio dos
+      dados, não do hardcode); /carta/lorcana-... e /carta/gundam-... resolvem (5º jogo ok);
+      preço em centavos correto; imagem via /img proxy carrega. next build limpo com env real.
+- **Pendente pra ver dados reais no ar:** deploy do backend Go com a rota /api/storefront (prod
+  atual é build antigo, serve o SPA) — aí o site mostra o estoque real automaticamente.
+
+# Reskin arcade do dashboard (web/) (2026-07-24)
+
+Reskin visual do dashboard interno (`web/`, React+Vite+Tailwind v4) para a linguagem
+"arcade" da vitrine (`storefront/`). É RESKIN: preservar 100% dos dados, chamadas de API
+e lógica — só a camada visual muda.
+
+## Decisões (aprovadas com o usuário)
+- Shell: manter sidebar+topbar (reskin, não reescrever navegação).
+- Escopo: fundação + todas as views.
+- Tabelas densas: SUTIL — sticker completo só em KPI/botões/painéis; linhas com borda fina 2–3px, sombra ~0.
+- Tokens: EXTRAIR para arquivo CSS comum importado pelos dois apps (evita divergência).
+
+## Regras de estilo
+- Press Start 2P só em rótulos curtos e ACCENT-FREE (KPI caption, eyebrow, badge). Nunca em
+  números/células/texto longo, nunca em label com acento ("Orçamento" fica em Baloo/DM Sans).
+- Sticker = cor sólida + borda 4–5px `#0b0b0c` + sombra dura `Xpx Ypx 0` (sem blur), via `--sh`.
+- Semânticas (verde/ganho, vermelho/perda, âmbar/live) MANTIDAS distinguíveis, ganhando borda ink.
+- Focus rings nunca removidos. Respeitar prefers-reduced-motion. Scanlines OFF por padrão.
+
+## Fase 0 — Fontes + tokens compartilhados
+- [ ] `@fontsource/baloo-2` (600/700/800), `@fontsource/dm-sans` (400/500/700),
+      `@fontsource/press-start-2p` (400) no `web/package.json`; importar pesos em `web/src/main.tsx`.
+- [ ] Criar `shared/arcade.css` na raiz: `@theme` (brand/brand-soft/royal/ink/surface/outline/
+      muted/faint/on-soft + aliases de fonte) + classes à mão (sticker, sticker-5, arcade-press
+      +hover/active, font-display, font-pixel, logo/hero-shadow, art-stripes-*, scanlines,
+      keyframes blink/bob/rise + animate-*, focus-visible, scrollbar).
+- [ ] Refatorar `storefront/app/globals.css` p/ importar o comum (remover bloco duplicado).
+- [ ] Reescrever `web/src/index.css`: importar tailwindcss + comum; vars cruas de fonte;
+      remapear `accent-*`→rosa e `slate-*`→neutros arcade (mantendo aliases sky/violet/fuchsia);
+      body→DM Sans; canvas→ink.
+
+## Fase 1 — Primitivos (cascateiam p/ todas as views)
+- [ ] `ui/card.tsx` sticker · `ui/button.tsx` arcade-press · `ui/badge.tsx` chip 3px
+- [ ] `ui/input.tsx` + `ui/select.tsx` sticker flat · `ui/table.tsx` sutil
+- [ ] `ui/tabs.tsx` · `ui/toggle-group.tsx` · `ui/checkbox.tsx` arcade
+
+## Fase 2 — Shell
+- [ ] `ui/sidebar.tsx` · `AppSidebar.tsx` · `TopBar.tsx` · `PageHeader.tsx` · `App.tsx` Footer
+
+## Fase 3 — Polish por view
+- [ ] `KpiStrip` · Deals (Page/Table/Grid/Depth) · Tracking (Sales/Movers/Leaderboard/TrendTable/
+      InventoryPanel) · Portfolio + AllPortfolio · Quote · Stock · `ui/chart.tsx` chartColors ·
+      restos (CardArt, SelectionTray, Browse, Buyout, SnapshotIndicator, ShareList, SoldCardTile).
+
+## Fase 4 — Verificação
+- [ ] `npm run build` (web) limpo · `npm run build` (storefront) limpo · screenshots headless de
+      cada view · sem comentários · não commitar.
+
+## Review (2026-07-24)
+- **Fundação:** `shared/arcade.css` na raiz (tokens `@theme` brand/royal/ink/surface/outline +
+  aliases de fonte + classes sticker/arcade-press/art-stripes/scanlines/keyframes) — importado
+  por `storefront/app/globals.css` (bloco duplicado removido) e `web/src/index.css`. Fontes no
+  dashboard via `@fontsource` (baloo-2 600/700/800, dm-sans 400/500/700, press-start-2p 400)
+  importadas em `main.tsx`. `web/src/index.css` remapeia as rampas legadas `accent-*`→rosa e
+  `slate-*`→neutros arcade (mantendo aliases sky/violet/fuchsia→accent), então TODA classe
+  existente (`bg-slate-900`, `text-slate-400`, `bg-accent-500`…) já renderiza arcade sem editar
+  componente. emerald(ganho)/rose(perda)/amber(live) preservados como os 3 sinais de dado.
+- **Primitivos** (cascateiam p/ tudo): Card (sticker sutil), Button (arcade-press por variante),
+  Badge (chip borda ink), Input/Select (sticker flat), Table (sutil: header muted, linha borda
+  fina), Tabs/ToggleGroup/Checkbox (ativo rosa), Sidebar (borda ink, item ativo rosa).
+- **Shell:** AppSidebar (logo Baloo + tile royal, game switcher pixel, labels DISCOVER/MARKET/
+  INVENTORY em pixel), TopBar (pills arcade + Refresh rosa), PageHeader (título Baloo + tile
+  sticker), Footer borda ink.
+- **Views:** KpiStrip + KPIs de Portfolio/Stock/Inventory viraram sticker completo (tile rosa,
+  caption pixel EN / DM Sans uppercase p/ pt-BR com acento, número tabular). Charts (`ui/chart.tsx`)
+  recoloridos (série rosa, mantendo emerald/rose; tooltip sticker). Barras de margem/lift, badges
+  de delta, chips de link e tabelas cruas (Portfolio/Quote/Stock) reskinnados sutis. Regra da
+  Press Start 2P respeitada: pixel só em rótulos curtos accent-free.
+- **Verificação:** `npm run build` (tsc+vite) limpo em `web/` E `storefront/`. Screenshots headless
+  1440px de Deals/Tracking/Portfolio/Estoque/Orçamento/Buyout/AllGames — shell arcade coeso, dados
+  reais (via vite :5173 → :8080). Sem comentários no código; não commitado.
+- **Nota:** `marginTier.ring`/`liftTier.ring` viraram campos de objeto não-usados (não são
+  variáveis soltas; TS não acusa) — deixados colocados com o resto da config de tier.

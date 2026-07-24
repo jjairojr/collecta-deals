@@ -154,7 +154,7 @@ export default function PriceTrendTable({ trends }: { trends: CardTrend[] }) {
         </Card>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+      <div className="overflow-x-auto rounded-[14px] border-2 border-outline bg-surface">
         <Table className="min-w-[560px]">
           <TableHeader>
             <TableRow className="hover:bg-transparent">

@@ -99,7 +99,7 @@ export default function BuyoutPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">
+          <h1 className="font-display text-lg font-extrabold text-white">
             {snipe ? "Snipe underpriced cards" : "Best Cards to Buyout"}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
@@ -228,13 +228,13 @@ export default function BuyoutPage() {
               {date && <span className="ml-2 text-xs text-slate-500">snapshot {date}</span>}
               {loading && <span className="ml-2 text-xs text-slate-500">updating…</span>}
             </span>
-            <div className="inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+            <div className="inline-flex rounded-[8px] border-2 border-outline bg-surface p-0.5">
               <button
                 onClick={() => setLayout("grid")}
                 aria-label="Grid view"
-                className={`rounded-md p-1.5 transition-colors ${
+                className={`rounded-[6px] p-1.5 transition-colors ${
                   layout === "grid"
-                    ? "bg-emerald-500/20 text-emerald-200"
+                    ? "bg-brand/20 text-brand-soft"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -243,9 +243,9 @@ export default function BuyoutPage() {
               <button
                 onClick={() => setLayout("table")}
                 aria-label="Table view"
-                className={`rounded-md p-1.5 transition-colors ${
+                className={`rounded-[6px] p-1.5 transition-colors ${
                   layout === "table"
-                    ? "bg-emerald-500/20 text-emerald-200"
+                    ? "bg-brand/20 text-brand-soft"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -307,7 +307,7 @@ function BuyoutTable({
   toggle: (item: PickedCard) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+    <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
       <Table className="min-w-[1040px]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -399,7 +399,7 @@ function BuyoutTable({
                   href={c.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/20"
+                  className="rounded-[8px] border-2 border-outline bg-emerald-500/15 px-2 py-1 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25"
                 >
                   Liga
                 </a>
@@ -414,7 +414,7 @@ function BuyoutTable({
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-10 text-center text-slate-400">
+    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
       {children}
     </div>
   );

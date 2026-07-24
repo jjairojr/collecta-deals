@@ -1,7 +1,6 @@
 import { Coins, ShoppingBag, Store, TrendingDown, TrendingUp } from "lucide-react";
 import type { CardTrend } from "../api";
 import { brl0 } from "../format";
-import { Card } from "./ui/card";
 
 function cleanName(n: string): string {
   return n.replace(/\s*\([^)]*\)\s*$/, "");
@@ -21,18 +20,18 @@ function Kpi({
   tone?: "slate" | "emerald" | "sky";
 }) {
   const valueTone =
-    tone === "emerald" ? "text-emerald-300" : tone === "sky" ? "text-sky-200" : "text-slate-100";
+    tone === "emerald" ? "text-emerald-300" : tone === "sky" ? "text-brand-soft" : "text-white";
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800/70 text-sky-300">
+    <div className="sticker flex items-center gap-3 rounded-[14px] bg-surface p-4">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-        <div className={`truncate text-lg font-semibold tabular-nums ${valueTone}`}>{value}</div>
+        <div className="font-pixel truncate text-[8px] uppercase text-brand-soft">{label}</div>
+        <div className={`mt-1 truncate text-xl font-bold tabular-nums ${valueTone}`}>{value}</div>
         {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
       </div>
-    </Card>
+    </div>
   );
 }
 

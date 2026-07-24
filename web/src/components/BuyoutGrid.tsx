@@ -39,7 +39,7 @@ function BuyoutCard({
   const headroom = cand.sellUSD && floorUSD ? cand.sellUSD - floorUSD : 0;
 
   return (
-    <Card className="group flex flex-col overflow-hidden p-0 transition hover:border-slate-600">
+    <Card className="group flex flex-col overflow-hidden p-0 transition hover:border-brand">
       <div className="relative">
         <CardArt
           set={cardSet}
@@ -47,11 +47,11 @@ function BuyoutCard({
           name={cand.name}
           className="aspect-[350/489] w-full"
         />
-        <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-slate-950/80 ring-1 ring-inset ring-slate-700 backdrop-blur">
+        <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] border-2 border-outline bg-ink">
           <Checkbox accent="emerald" checked={picked} onChange={onToggle} />
         </label>
         <div
-          className={`absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-slate-950/85 px-2 py-1 text-sm font-bold tabular-nums ring-1 ring-inset backdrop-blur ${tier.text} ${tier.ring}`}
+          className={`absolute right-2 top-2 flex items-center gap-1 rounded-[8px] border-2 border-outline bg-ink px-2 py-1 text-sm font-bold tabular-nums ${tier.text}`}
         >
           <TrendingUp className="h-3.5 w-3.5" />+{Math.round(cand.liftPct)}%
         </div>
@@ -84,12 +84,12 @@ function BuyoutCard({
               <div className={`font-semibold tabular-nums ${tier.text}`}>{brl(cand.nextFloor)}</div>
             </div>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
-            <div className={`h-full rounded-full ${tier.bar}`} style={{ width: `${barWidth}%` }} />
+          <div className="mt-2 h-2.5 overflow-hidden rounded-[4px] border-2 border-outline bg-outline">
+            <div className={`h-full ${tier.bar}`} style={{ width: `${barWidth}%` }} />
           </div>
         </div>
 
-        <div className="rounded-lg bg-slate-800/40 px-2.5 py-2 text-xs text-slate-400">
+        <div className="rounded-[8px] border-2 border-outline bg-surface px-2.5 py-2 text-xs text-slate-400">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <Package className="h-3.5 w-3.5" />
@@ -117,7 +117,7 @@ function BuyoutCard({
         </div>
 
         {fxRate > 0 && (
-          <div className="flex items-center justify-between rounded-lg bg-sky-500/5 px-2.5 py-2 text-xs ring-1 ring-inset ring-sky-500/15">
+          <div className="flex items-center justify-between rounded-[8px] border-2 border-outline bg-sky-500/10 px-2.5 py-2 text-xs">
             <div>
               <div className="text-[10px] uppercase tracking-wide text-slate-500">TCG sell</div>
               {cand.sellUSD ? (
@@ -152,7 +152,7 @@ function BuyoutCard({
             href={cand.url}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/20"
+            className="flex flex-1 items-center justify-center gap-1 rounded-[8px] border-2 border-outline bg-emerald-500/15 px-2 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25"
           >
             Buy · Liga
           </a>
@@ -161,7 +161,7 @@ function BuyoutCard({
               href={cand.tcgUrl}
               target="_blank"
               rel="noreferrer"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-sky-500/10 px-2 py-1.5 text-xs font-medium text-sky-300 ring-1 ring-inset ring-sky-500/30 hover:bg-sky-500/20"
+              className="flex flex-1 items-center justify-center gap-1 rounded-[8px] border-2 border-outline bg-sky-500/15 px-2 py-1.5 text-xs font-bold text-sky-300 hover:bg-sky-500/25"
             >
               TCG <ExternalLink className="h-3 w-3" />
             </a>
