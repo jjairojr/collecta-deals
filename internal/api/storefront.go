@@ -16,6 +16,7 @@ import (
 type storefrontItem struct {
 	Game      string  `json:"game"`
 	GameLabel string  `json:"gameLabel"`
+	Kind      string  `json:"kind,omitempty"` // "sealed" for sealed product, empty for singles
 	Number    string  `json:"number"`
 	Name      string  `json:"name"`
 	Set       string  `json:"set"`
@@ -63,6 +64,7 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			item := storefrontItem{
 				Game:      gs.Game.ID,
 				GameLabel: label,
+				Kind:      t.Kind,
 				Number:    t.Number,
 				Name:      t.Name,
 				Set:       t.Set,
