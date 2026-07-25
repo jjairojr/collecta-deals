@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 import Container from "@/components/ui/Container";
 import FilterChip from "@/components/ui/FilterChip";
@@ -28,15 +28,17 @@ export default function SinglesBrowse({
   catalog,
   games,
   navGames,
+  initialGame = null,
+  query = "",
 }: {
   catalog: Single[];
   games: { id: string; label: string }[];
   navGames: { id: string; label: string }[];
+  initialGame?: string | null;
+  query?: string;
 }) {
   const router = useRouter();
-  const params = useSearchParams();
-  const initialGame = params.get("jogo");
-  const q = (params.get("q") ?? "").trim().toLowerCase();
+  const q = query.trim().toLowerCase();
 
   // Price bounds come from the real catalog (cents). The range filter only shows
   // when there is an actual spread to slide across.
@@ -169,7 +171,7 @@ export default function SinglesBrowse({
           onClick={() =>
             router.push(
               gameSel.length === 1
-                ? `/selado?jogo=${gameSel[0]}`
+                ? `/selado/${gameSel[0]}`
                 : "/selado",
             )
           }
@@ -350,7 +352,7 @@ export default function SinglesBrowse({
               <Link
                 href={
                   gameSel.length === 1
-                    ? `/selado?jogo=${gameSel[0]}`
+                    ? `/selado/${gameSel[0]}`
                     : "/selado"
                 }
                 className="arcade-press sticker rounded-[10px] bg-brand-soft px-5 py-3 font-pixel text-[10px] text-outline [--sh:4px]"

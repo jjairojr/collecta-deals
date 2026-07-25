@@ -30,6 +30,20 @@ const PIXEL: Record<string, string> = {
   gundam: "GUNDAM",
 };
 
+export const GAME_NAMES: Record<string, string> = {
+  pokemon: "Pokémon",
+  onepiece: "One Piece",
+  riftbound: "Riftbound",
+  lorcana: "Disney Lorcana",
+  gundam: "Gundam Card Game",
+};
+
+export const GAME_IDS = Object.keys(GAME_NAMES);
+
+export function isGameId(id: string): boolean {
+  return id in GAME_NAMES;
+}
+
 // Card/box art fill color.
 export function gameArtHue(game: string): ArtHue {
   return ART_HUE[game] ?? "royal";

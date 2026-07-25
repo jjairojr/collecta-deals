@@ -3,12 +3,15 @@ import { Baloo_2, DM_Sans, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart";
 import { loadCatalog } from "@/lib/catalog";
+import { organizationJsonLd, webSiteJsonLd } from "@/lib/seo";
+import { siteURL } from "@/lib/site";
 import AnnouncementBar from "@/components/chrome/AnnouncementBar";
 import Header from "@/components/chrome/Header";
 import TabBar from "@/components/chrome/TabBar";
 import Footer from "@/components/chrome/Footer";
 import Scanlines from "@/components/chrome/Scanlines";
 import CartToast from "@/components/cart/CartToast";
+import JsonLd from "@/components/seo/JsonLd";
 
 const baloo = Baloo_2({
   subsets: ["latin"],
@@ -26,13 +29,15 @@ const pressStart = Press_Start_2P({
   variable: "--font-press-start",
 });
 
-const siteURL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collecta.vercel.app";
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteURL),
-  title: "Collecta — Loja de cartas TCG",
+  title: {
+    default: "Collecta — Cartas Pokémon, One Piece e Riftbound · Singles e Selados",
+    template: "%s — Collecta",
+  },
   description:
-    "Singles avulsas e produto selado de Pokémon, One Piece e Riftbound. Conferido carta por carta, enviado do Brasil.",
+    "Loja de cartas TCG do Brasil: singles avulsas e produto selado de Pokémon, One Piece e Riftbound. Cartas conferidas uma a uma, pedido pelo WhatsApp e envio para todo o Brasil.",
+  applicationName: "Collecta",
   openGraph: {
     title: "Collecta — Loja de cartas TCG",
     description:
@@ -40,6 +45,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
     siteName: "Collecta",
+    url: siteURL,
   },
   twitter: {
     card: "summary_large_image",
@@ -65,6 +71,8 @@ export default async function RootLayout({
       className={`${baloo.variable} ${dmSans.variable} ${pressStart.variable}`}
     >
       <body>
+        <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={webSiteJsonLd()} />
         <CartProvider>
           <Scanlines />
           <AnnouncementBar />

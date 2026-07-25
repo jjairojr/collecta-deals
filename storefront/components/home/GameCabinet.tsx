@@ -31,7 +31,7 @@ const countColor: Record<Game["hue"], string> = {
 export default function GameCabinet({ game }: { game: Game }) {
   return (
     <Link
-      href={`/singles?jogo=${game.id}`}
+      href={`/singles/${game.id}`}
       className={`arcade-press sticker sticker-5 flex flex-col overflow-hidden rounded-[18px] ${surface[game.hue]}`}
       style={{ ["--sh" as string]: "8px" }}
     >

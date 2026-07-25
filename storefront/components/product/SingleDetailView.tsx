@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Heart } from "lucide-react";
 import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
@@ -39,7 +40,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
         items={[
           {
             label: gamePixel(item.game, item.gameLabel),
-            href: `/singles?jogo=${item.game}`,
+            href: `/singles/${item.game}`,
           },
           { label: pixelText(item.set) },
           { label: pixelText(item.name) },
@@ -64,6 +65,8 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                 }
                 imageURL={item.imageURL}
                 alt={item.name}
+                sizes="(min-width: 1024px) 40vw, 90vw"
+                priority
               />
             </div>
           </div>
@@ -140,10 +143,11 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             className="sticker mt-5 flex items-center gap-4 rounded-[14px] bg-royal px-5 py-4"
             style={{ ["--sh" as string]: "6px" }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="/mascot.png"
               alt=""
+              width={48}
+              height={50}
               className="h-12 w-12 shrink-0 rounded-full border-2 border-outline object-cover"
             />
             <div className="min-w-0">
@@ -160,6 +164,12 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             </span>
           </div>
 
+          <p className="mt-6 text-[14px] leading-relaxed text-muted">
+            {item.name} ({item.number}) é uma carta de {item.gameLabel} do set{" "}
+            {item.set}, em condição {item.condition}, conferida uma a uma antes
+            do envio. Adicione ao carrinho, finalize o pedido pelo WhatsApp e
+            receba em todo o Brasil.
+          </p>
         </div>
       </div>
     </Container>

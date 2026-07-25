@@ -7,22 +7,25 @@ export default function SectionHead({
   eyebrow,
   action,
   size = "lg",
+  heading = "h2",
 }: {
   title: string;
   eyebrow?: string;
   action?: { label: string; href: string };
   size?: "lg" | "md";
+  heading?: "h1" | "h2";
 }) {
   const h2 = size === "lg" ? "text-4xl sm:text-[44px]" : "text-3xl sm:text-[38px]";
+  const Tag = heading;
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         {eyebrow && (
           <div className="mb-2 font-pixel text-[10px] text-brand">{eyebrow}</div>
         )}
-        <h2 className={`font-display font-bold leading-none text-white ${h2}`}>
+        <Tag className={`font-display font-bold leading-none text-white ${h2}`}>
           {title}
-        </h2>
+        </Tag>
       </div>
       {action && (
         <Link

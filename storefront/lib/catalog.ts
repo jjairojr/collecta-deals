@@ -92,15 +92,38 @@ function mapItem(it: RawItem): Single {
   };
 }
 
+const SEALED_LANGS: [RegExp, string][] = [
+  [/^\((ING|EN)\)/i, "Inglês"],
+  [/^\((JAP|JPN)\)/i, "Japonês"],
+  [/^\((PORT?|PT(-BR)?|BR)\)/i, "Português"],
+];
+
+function sealedLanguage(name: string): string | undefined {
+  for (const [re, lang] of SEALED_LANGS) {
+    if (re.test(name.trim())) {
+      return lang;
+    }
+  }
+  return undefined;
+}
+
+function cleanSet(set: string): string {
+  const s = set.trim();
+  return /^sealed$/i.test(s) ? "" : s;
+}
+
 function mapSealed(it: RawItem): Sealed {
+  const set = cleanSet(it.set);
+  const language = sealedLanguage(it.name);
   return {
     kind: "sealed",
     slug: slugFor(it),
     game: it.game,
     gameLabel: it.gameLabel,
     name: it.name,
-    set: it.set,
-    meta: it.set || it.gameLabel,
+    set,
+    meta: [set || it.gameLabel, language].filter(Boolean).join(" · "),
+    language,
     price: Math.round(it.askBRL * 100),
     qty: it.qty > 0 ? it.qty : 1,
     badge: "LACRADO",
@@ -204,30 +227,38 @@ export async function loadCatalog(): Promise<Catalog> {
   }
 }
 
-// Product detail: curated override (mock demo) → real single built up with mock
-// sellers/history → null (404).
-export async function loadSingleDetail(
-  slug: string,
-): Promise<SingleDetail | null> {
-  const curated = curatedSingle(slug);
-  if (curated) {
-    return curated;
-  }
-  const { singles } = await loadCatalog();
-  const s = singles.find((c) => c.slug === slug);
-  return s ? buildSingleDetail(s) : null;
+// Product detail. Curated mock overrides only apply when the catalog itself is
+// the mock fallback — a live catalog must never serve demo products. `live`
+// travels with the item so pages can noindex mock-derived content.
+export interface DetailResult<T> {
+  item: T;
+  live: boolean;
 }
 
-// Sealed detail: curated mock override → real sealed built up with mock
-// specs/stock → null (404).
+export async function loadSingleDetail(
+  slug: string,
+): Promise<DetailResult<SingleDetail> | null> {
+  const catalog = await loadCatalog();
+  if (!catalog.live) {
+    const curated = curatedSingle(slug);
+    if (curated) {
+      return { item: curated, live: false };
+    }
+  }
+  const s = catalog.singles.find((c) => c.slug === slug);
+  return s ? { item: buildSingleDetail(s), live: catalog.live } : null;
+}
+
 export async function loadSealedDetail(
   slug: string,
-): Promise<SealedDetail | null> {
-  const curated = sealedBySlug(slug);
-  if (curated) {
-    return curated;
+): Promise<DetailResult<SealedDetail> | null> {
+  const catalog = await loadCatalog();
+  if (!catalog.live) {
+    const curated = sealedBySlug(slug);
+    if (curated) {
+      return { item: curated, live: false };
+    }
   }
-  const { sealed } = await loadCatalog();
-  const s = sealed.find((c) => c.slug === slug);
-  return s ? buildSealedDetail(s) : null;
+  const s = catalog.sealed.find((c) => c.slug === slug);
+  return s ? { item: buildSealedDetail(s), live: catalog.live } : null;
 }

@@ -1,0 +1,47 @@
+import type { MetadataRoute } from "next";
+import { loadCatalog } from "@/lib/catalog";
+import { absoluteURL } from "@/lib/site";
+
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { singles, sealed, games, live } = await loadCatalog();
+  const urls: MetadataRoute.Sitemap = [
+    { url: absoluteURL("/"), changeFrequency: "daily", priority: 1 },
+    { url: absoluteURL("/singles"), changeFrequency: "daily", priority: 0.9 },
+    { url: absoluteURL("/selado"), changeFrequency: "daily", priority: 0.9 },
+  ];
+  if (!live) {
+    return urls;
+  }
+  for (const g of games) {
+    urls.push({
+      url: absoluteURL(`/singles/${g.id}`),
+      changeFrequency: "daily",
+      priority: 0.8,
+    });
+  }
+  const sealedGames = [...new Set(sealed.map((s) => s.game))];
+  for (const id of sealedGames) {
+    urls.push({
+      url: absoluteURL(`/selado/${id}`),
+      changeFrequency: "daily",
+      priority: 0.8,
+    });
+  }
+  for (const s of singles) {
+    urls.push({
+      url: absoluteURL(`/carta/${s.slug}`),
+      changeFrequency: "weekly",
+      priority: 0.7,
+    });
+  }
+  for (const s of sealed) {
+    urls.push({
+      url: absoluteURL(`/selado/${s.slug}`),
+      changeFrequency: "weekly",
+      priority: 0.7,
+    });
+  }
+  return urls;
+}

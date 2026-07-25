@@ -415,18 +415,24 @@ export function buildSingleDetail(s: Single): SingleDetail {
 }
 
 export function buildSealedDetail(s: Sealed): SealedDetail {
-  const [content, language] = s.meta.split(" · ");
+  const [content, metaLanguage] = s.meta.split(" · ");
+  const specs = s.language
+    ? [
+        { key: "JOGO", value: s.gameLabel },
+        { key: "IDIOMA", value: s.language },
+        { key: "GARANTIA", value: "Lacre original de fábrica" },
+      ]
+    : [
+        { key: "CONTEUDO", value: content ?? "24 packs" },
+        { key: "IDIOMA", value: metaLanguage ?? "Inglês" },
+        { key: "GARANTIA", value: "Lacre original de fábrica" },
+      ];
   return {
     ...s,
     installmentsNote: `12x de ${(s.price / 12 / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
     stockLeft: s.qty,
     stockTotal: s.qty,
-    specs: [
-      { key: "CONTEUDO", value: content ?? "24 packs" },
-      { key: "IDIOMA", value: language ?? "Inglês" },
-      { key: "LANCAMENTO", value: "Disponível" },
-      { key: "GARANTIA", value: "Lacre original de fábrica" },
-    ],
+    specs,
   };
 }
 

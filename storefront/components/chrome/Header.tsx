@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "@/lib/cart";
@@ -29,10 +30,11 @@ export default function Header() {
             className="sticker grid place-items-center overflow-hidden rounded-[14px] bg-royal"
             style={{ ["--sh" as string]: "4px", height: 52, width: 52 }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="/mascot.png"
               alt=""
+              width={52}
+              height={54}
               className="h-full w-full object-cover"
             />
           </span>

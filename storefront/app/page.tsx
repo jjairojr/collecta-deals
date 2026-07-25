@@ -1,12 +1,23 @@
 import Link from "next/link";
+import Image from "next/image";
+import type { Metadata } from "next";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import HighScores from "@/components/home/HighScores";
 import SingleCard from "@/components/SingleCard";
 import SealedCard from "@/components/SealedCard";
 import { loadCatalog } from "@/lib/catalog";
+import { pixelText } from "@/lib/format";
 
 export const revalidate = 60;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { live } = await loadCatalog();
+  return {
+    alternates: { canonical: "/" },
+    robots: live ? undefined : { index: false },
+  };
+}
 
 const heroLayers =
   "radial-gradient(120% 150% at 78% 45%, rgba(246,85,155,.55) 0%, rgba(246,85,155,0) 55%)," +
@@ -81,10 +92,12 @@ export default async function HomePage() {
               aria-hidden
             />
             <div className="animate-bob relative h-[300px] w-[300px] overflow-hidden rounded-full border-[6px] border-outline bg-royal-light">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/mascot.png"
                 alt="Mascote da Collecta segurando cartas"
+                width={300}
+                height={312}
+                priority
                 className="h-full w-full object-cover"
               />
             </div>
@@ -129,6 +142,35 @@ export default async function HomePage() {
       {/* High scores */}
       <Container className="py-6">
         <HighScores />
+      </Container>
+
+      <Container className="py-10">
+        <section
+          className="sticker rounded-[14px] bg-surface p-6 sm:p-8"
+          style={{ ["--sh" as string]: "6px" }}
+        >
+          <h2 className="font-display text-3xl font-bold leading-none text-white">
+            Loja de cartas TCG do Brasil
+          </h2>
+          <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-muted">
+            A Collecta vende cartas avulsas (singles) e produto selado de
+            trading card games. Cada carta é conferida uma a uma antes do
+            envio, com a condição descrita no anúncio. Você monta o carrinho no
+            site, finaliza o pedido direto no WhatsApp e recebe em todo o
+            Brasil.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            {games.map((g) => (
+              <Link
+                key={g.id}
+                href={`/singles/${g.id}`}
+                className="arcade-press sticker rounded-[10px] bg-royal px-4 py-2.5 font-pixel text-[10px] text-white [--sh:4px]"
+              >
+                CARTAS {pixelText(g.name)}
+              </Link>
+            ))}
+          </div>
+        </section>
       </Container>
     </>
   );

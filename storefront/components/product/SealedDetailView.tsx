@@ -19,13 +19,17 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
     ((item.stockTotal - item.stockLeft) / item.stockTotal) * 100,
   );
 
+  const subtitle = [...new Set([item.set, item.meta].filter(Boolean))].join(
+    " · ",
+  );
+
   const addToCart = () =>
     add(
       {
         slug: item.slug,
         kind: "sealed",
         name: item.name,
-        meta: `${item.set} · ${item.meta}`,
+        meta: subtitle,
         seller: "Collecta Oficial",
         price: item.price,
         stock: item.stockLeft,
@@ -40,9 +44,9 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
         items={[
           {
             label: gamePixel(item.game, item.gameLabel),
-            href: `/singles?jogo=${item.game}`,
+            href: `/singles/${item.game}`,
           },
-          { label: "SELADOS", href: "/selado" },
+          { label: "SELADOS", href: `/selado/${item.game}` },
           { label: pixelText(item.name) },
         ]}
       />
@@ -54,13 +58,15 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
             className="sticker sticker-5 rounded-[18px] bg-brand-soft p-6 sm:p-[26px]"
             style={{ ["--sh" as string]: "8px" }}
           >
-            <div className="relative aspect-[4/3] overflow-hidden rounded-[8px] border-4 border-outline">
+            <div className="relative aspect-[5/7] overflow-hidden rounded-[8px] border-4 border-outline">
               <ArtPlaceholder
                 hue="royal"
                 angle="45"
                 label={"FOTO DA CAIXA\nLACRE VISIVEL"}
                 imageURL={item.imageURL}
                 alt={item.name}
+                sizes="(min-width: 1024px) 45vw, 90vw"
+                priority
               />
             </div>
           </div>
@@ -82,9 +88,7 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
           <h1 className="font-display mt-4 text-4xl font-bold leading-none text-white sm:text-[50px]">
             {item.name}
           </h1>
-          <p className="mt-3 text-base text-muted">
-            {item.set} · {item.meta}
-          </p>
+          <p className="mt-3 text-base text-muted">{subtitle}</p>
 
           {/* Buy box */}
           <div
@@ -143,6 +147,14 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
               </div>
             ))}
           </div>
+
+          <p className="mt-6 text-[14px] leading-relaxed text-muted">
+            {item.name} é um produto selado de {item.gameLabel}
+            {item.language ? ` em ${item.language.toLowerCase()}` : ""}, com
+            lacre original de fábrica conferido antes do envio. Adicione ao
+            carrinho, finalize o pedido pelo WhatsApp e receba em todo o
+            Brasil.
+          </p>
         </div>
       </div>
     </Container>

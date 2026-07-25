@@ -70,6 +70,7 @@ export interface Sealed {
   name: string;
   set: string;
   meta: string;
+  language?: string;
   price: number;
   qty: number;
   badge?: string;
