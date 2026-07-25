@@ -23,3 +23,6 @@
 
 # deploy secrets
 /scripts/deploy.env
+
+# binário compilado (fonte em cmd/sellerquote)
+sellerquote

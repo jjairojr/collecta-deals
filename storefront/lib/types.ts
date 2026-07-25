@@ -71,6 +71,7 @@ export interface Sealed {
   set: string;
   meta: string;
   price: number;
+  qty: number;
   badge?: string;
   imageURL?: string;
 }

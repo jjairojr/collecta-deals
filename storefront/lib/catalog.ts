@@ -102,6 +102,7 @@ function mapSealed(it: RawItem): Sealed {
     set: it.set,
     meta: it.set || it.gameLabel,
     price: Math.round(it.askBRL * 100),
+    qty: it.qty > 0 ? it.qty : 1,
     badge: "LACRADO",
     imageURL: resolveImage(it),
   };
@@ -144,12 +145,15 @@ function dedup(items: Single[]): Single[] {
   return [...bySlug.values()];
 }
 
-// Sealed has no quantity in the public view — collapse duplicate slugs, first wins.
+// Collapse duplicate slugs, summing quantity.
 function dedupSealed(items: Sealed[]): Sealed[] {
   const bySlug = new Map<string, Sealed>();
   for (const s of items) {
-    if (!bySlug.has(s.slug)) {
-      bySlug.set(s.slug, s);
+    const cur = bySlug.get(s.slug);
+    if (cur) {
+      cur.qty += s.qty;
+    } else {
+      bySlug.set(s.slug, { ...s });
     }
   }
   return [...bySlug.values()];

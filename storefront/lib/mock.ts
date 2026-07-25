@@ -136,6 +136,7 @@ export const SEALED: Sealed[] = [
     set: "Emperors in the New World",
     meta: "24 packs · Japonês",
     price: 89900,
+    qty: 7,
     badge: "PRE-VENDA",
   },
   {
@@ -147,6 +148,7 @@ export const SEALED: Sealed[] = [
     set: "Obsidian Flames",
     meta: "9 packs · Inglês",
     price: 42900,
+    qty: 6,
     badge: "HOT",
   },
   {
@@ -158,6 +160,7 @@ export const SEALED: Sealed[] = [
     set: "Origins",
     meta: "24 packs · Inglês",
     price: 67900,
+    qty: 3,
     badge: "NOVO",
   },
   {
@@ -169,6 +172,7 @@ export const SEALED: Sealed[] = [
     set: "Scarlet & Violet 151",
     meta: "36 packs · Japonês",
     price: 129900,
+    qty: 4,
     badge: "SO RESTAM 4",
   },
 ];
@@ -415,8 +419,8 @@ export function buildSealedDetail(s: Sealed): SealedDetail {
   return {
     ...s,
     installmentsNote: `12x de ${(s.price / 12 / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
-    stockLeft: 7,
-    stockTotal: 40,
+    stockLeft: s.qty,
+    stockTotal: s.qty,
     specs: [
       { key: "CONTEUDO", value: content ?? "24 packs" },
       { key: "IDIOMA", value: language ?? "Inglês" },

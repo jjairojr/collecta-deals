@@ -109,18 +109,22 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
             <p className="mt-2 text-[13px] text-muted">{item.installmentsNote}</p>
 
             <div className="mt-4 font-pixel text-[9px] text-brand-soft">
-              RESTAM {item.stockLeft} DE {item.stockTotal} CAIXAS
+              {soldPct > 0
+                ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} CAIXAS`
+                : `RESTAM ${item.stockLeft} CAIXAS`}
             </div>
-            <div className="mt-2 h-[18px] overflow-hidden rounded-[10px] border-[3px] border-brand bg-outline">
-              <div
-                className="h-full"
-                style={{
-                  width: `${soldPct}%`,
-                  backgroundImage:
-                    "repeating-linear-gradient(90deg,#F6559B 0 10px,#FDC4E5 10px 20px)",
-                }}
-              />
-            </div>
+            {soldPct > 0 && (
+              <div className="mt-2 h-[18px] overflow-hidden rounded-[10px] border-[3px] border-brand bg-outline">
+                <div
+                  className="h-full"
+                  style={{
+                    width: `${soldPct}%`,
+                    backgroundImage:
+                      "repeating-linear-gradient(90deg,#F6559B 0 10px,#FDC4E5 10px 20px)",
+                  }}
+                />
+              </div>
+            )}
 
             <div className="mt-5 flex flex-wrap items-stretch gap-3">
               <Stepper value={qty} onChange={setQty} max={item.stockLeft} />

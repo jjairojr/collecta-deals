@@ -24,6 +24,9 @@ export default function SealedCard({ item }: { item: Sealed }) {
             {item.badge}
           </span>
         )}
+        <span className="absolute bottom-2 right-2 bg-outline px-1.5 py-1 font-pixel text-[8px] text-white">
+          {item.qty} UN
+        </span>
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5 p-4">
