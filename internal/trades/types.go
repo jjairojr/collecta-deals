@@ -21,8 +21,9 @@ type Trade struct {
 	RefUSD    float64 `json:"refUSD,omitempty"`
 	ManualBRL float64 `json:"manualBRL,omitempty"`
 
-	AskBRL float64 `json:"askBRL,omitempty"` // per-unit asking price for the public storefront
-	Listed bool    `json:"listed,omitempty"` // show this holding on the public storefront
+	AskBRL   float64 `json:"askBRL,omitempty"`    // per-unit asking price for the public storefront
+	Listed   bool    `json:"listed,omitempty"`    // show this holding on the public storefront
+	ImageURL string  `json:"imageURL,omitempty"`  // custom image URL for products without TCG art (e.g. sealed)
 
 	Status string `json:"status"` // "holding" | "sold"
 

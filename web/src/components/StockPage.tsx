@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, Store, Check, X, Wand2, Save, Combine } from "lucide-react";
+import { Search, Store, Check, X, Wand2, Save, Combine, ImagePlus } from "lucide-react";
 import {
   gameHasDeals,
   getGame,
@@ -38,6 +38,7 @@ const suggestOptions = [
 interface RowState {
   askBRL: number;
   listed: boolean;
+  imageURL: string;
 }
 
 // refBRL is a card's per-unit market reference in reais: for deals games the live
@@ -65,6 +66,7 @@ export default function StockPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmMerge, setConfirmMerge] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [imgEditId, setImgEditId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,7 +78,11 @@ export default function StockPage() {
         if (t.realized) {
           continue;
         }
-        seeded[t.id] = { askBRL: t.askBRL ?? 0, listed: Boolean(t.listed) };
+        seeded[t.id] = {
+          askBRL: t.askBRL ?? 0,
+          listed: Boolean(t.listed),
+          imageURL: t.imageURL ?? "",
+        };
       }
       setRows(seeded);
       setSelected(new Set());
@@ -110,7 +116,12 @@ export default function StockPage() {
     }
     return holdings.some((t) => {
       const r = rows[t.id];
-      return r && (round2(r.askBRL) !== round2(t.askBRL ?? 0) || r.listed !== Boolean(t.listed));
+      return (
+        r &&
+        (round2(r.askBRL) !== round2(t.askBRL ?? 0) ||
+          r.listed !== Boolean(t.listed) ||
+          (r.imageURL ?? "") !== (t.imageURL ?? ""))
+      );
     });
   }, [holdings, rows, data]);
 
@@ -225,6 +236,7 @@ export default function StockPage() {
         id: t.id,
         askBRL: rows[t.id]?.askBRL ?? 0,
         listed: Boolean(rows[t.id]?.listed),
+        imageURL: rows[t.id]?.imageURL ?? "",
       }));
       await setListings(items);
       setSavedAt(Date.now());
@@ -235,6 +247,10 @@ export default function StockPage() {
       setSaving(false);
     }
   };
+
+  const imgEditTrade = imgEditId
+    ? holdings.find((h) => h.id === imgEditId) ?? null
+    : null;
 
   return (
     <div className="space-y-6">
@@ -374,6 +390,7 @@ export default function StockPage() {
                   onPatch={patch}
                   selected={selected.has(t.id)}
                   onToggle={toggleSelect}
+                  onEditImage={setImgEditId}
                 />
               ))}
             </tbody>
@@ -427,6 +444,81 @@ export default function StockPage() {
           </div>
         </div>
       )}
+
+      {imgEditId && imgEditTrade && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setImgEditId(null)}
+        >
+          <div
+            className="sticker sticker-5 w-full max-w-md rounded-[16px] bg-surface p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="font-pixel text-[10px] uppercase text-brand-soft">
+              Imagem do produto
+            </div>
+            <h2 className="font-display mt-2 text-lg font-extrabold text-white">
+              {cleanName(imgEditTrade.name) || imgEditTrade.number}
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Cole a URL de uma imagem — ela aparece na vitrine no lugar do ícone padrão.
+            </p>
+
+            <div className="mt-4 flex items-start gap-4">
+              <div className="h-[112px] w-[80px] shrink-0 overflow-hidden rounded-[8px] border-2 border-outline">
+                <CardArt
+                  set={imgEditTrade.set}
+                  number={imgEditTrade.number}
+                  name={imgEditTrade.name}
+                  productID={productIDFromTcgURL(imgEditTrade.tcgUrl)}
+                  imageURL={rows[imgEditId]?.imageURL}
+                  className="h-[112px] w-[80px]"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <label className="font-pixel text-[8px] uppercase text-brand-soft">
+                  URL da imagem
+                </label>
+                <Input
+                  autoFocus
+                  value={rows[imgEditId]?.imageURL ?? ""}
+                  onChange={(e) => patch(imgEditId, { imageURL: e.target.value })}
+                  placeholder="https://…/imagem.jpg"
+                  className="mt-1 w-full"
+                />
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Deixe em branco para usar o ícone padrão.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => patch(imgEditId, { imageURL: "" })}
+                disabled={!(rows[imgEditId]?.imageURL ?? "")}
+              >
+                <X /> Remover
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" onClick={() => setImgEditId(null)}>
+                  Fechar
+                </Button>
+                <Button
+                  variant="accent"
+                  onClick={() => {
+                    setImgEditId(null);
+                    void save();
+                  }}
+                  disabled={saving}
+                >
+                  <Save /> {saving ? "Salvando…" : "Salvar"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -438,6 +530,7 @@ function StockRow({
   onPatch,
   selected,
   onToggle,
+  onEditImage,
 }: {
   t: TradeView;
   fx: number;
@@ -445,6 +538,7 @@ function StockRow({
   onPatch: (id: string, next: Partial<RowState>) => void;
   selected: boolean;
   onToggle: (id: string) => void;
+  onEditImage: (id: string) => void;
 }) {
   const ask = row?.askBRL ?? 0;
   const listed = Boolean(row?.listed);
@@ -460,7 +554,24 @@ function StockRow({
       </td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-2">
-          <CardArt set={t.set} number={t.number} name={t.name} productID={productIDFromTcgURL(t.tcgUrl)} className="h-12 w-[34px] shrink-0 rounded" />
+          <button
+            type="button"
+            onClick={() => onEditImage(t.id)}
+            title="Definir imagem do produto"
+            className="group relative h-12 w-[34px] shrink-0 overflow-hidden rounded"
+          >
+            <CardArt
+              set={t.set}
+              number={t.number}
+              name={t.name}
+              productID={productIDFromTcgURL(t.tcgUrl)}
+              imageURL={row?.imageURL}
+              className="h-12 w-[34px] rounded"
+            />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              <ImagePlus className="h-3.5 w-3.5 text-white" />
+            </span>
+          </button>
           <div className="min-w-0">
             <div className="truncate font-medium text-slate-100" title={t.name}>
               {cleanName(t.name) || t.number}

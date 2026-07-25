@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"opdeals/internal/trades"
 )
@@ -73,7 +74,12 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 				Qty:       qty,
 				AskBRL:    round2(t.AskBRL),
 			}
-			if t.Kind != "sealed" && lookup != nil {
+			// A seller-supplied image wins over everything (the only art for
+			// products without TCG data, e.g. sealed starters). Otherwise fall
+			// back to the exact TCGplayer image for singles.
+			if t.ImageURL != "" {
+				item.ImageURL = t.ImageURL
+			} else if t.Kind != "sealed" && lookup != nil {
 				if _, url, ok := lookup(t.Number, t.Name, t.Set); ok {
 					if pid := productIDFromURL(url); pid > 0 {
 						item.ProductID = pid
@@ -108,9 +114,10 @@ func (s *Server) storefrontFX() float64 {
 }
 
 type listingInput struct {
-	ID     string  `json:"id"`
-	AskBRL float64 `json:"askBRL"`
-	Listed bool    `json:"listed"`
+	ID       string  `json:"id"`
+	AskBRL   float64 `json:"askBRL"`
+	Listed   bool    `json:"listed"`
+	ImageURL string  `json:"imageURL"`
 }
 
 // handleTradesListings sets storefront state (asking price + listed flag) on one
@@ -138,7 +145,7 @@ func (s *Server) handleTradesListings(w http.ResponseWriter, r *http.Request) {
 		if ask < 0 {
 			ask = 0
 		}
-		updates[it.ID] = trades.Listing{AskBRL: ask, Listed: it.Listed}
+		updates[it.ID] = trades.Listing{AskBRL: ask, Listed: it.Listed, ImageURL: strings.TrimSpace(it.ImageURL)}
 	}
 	n, err := gs.Trades.SetListings(updates)
 	if err != nil {

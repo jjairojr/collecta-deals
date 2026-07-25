@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { cardImageURL, tcgProductImageURL } from "../api";
 
@@ -7,15 +7,20 @@ export default function CardArt({
   number,
   name,
   productID,
+  imageURL,
   className = "",
 }: {
   set: string;
   number: string;
   name?: string;
   productID?: number;
+  imageURL?: string;
   className?: string;
 }) {
   const sources: string[] = [];
+  if (imageURL) {
+    sources.push(imageURL);
+  }
   if (productID) {
     sources.push(tcgProductImageURL(productID));
   }
@@ -23,6 +28,11 @@ export default function CardArt({
     sources.push(cardImageURL(set, number));
   }
   const [sourceIdx, setSourceIdx] = useState(0);
+  // Reset to the first source whenever the inputs change (e.g. the seller edits
+  // the image URL live), so a prior onError fallthrough doesn't stick.
+  useEffect(() => {
+    setSourceIdx(0);
+  }, [imageURL, productID, set, number]);
   if (sourceIdx >= sources.length) {
     return (
       <div
