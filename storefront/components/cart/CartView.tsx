@@ -6,7 +6,7 @@ import Container from "@/components/ui/Container";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import { useCart } from "@/lib/cart";
-import { brl, installments } from "@/lib/format";
+import { brl } from "@/lib/format";
 import { COUPON } from "@/lib/mock";
 import type { CartLine } from "@/lib/types";
 
@@ -137,7 +137,11 @@ export default function CartView() {
               className="h-11 w-11 shrink-0 rounded-full border-2 border-outline object-cover"
             />
             <p className="text-[15px] leading-snug text-white">
-              O meio de entrega é combinado{" "}
+              No momento aceitamos{" "}
+              <strong className="font-bold text-brand-soft">
+                pagamento somente via PIX
+              </strong>
+              . O meio de entrega é combinado{" "}
               <strong className="font-bold text-brand-soft">
                 direto no WhatsApp
               </strong>{" "}
@@ -196,7 +200,8 @@ export default function CartView() {
             </span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            em até {installments(total, 12)}
+            no momento aceitamos pagamento{" "}
+            <strong className="font-bold text-brand">somente via PIX</strong>
           </p>
 
           <button
@@ -210,7 +215,7 @@ export default function CartView() {
           <p className="mt-4 text-center font-pixel text-[8px] leading-relaxed text-faint">
             VOCE SERA REDIRECIONADO AO WHATSAPP
             <br />
-            PAGAMENTO E ENTREGA COMBINADOS LA
+            PAGAMENTO NO PIX E ENTREGA COMBINADOS LA
           </p>
         </div>
       </div>

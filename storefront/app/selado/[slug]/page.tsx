@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import SealedGrid from "@/components/SealedGrid";
+import KindToggle from "@/components/ui/KindToggle";
 import SealedDetailView from "@/components/product/SealedDetailView";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadCatalog, loadSealedDetail } from "@/lib/catalog";
@@ -61,6 +62,7 @@ export default async function SeladoSlugPage({
           size="md"
           heading="h1"
         />
+        <KindToggle singlesHref={`/singles/${slug}`} />
         <SealedGrid list={list} />
       </Container>
     );

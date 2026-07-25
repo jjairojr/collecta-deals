@@ -17,7 +17,7 @@ const SORTS = [
   { id: "maior-preco", label: "MAIOR PRECO" },
   { id: "novidades", label: "NOVIDADES" },
 ];
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 24;
 
 function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value)
@@ -31,21 +31,28 @@ export default function SinglesBrowse({
   navGames,
   initialGame = null,
   query = "",
+  filtersOnTop = false,
 }: {
   catalog: Single[];
   games: { id: string; label: string }[];
   navGames: { id: string; label: string }[];
   initialGame?: string | null;
   query?: string;
+  filtersOnTop?: boolean;
 }) {
   const router = useRouter();
   const q = query.trim().toLowerCase();
 
-  // Price bounds come from the real catalog (cents). The range filter only shows
-  // when there is an actual spread to slide across.
+  // Price bounds come from the real catalog (cents), snapped outward to whole
+  // reais so both slider ends land exactly on the R$1 step grid. The range
+  // filter only shows when there is an actual spread to slide across.
   const prices = catalog.map((c) => c.price);
-  const priceFloor = prices.length ? Math.min(...prices) : 0;
-  const priceCeil = prices.length ? Math.max(...prices) : 0;
+  const priceFloor = prices.length
+    ? Math.floor(Math.min(...prices) / 100) * 100
+    : 0;
+  const priceCeil = prices.length
+    ? Math.ceil(Math.max(...prices) / 100) * 100
+    : 0;
   const hasPriceRange = priceCeil > priceFloor;
 
   const [gameSel, setGameSel] = useState<string[]>(
@@ -55,6 +62,7 @@ export default function SinglesBrowse({
   );
   const [estado, setEstado] = useState<string[]>([]);
   const [idioma, setIdioma] = useState<string[]>([]);
+  const [colecao, setColecao] = useState<string[]>([]);
   const [priceMin, setPriceMin] = useState(priceFloor);
   const [priceMax, setPriceMax] = useState(priceCeil);
   const [sort, setSort] = useState("relevancia");
@@ -91,6 +99,21 @@ export default function SinglesBrowse({
     [catalog],
   );
 
+  // Collection options scoped to the selected games. Selections that fall out
+  // of scope stay stored but stop applying (and reappear if the game returns).
+  const colecaoOpts = useMemo(() => {
+    const scope = gameSel.length
+      ? catalog.filter((c) => gameSel.includes(c.game))
+      : catalog;
+    return [...new Set(scope.map((c) => c.set).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "pt-BR"),
+    );
+  }, [catalog, gameSel]);
+  const colecaoSel = useMemo(
+    () => colecao.filter((s) => colecaoOpts.includes(s)),
+    [colecao, colecaoOpts],
+  );
+
   const filtered = useMemo(() => {
     let list = catalog.filter((c) => {
       if (gameSel.length && !gameSel.includes(c.game)) return false;
@@ -98,6 +121,7 @@ export default function SinglesBrowse({
       // Language filter only bites cards that carry a language.
       if (idioma.length && c.language && !idioma.includes(c.language))
         return false;
+      if (colecaoSel.length && !colecaoSel.includes(c.set)) return false;
       if (c.price < priceMin || c.price > priceMax) return false;
       if (q && !`${c.name} ${c.number} ${c.set}`.toLowerCase().includes(q))
         return false;
@@ -111,7 +135,7 @@ export default function SinglesBrowse({
       list = [...list].reverse();
     }
     return list;
-  }, [catalog, gameSel, estado, idioma, priceMin, priceMax, q, sort]);
+  }, [catalog, gameSel, estado, idioma, colecaoSel, priceMin, priceMax, q, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -129,12 +153,14 @@ export default function SinglesBrowse({
     gameSel.length +
     estado.length +
     idioma.length +
+    colecaoSel.length +
     (hasPriceRange && (priceMin > priceFloor || priceMax < priceCeil) ? 1 : 0);
 
   const clearFilters = () => {
     setGameSel([]);
     setEstado([]);
     setIdioma([]);
+    setColecao([]);
     setPriceMin(priceFloor);
     setPriceMax(priceCeil);
     setPage(1);
@@ -182,6 +208,23 @@ export default function SinglesBrowse({
           Selados
         </FilterChip>
       </FilterGroup>
+
+      {colecaoOpts.length > 1 && (
+        <FilterGroup heading="COLECAO">
+          {colecaoOpts.map((o) => (
+            <FilterChip
+              key={o}
+              active={colecao.includes(o)}
+              onClick={() => {
+                setColecao((s) => toggle(s, o));
+                reset();
+              }}
+            >
+              {o}
+            </FilterChip>
+          ))}
+        </FilterGroup>
+      )}
 
       {estadoOpts.length > 0 && (
         <FilterGroup heading="ESTADO">
@@ -266,12 +309,20 @@ export default function SinglesBrowse({
   );
 
   return (
-    <Container className="grid gap-7 py-9 md:grid-cols-[270px_1fr] md:items-start">
-      <div className="hidden md:block">
-        <aside className="sticker h-max rounded-[14px] bg-surface p-5 [--sh:6px]">
-          {filters}
-        </aside>
-      </div>
+    <Container
+      className={
+        filtersOnTop
+          ? "py-9"
+          : "grid gap-7 py-9 md:grid-cols-[270px_1fr] md:items-start"
+      }
+    >
+      {!filtersOnTop && (
+        <div className="hidden md:block">
+          <aside className="sticker h-max rounded-[14px] bg-surface p-5 [--sh:6px]">
+            {filters}
+          </aside>
+        </div>
+      )}
 
       <div className="min-w-0">
         {/* Toolbar */}
@@ -301,11 +352,11 @@ export default function SinglesBrowse({
           </div>
         </div>
 
-        {/* Mobile filters toggle */}
+        {/* Filters toggle: always visible in top mode, mobile-only otherwise */}
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="arcade-press sticker mb-5 flex items-center gap-2 rounded-[10px] bg-surface px-4 py-2.5 font-pixel text-[10px] text-white [--sh:4px] md:hidden"
+          className={`arcade-press sticker mb-5 flex items-center gap-2 rounded-[10px] bg-surface px-4 py-2.5 font-pixel text-[10px] text-white [--sh:4px] ${filtersOnTop ? "" : "md:hidden"}`}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" /> FILTROS
           {activeFilters > 0 && (
@@ -315,14 +366,16 @@ export default function SinglesBrowse({
           )}
         </button>
         {sheetOpen && (
-          <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
+          <div
+            className={`fixed inset-0 z-50 flex flex-col justify-end ${filtersOnTop ? "" : "md:hidden"}`}
+          >
             <button
               type="button"
               aria-label="Fechar filtros"
               onClick={() => setSheetOpen(false)}
               className="absolute inset-0 bg-outline/70"
             />
-            <div className="relative max-h-[80dvh] overflow-y-auto rounded-t-[20px] border-t-4 border-brand bg-surface p-5">
+            <div className="relative max-h-[80dvh] w-full overflow-y-auto rounded-t-[20px] border-t-4 border-brand bg-surface p-5 md:mx-auto md:max-w-xl md:border-x-4">
               {filters}
               <button
                 type="button"

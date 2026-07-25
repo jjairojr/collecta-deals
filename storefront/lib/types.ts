@@ -78,7 +78,6 @@ export interface Sealed {
 }
 
 export interface SealedDetail extends Sealed {
-  installmentsNote: string;
   stockLeft: number;
   stockTotal: number;
   specs: { key: string; value: string }[];

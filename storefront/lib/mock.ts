@@ -235,7 +235,6 @@ const SINGLE_DETAILS: Record<string, SingleDetail> = {
 const SEALED_DETAILS: Record<string, SealedDetail> = {
   "booster-box-op-09": {
     ...SEALED[0],
-    installmentsNote: "12x de R$ 83,20 · lançamento 12/09",
     stockLeft: 7,
     stockTotal: 40,
     specs: [
@@ -407,7 +406,6 @@ export function buildSingleDetail(s: Single): SingleDetail {
   return {
     ...s,
     rarity: RARITY[s.slug],
-    marketAvg: Math.round(s.price * 1.08),
     seller: OFFICIAL_SELLER,
     priceHistory: historyFor(s.slug),
     offers: offersFor(s),
@@ -429,7 +427,6 @@ export function buildSealedDetail(s: Sealed): SealedDetail {
       ];
   return {
     ...s,
-    installmentsNote: `12x de ${(s.price / 12 / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
     stockLeft: s.qty,
     stockTotal: s.qty,
     specs,

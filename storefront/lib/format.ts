@@ -12,11 +12,6 @@ export function brl(cents: number): string {
     .replace(/\u00a0/g, " ");
 }
 
-// installments("12x", 420000, 12) → "12x de R$ 350,00".
-export function installments(total: number, n: number): string {
-  return `${n}x de ${brl(Math.round(total / n))}`;
-}
-
 // Press Start 2P has no accented glyphs — normalize any string rendered in it to
 // uppercase, accent-free. pixelText("Obsidian Flames") → "OBSIDIAN FLAMES".
 export function pixelText(s: string): string {

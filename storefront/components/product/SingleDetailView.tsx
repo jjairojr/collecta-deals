@@ -8,7 +8,7 @@ import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import { useCart } from "@/lib/cart";
-import { brl, installments, pixelText } from "@/lib/format";
+import { brl, pixelText } from "@/lib/format";
 import { gameArtHue, gamePixel } from "@/lib/games";
 import type { SingleDetail } from "@/lib/types";
 
@@ -110,12 +110,11 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                 </span>
               )}
             </div>
-            <p className="mt-2 text-[13px] text-muted">
-              ou {installments(item.price, 12)}
-              {item.marketAvg
-                ? ` · média de mercado ${brl(item.marketAvg)}`
-                : ""}
-            </p>
+            {item.marketAvg && (
+              <p className="mt-2 text-[13px] text-muted">
+                média de mercado {brl(item.marketAvg)}
+              </p>
+            )}
 
             <div className="mt-5 flex flex-wrap items-stretch gap-3">
               <Stepper value={qty} onChange={setQty} max={item.qty} />
@@ -155,13 +154,9 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                 {item.seller.name}
               </div>
               <div className="mt-1 font-pixel text-[9px] text-brand-soft">
-                {item.seller.rating.toLocaleString("pt-BR")}% POSITIVO ·{" "}
-                {item.seller.sales.toLocaleString("pt-BR")} VENDAS
+                CARTAS CONFERIDAS UMA A UMA
               </div>
             </div>
-            <span className="ml-auto shrink-0 rounded-[8px] border-2 border-outline bg-brand-soft px-2.5 py-1.5 font-pixel text-[8px] text-outline">
-              {item.seller.ships}
-            </span>
           </div>
 
           <p className="mt-6 text-[14px] leading-relaxed text-muted">

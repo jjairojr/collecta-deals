@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import SealedGrid from "@/components/SealedGrid";
+import KindToggle from "@/components/ui/KindToggle";
 import { loadCatalog } from "@/lib/catalog";
 import { isGameId } from "@/lib/games";
 
@@ -37,6 +38,7 @@ export default async function SeladoPage({
         size="md"
         heading="h1"
       />
+      <KindToggle singlesHref="/singles" />
       <SealedGrid list={sealed} />
     </Container>
   );

@@ -73,6 +73,7 @@ export default async function JogoPage({
           games={gameOpts}
           navGames={navOpts}
           initialGame={jogo}
+          filtersOnTop
         />
       )}
     </>

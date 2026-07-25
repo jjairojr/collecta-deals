@@ -98,8 +98,6 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
             <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
               {brl(item.price)}
             </span>
-            <p className="mt-2 text-[13px] text-muted">{item.installmentsNote}</p>
-
             <div className="mt-4 font-pixel text-[9px] text-brand-soft">
               {soldPct > 0
                 ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} CAIXAS`
