@@ -139,7 +139,7 @@ function GameMenu({ game }: { game: NavGame }) {
   return (
     <div ref={rootRef} className="group relative flex items-stretch">
       <Link
-        href={`/singles/${game.id}`}
+        href={`/jogo/${game.id}`}
         aria-haspopup="menu"
         aria-expanded={menu !== null}
         onClick={onTabTap}
@@ -158,6 +158,7 @@ function GameMenu({ game }: { game: NavGame }) {
           role="menu"
           className="sticker mt-1 overflow-hidden rounded-[10px] bg-surface [--sh:5px]"
         >
+          <MenuLink href={`/jogo/${game.id}`} label="VER TUDO" />
           <MenuLink href={`/singles/${game.id}`} label="SINGLES" />
           <MenuLink href={`/selado/${game.id}`} label="SELADOS" />
         </div>
@@ -172,6 +173,11 @@ function GameMenu({ game }: { game: NavGame }) {
             role="menu"
             className="sticker w-[188px] overflow-hidden rounded-[10px] bg-surface [--sh:5px]"
           >
+            <MenuLink
+              href={`/jogo/${game.id}`}
+              label="VER TUDO"
+              onNavigate={() => setMenu(null)}
+            />
             <MenuLink
               href={`/singles/${game.id}`}
               label="SINGLES"

@@ -14,6 +14,7 @@ const IDIOMA_OPTS = ["EN", "JP", "PT"];
 const SORTS = [
   { id: "relevancia", label: "RELEVANCIA" },
   { id: "menor-preco", label: "MENOR PRECO" },
+  { id: "maior-preco", label: "MAIOR PRECO" },
   { id: "novidades", label: "NOVIDADES" },
 ];
 const PAGE_SIZE = 8;
@@ -104,6 +105,8 @@ export default function SinglesBrowse({
     });
     if (sort === "menor-preco") {
       list = [...list].sort((a, b) => a.price - b.price);
+    } else if (sort === "maior-preco") {
+      list = [...list].sort((a, b) => b.price - a.price);
     } else if (sort === "novidades") {
       list = [...list].reverse();
     }

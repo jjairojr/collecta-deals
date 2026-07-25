@@ -5,7 +5,7 @@ import { absoluteURL } from "@/lib/site";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { singles, sealed, games, live } = await loadCatalog();
+  const { singles, sealed, games, navGames, live } = await loadCatalog();
   const urls: MetadataRoute.Sitemap = [
     { url: absoluteURL("/"), changeFrequency: "daily", priority: 1 },
     { url: absoluteURL("/singles"), changeFrequency: "daily", priority: 0.9 },
@@ -13,6 +13,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
   if (!live) {
     return urls;
+  }
+  for (const g of navGames) {
+    urls.push({
+      url: absoluteURL(`/jogo/${g.id}`),
+      changeFrequency: "daily",
+      priority: 0.8,
+    });
   }
   for (const g of games) {
     urls.push({
