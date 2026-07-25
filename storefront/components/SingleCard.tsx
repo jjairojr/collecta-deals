@@ -76,7 +76,7 @@ export default function SingleCard({
         </div>
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 pt-1">
-          <span className="font-pixel text-[11px] text-brand sm:text-[12px]">
+          <span className="font-pixel text-[10px] leading-relaxed text-brand sm:text-[12px]">
             {brl(item.price)}
           </span>
           <button

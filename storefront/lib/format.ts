@@ -2,12 +2,14 @@
 // pt-BR: brl(112320) → "R$ 1.123,20". Keeping money in cents avoids float drift
 // when summing cart lines.
 export function brl(cents: number): string {
-  return (cents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return (cents / 100)
+    .toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    .replace(/\u00a0/g, " ");
 }
 
 // installments("12x", 420000, 12) → "12x de R$ 350,00".

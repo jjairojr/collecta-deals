@@ -7,7 +7,7 @@ import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import { useCart } from "@/lib/cart";
 import { brl, installments } from "@/lib/format";
-import { COUPON, FREE_SHIPPING, SHIPPING } from "@/lib/mock";
+import { COUPON } from "@/lib/mock";
 import type { CartLine } from "@/lib/types";
 
 export default function CartView() {
@@ -46,11 +46,8 @@ export default function CartView() {
     );
   }
 
-  const freeShipping = subtotal >= FREE_SHIPPING;
-  const shipping = freeShipping ? 0 : SHIPPING;
   const discount = applied ? Math.round((subtotal * COUPON.pct) / 100) : 0;
-  const total = subtotal + shipping - discount;
-  const missing = FREE_SHIPPING - subtotal;
+  const total = subtotal - discount;
   const count = lines.reduce((n, l) => n + l.qty, 0);
 
   const applyCoupon = () => {
@@ -79,7 +76,7 @@ export default function CartView() {
 
       <div className="mt-7 grid gap-7 lg:grid-cols-[1.4fr_.6fr] lg:items-start">
         {/* Line items */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {lines.map((l) => (
             <div
               key={`${l.slug}|${l.seller}|${l.meta}`}
@@ -106,7 +103,7 @@ export default function CartView() {
                 </div>
               </div>
 
-              <div className="col-span-2 flex items-center justify-between gap-4 sm:col-span-1 sm:block">
+              <div className="col-span-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:col-span-1 sm:block">
                 <Stepper
                   value={l.qty}
                   onChange={(n) => setQty(l, n)}
@@ -129,41 +126,36 @@ export default function CartView() {
             </div>
           ))}
 
-          {!freeShipping && (
-            <div
-              className="sticker flex items-center gap-4 rounded-[14px] bg-royal px-5 py-4"
-              style={{ ["--sh" as string]: "5px" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/mascot.png"
-                alt=""
-                className="h-11 w-11 shrink-0 rounded-full border-2 border-outline object-cover"
-              />
-              <p className="text-[15px] leading-snug text-white">
-                Faltam{" "}
-                <strong className="font-bold text-brand-soft">
-                  {brl(missing)}
-                </strong>{" "}
-                para o frete grátis. Bora completar o set?
-              </p>
-            </div>
-          )}
+          <div
+            className="sticker flex items-center gap-4 rounded-[14px] bg-royal px-5 py-4"
+            style={{ ["--sh" as string]: "5px" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/mascot.png"
+              alt=""
+              className="h-11 w-11 shrink-0 rounded-full border-2 border-outline object-cover"
+            />
+            <p className="text-[15px] leading-snug text-white">
+              O meio de entrega é combinado{" "}
+              <strong className="font-bold text-brand-soft">
+                direto no WhatsApp
+              </strong>{" "}
+              na hora de fechar o pedido.
+            </p>
+          </div>
         </div>
 
         {/* Summary */}
         <div
-          className="sticker sticker-5 rounded-[16px] border-brand bg-outline p-6 sm:p-[26px]"
+          className="sticker sticker-5 min-w-0 rounded-[16px] border-brand bg-outline p-5 sm:p-[26px]"
           style={{ ["--sh" as string]: "8px" }}
         >
           <div className="font-pixel text-[11px] text-brand-soft">RESUMO</div>
 
           <dl className="mt-5 space-y-3 text-[15px]">
             <Row label="Subtotal" value={brl(subtotal)} />
-            <Row
-              label="Frete (Sedex)"
-              value={freeShipping ? "Grátis" : brl(shipping)}
-            />
+            <Row label="Frete" value="A combinar" />
             {applied && (
               <Row
                 label={`Cupom ${COUPON.code}`}
@@ -213,12 +205,12 @@ export default function CartView() {
             className="mt-5 w-full rounded-[10px] border-4 border-white bg-brand px-6 py-3.5 font-pixel text-[11px] text-white transition-transform hover:-translate-y-0.5"
             style={{ boxShadow: "0 0 0 4px #0b0b0c" }}
           >
-            INSERIR FICHA - PAGAR
+            FECHAR PEDIDO NO WHATSAPP
           </button>
           <p className="mt-4 text-center font-pixel text-[8px] leading-relaxed text-faint">
-            PIX - CARTAO - BOLETO
+            VOCE SERA REDIRECIONADO AO WHATSAPP
             <br />
-            COMPRA PROTEGIDA COLLECTA
+            PAGAMENTO E ENTREGA COMBINADOS LA
           </p>
         </div>
       </div>
@@ -261,5 +253,6 @@ function buildOrder(
     out.push(`Cupom: ${coupon}`);
   }
   out.push(`Total: ${brl(total)}`);
+  out.push("Frete: a combinar");
   return out.join("\n");
 }

@@ -49,11 +49,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore corrupt storage
     }
-    hydrated.current = true;
   }, []);
 
   useEffect(() => {
     if (!hydrated.current) {
+      hydrated.current = true;
       return;
     }
     try {

@@ -34,7 +34,7 @@ export default function SealedCard({ item }: { item: Sealed }) {
           {item.name}
         </h3>
         <p className="text-xs text-on-soft">{item.meta}</p>
-        <span className="mt-auto pt-1 font-pixel text-[11px] text-royal sm:text-[12px]">
+        <span className="mt-auto pt-1 font-pixel text-[10px] leading-relaxed text-royal sm:text-[12px]">
           {brl(item.price)}
         </span>
       </div>

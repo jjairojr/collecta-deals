@@ -1,9 +1,12 @@
 import Container from "@/components/ui/Container";
+import { pixelText } from "@/lib/format";
 
 const NOTES = [
-  "FRETE GRATIS ACIMA DE R$ 250",
+  // "FRETE GRATIS ACIMA DE R$ 250",
+  "A LOJA DE CARTAS MAIS RÁPIDA DO BRASIL",
+  "CARTA CERTIFICADA E CONFERIDA",
   "ENVIO EM 24H",
-  "+18.400 CARTAS NO ESTOQUE",
+  // "+18.400 CARTAS NO ESTOQUE",
 ];
 
 function NoteRow({ hidden }: { hidden?: boolean }) {
@@ -18,7 +21,7 @@ function NoteRow({ hidden }: { hidden?: boolean }) {
             className="inline-block h-2 w-2 rounded-full bg-brand-soft animate-blink"
             aria-hidden
           />
-          {n}
+          {pixelText(n)}
         </span>
       ))}
     </span>
@@ -39,10 +42,10 @@ export default function AnnouncementBar() {
               className="inline-block h-2 w-2 rounded-full bg-brand-soft animate-blink"
               aria-hidden
             />
-            {NOTES[0]}
+            {pixelText(NOTES[0])}
           </span>
-          <span>{NOTES[1]}</span>
-          <span className="hidden md:inline">{NOTES[2]}</span>
+          <span>{pixelText(NOTES[1])}</span>
+          <span className="hidden md:inline">{pixelText(NOTES[2])}</span>
         </span>
         <span className="ml-auto hidden whitespace-nowrap font-pixel text-[9px] leading-none text-white sm:block">
           P1 · CONVIDADO
