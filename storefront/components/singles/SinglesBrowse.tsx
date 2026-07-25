@@ -26,9 +26,11 @@ function toggle<T>(list: T[], value: T): T[] {
 export default function SinglesBrowse({
   catalog,
   games,
+  navGames,
 }: {
   catalog: Single[];
   games: { id: string; label: string }[];
+  navGames: { id: string; label: string }[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -43,7 +45,9 @@ export default function SinglesBrowse({
   const hasPriceRange = priceCeil > priceFloor;
 
   const [gameSel, setGameSel] = useState<string[]>(
-    initialGame && games.some((g) => g.id === initialGame) ? [initialGame] : [],
+    initialGame && navGames.some((g) => g.id === initialGame)
+      ? [initialGame]
+      : [],
   );
   const [estado, setEstado] = useState<string[]>([]);
   const [idioma, setIdioma] = useState<string[]>([]);
@@ -89,7 +93,7 @@ export default function SinglesBrowse({
 
   const selectedLabel =
     gameSel.length === 1
-      ? games.find((g) => g.id === gameSel[0])?.label
+      ? navGames.find((g) => g.id === gameSel[0])?.label
       : undefined;
   const title = selectedLabel ? `${selectedLabel} · Singles` : "Todos · Singles";
 
@@ -123,7 +127,16 @@ export default function SinglesBrowse({
         <FilterChip active onClick={() => {}}>
           Singles
         </FilterChip>
-        <FilterChip active={false} onClick={() => router.push("/selado")}>
+        <FilterChip
+          active={false}
+          onClick={() =>
+            router.push(
+              gameSel.length === 1
+                ? `/selado?jogo=${gameSel[0]}`
+                : "/selado",
+            )
+          }
+        >
           Selados
         </FilterChip>
       </FilterGroup>

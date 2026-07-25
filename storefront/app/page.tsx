@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
-import GameCabinet from "@/components/home/GameCabinet";
 import HighScores from "@/components/home/HighScores";
 import SingleCard from "@/components/SingleCard";
 import SealedCard from "@/components/SealedCard";
@@ -24,7 +23,10 @@ export default async function HomePage() {
       <section className="relative overflow-hidden border-b-[6px] border-outline bg-royal">
         <div
           className="pointer-events-none absolute inset-0"
-          style={{ backgroundImage: heroLayers, backgroundSize: "auto, 96px 100%" }}
+          style={{
+            backgroundImage: heroLayers,
+            backgroundSize: "auto, 96px 100%",
+          }}
           aria-hidden
         />
         <div
@@ -96,18 +98,20 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* Game select */}
-      <Container className="py-14">
-        <SectionHead
-          title="Selecione seu jogo"
-          eyebrow={`${games.length} ${games.length === 1 ? "UNIVERSO" : "UNIVERSOS"}`}
-        />
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-[22px]">
-          {games.map((g) => (
-            <GameCabinet key={g.id} game={g} />
-          ))}
-        </div>
-      </Container>
+      {/* Produto selado */}
+      {featuredSealed.length > 0 && (
+        <Container className="py-10">
+          <SectionHead
+            title="Produtos selados"
+            action={{ label: "VER TODOS ›", href: "/selado" }}
+          />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            {featuredSealed.map((s) => (
+              <SealedCard key={s.slug} item={s} />
+            ))}
+          </div>
+        </Container>
+      )}
 
       {/* Singles em destaque */}
       <Container className="py-6">
@@ -121,21 +125,6 @@ export default async function HomePage() {
           ))}
         </div>
       </Container>
-
-      {/* Produto selado */}
-      {featuredSealed.length > 0 && (
-        <Container className="py-10">
-          <SectionHead
-            title="Produto selado"
-            action={{ label: "VER TODOS ›", href: "/selado" }}
-          />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
-            {featuredSealed.map((s) => (
-              <SealedCard key={s.slug} item={s} />
-            ))}
-          </div>
-        </Container>
-      )}
 
       {/* High scores */}
       <Container className="py-6">
