@@ -26,7 +26,7 @@ const heroLayers =
 export default async function HomePage() {
   // Real catalog; high-scores stay mock until the backend serves them.
   const { singles, sealed, games } = await loadCatalog();
-  const featured = singles.slice(0, 8);
+  const featured = [...singles].sort((a, b) => b.price - a.price).slice(0, 8);
   const featuredSealed = sealed.slice(0, 4);
   return (
     <>
