@@ -75,16 +75,15 @@ export default function SingleCard({
           </p>
         </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <span className="font-pixel text-[12px] text-brand">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 pt-1">
+          <span className="font-pixel text-[11px] text-brand sm:text-[12px]">
             {brl(item.price)}
           </span>
           <button
             type="button"
             onClick={onAdd}
             aria-label={`Adicionar ${item.name} ao carrinho`}
-            className="arcade-press sticker flex items-center gap-1 rounded-[8px] bg-royal px-2.5 py-1.5 font-pixel text-[9px] text-white"
-            style={{ ["--sh" as string]: "3px" }}
+            className="arcade-press sticker ml-auto flex items-center gap-1 rounded-[8px] bg-royal px-2.5 py-1.5 font-pixel text-[9px] text-white [--sh:3px]"
           >
             + ADD
           </button>

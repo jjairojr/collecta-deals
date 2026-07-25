@@ -18,8 +18,8 @@ export default function Header() {
   };
 
   return (
-    <header className="border-b-[6px] border-outline bg-brand">
-      <Container className="flex items-center gap-4 py-4 sm:gap-6">
+    <header className="sticky top-0 z-40 border-b-[6px] border-outline bg-brand">
+      <Container className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3 sm:flex-nowrap sm:gap-6 sm:py-4">
         <Link
           href="/"
           className="flex shrink-0 items-center gap-3"
@@ -43,7 +43,7 @@ export default function Header() {
 
         <form
           onSubmit={search}
-          className="sticker flex min-w-0 flex-1 items-stretch overflow-hidden rounded-[10px] bg-white sm:max-w-[520px]"
+          className="sticker order-last flex w-full min-w-0 items-stretch overflow-hidden rounded-[10px] bg-white sm:order-none sm:w-auto sm:max-w-[520px] sm:flex-1"
           style={{ ["--sh" as string]: "4px" }}
         >
           <input
@@ -51,7 +51,7 @@ export default function Header() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar carta, set ou número…"
             aria-label="Buscar"
-            className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-sm text-outline outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-base text-outline outline-none placeholder:text-faint sm:text-sm"
           />
           <button
             type="submit"

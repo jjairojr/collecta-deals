@@ -120,7 +120,7 @@ export default function CartView() {
                   <button
                     type="button"
                     onClick={() => remove(l)}
-                    className="mt-1 text-xs text-faint hover:text-brand"
+                    className="-mr-2 mt-0.5 rounded px-2 py-1.5 text-xs text-faint hover:text-brand"
                   >
                     remover
                   </button>
@@ -183,7 +183,7 @@ export default function CartView() {
                 onChange={(e) => setCoupon(e.target.value)}
                 placeholder="Cupom"
                 aria-label="Cupom de desconto"
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-outline outline-none placeholder:text-faint"
+                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-base text-outline outline-none placeholder:text-faint sm:text-sm"
               />
               <button
                 type="button"
@@ -197,9 +197,9 @@ export default function CartView() {
 
           <div className="my-5 border-t-[3px] border-brand" />
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span className="font-pixel text-[10px] text-white">TOTAL</span>
-            <span className="font-pixel text-[22px] text-brand">
+            <span className="font-pixel text-[18px] text-brand sm:text-[22px]">
               {brl(total)}
             </span>
           </div>

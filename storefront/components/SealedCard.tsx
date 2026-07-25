@@ -30,11 +30,11 @@ export default function SealedCard({ item }: { item: Sealed }) {
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <h3 className="font-display text-xl font-bold leading-tight text-outline">
+        <h3 className="font-display line-clamp-3 text-base font-bold leading-tight text-outline sm:text-xl">
           {item.name}
         </h3>
         <p className="text-xs text-on-soft">{item.meta}</p>
-        <span className="mt-auto pt-1 font-pixel text-[12px] text-royal">
+        <span className="mt-auto pt-1 font-pixel text-[11px] text-royal sm:text-[12px]">
           {brl(item.price)}
         </span>
       </div>

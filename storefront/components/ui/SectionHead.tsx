@@ -27,9 +27,11 @@ export default function SectionHead({
       {action && (
         <Link
           href={action.href}
-          className="border-b-[3px] border-brand pb-1 font-pixel text-[10px] text-white"
+          className="inline-flex min-h-11 items-center font-pixel text-[10px] text-white"
         >
-          {action.label}
+          <span className="border-b-[3px] border-brand pb-1">
+            {action.label}
+          </span>
         </Link>
       )}
     </div>

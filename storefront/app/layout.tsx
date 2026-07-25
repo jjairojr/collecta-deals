@@ -8,6 +8,7 @@ import Header from "@/components/chrome/Header";
 import TabBar from "@/components/chrome/TabBar";
 import Footer from "@/components/chrome/Footer";
 import Scanlines from "@/components/chrome/Scanlines";
+import CartToast from "@/components/cart/CartToast";
 
 const baloo = Baloo_2({
   subsets: ["latin"],
@@ -29,11 +30,11 @@ const siteURL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collecta.vercel.app
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteURL),
-  title: "Collecta — Marketplace de cartas",
+  title: "Collecta — Loja de cartas TCG",
   description:
     "Singles avulsas e produto selado de Pokémon, One Piece e Riftbound. Conferido carta por carta, enviado do Brasil.",
   openGraph: {
-    title: "Collecta — Marketplace de cartas",
+    title: "Collecta — Loja de cartas TCG",
     description:
       "Singles e selados de Pokémon, One Piece e Riftbound. Monte seu pedido e finalize no WhatsApp.",
     type: "website",
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Collecta — Marketplace de cartas",
+    title: "Collecta — Loja de cartas TCG",
     description: "Singles e selados. Peça pelo WhatsApp.",
   },
 };
@@ -71,6 +72,7 @@ export default async function RootLayout({
           <TabBar games={games} />
           <main className="min-h-[60vh]">{children}</main>
           <Footer />
+          <CartToast />
         </CartProvider>
       </body>
     </html>

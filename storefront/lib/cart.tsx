@@ -23,6 +23,7 @@ interface CartContext {
   lines: CartLine[];
   count: number;
   total: number;
+  lastAdded: { name: string; nonce: number } | null;
   add: (line: Omit<CartLine, "qty">, qty?: number) => void;
   setQty: (line: CartLine, qty: number) => void;
   remove: (line: CartLine) => void;
@@ -33,6 +34,10 @@ const Ctx = createContext<CartContext | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [lastAdded, setLastAdded] = useState<{
+    name: string;
+    nonce: number;
+  } | null>(null);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -72,6 +77,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, { ...line, qty: Math.min(qty, cap) }];
     });
+    setLastAdded((prev) => ({
+      name: line.name,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
   }, []);
 
   const setQty = useCallback((line: CartLine, qty: number) => {
@@ -94,8 +103,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<CartContext>(() => {
     const count = lines.reduce((n, l) => n + l.qty, 0);
     const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
-    return { lines, count, total, add, setQty, remove, clear };
-  }, [lines, add, setQty, remove, clear]);
+    return { lines, count, total, lastAdded, add, setQty, remove, clear };
+  }, [lines, lastAdded, add, setQty, remove, clear]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -16,7 +16,7 @@ export default function FilterChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-[8px] border-[3px] border-outline px-2.5 py-1.5 text-xs font-bold transition-colors ${
+      className={`rounded-[8px] border-[3px] border-outline px-3 py-2 text-xs font-bold transition-colors ${
         active ? "bg-brand text-white" : "bg-outline text-[#c9c9d1] hover:text-white"
       }`}
     >

@@ -10,8 +10,6 @@ import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
 import type { SealedDetail } from "@/lib/types";
 
-const THUMBS = ["LACRE", "LATERAL", "CODIGO"];
-
 export default function SealedDetailView({ item }: { item: SealedDetail }) {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
@@ -51,7 +49,7 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
 
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
         {/* Left — gallery */}
-        <div>
+        <div className="min-w-0">
           <div
             className="sticker sticker-5 rounded-[18px] bg-brand-soft p-6 sm:p-[26px]"
             style={{ ["--sh" as string]: "8px" }}
@@ -66,20 +64,10 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
               />
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            {THUMBS.map((label) => (
-              <div
-                key={label}
-                className="grid aspect-square place-items-center rounded-[10px] border-[3px] border-outline bg-white font-pixel text-[7px] text-outline"
-              >
-                {label}
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Right — buy */}
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
             {preorder && (
               <span className="bg-brand px-2.5 py-1.5 font-pixel text-[8px] text-white">
@@ -103,7 +91,7 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
             className="sticker mt-6 rounded-[14px] bg-surface p-6"
             style={{ ["--sh" as string]: "6px" }}
           >
-            <span className="font-pixel text-[28px] text-brand sm:text-[32px]">
+            <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
               {brl(item.price)}
             </span>
             <p className="mt-2 text-[13px] text-muted">{item.installmentsNote}</p>

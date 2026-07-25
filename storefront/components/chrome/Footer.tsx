@@ -50,14 +50,14 @@ export default function Footer() {
               COLLECTA
             </span>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white">
-              Marketplace de cartas do Brasil. Singles e selados de Pokémon, One
-              Piece e Riftbound — conferidos carta por carta.
+              Loja de cartas do Brasil. Singles e selados de Pokémon, One Piece
+              e Riftbound — conferidos carta por carta.
             </p>
           </div>
           {columns.map((col) => (
             <div key={col.heading}>
               <h3 className="font-pixel text-[9px] text-outline">{col.heading}</h3>
-              <ul className="mt-4 space-y-2.5">
+              <ul className="mt-3 space-y-1">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     {l.external ? (
@@ -65,14 +65,14 @@ export default function Footer() {
                         href={l.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-white underline-offset-4 hover:underline"
+                        className="inline-block py-1.5 text-sm text-white underline-offset-4 hover:underline"
                       >
                         {l.label}
                       </a>
                     ) : (
                       <Link
                         href={l.href}
-                        className="text-sm text-white underline-offset-4 hover:underline"
+                        className="inline-block py-1.5 text-sm text-white underline-offset-4 hover:underline"
                       >
                         {l.label}
                       </Link>

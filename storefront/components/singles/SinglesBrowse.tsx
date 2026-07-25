@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 import Container from "@/components/ui/Container";
@@ -57,6 +58,26 @@ export default function SinglesBrowse({
   const [page, setPage] = useState(1);
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  useEffect(() => {
+    setGameSel(
+      initialGame && navGames.some((g) => g.id === initialGame)
+        ? [initialGame]
+        : [],
+    );
+    setPage(1);
+  }, [initialGame, navGames]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q]);
+
+  useEffect(() => {
+    document.body.style.overflow = sheetOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [sheetOpen]);
+
   // Estado options come from the real conditions in stock.
   const estadoOpts = useMemo(
     () => [...new Set(catalog.map((c) => c.condition).filter(Boolean))].sort(),
@@ -99,11 +120,27 @@ export default function SinglesBrowse({
 
   const reset = () => setPage(1);
 
-  const sidebar = (
-    <aside
-      className="sticker h-max rounded-[14px] bg-surface p-5"
-      style={{ ["--sh" as string]: "6px" }}
-    >
+  const activeFilters =
+    gameSel.length +
+    estado.length +
+    idioma.length +
+    (hasPriceRange && (priceMin > priceFloor || priceMax < priceCeil) ? 1 : 0);
+
+  const clearFilters = () => {
+    setGameSel([]);
+    setEstado([]);
+    setIdioma([]);
+    setPriceMin(priceFloor);
+    setPriceMax(priceCeil);
+    setPage(1);
+    setSheetOpen(false);
+    if (q || initialGame) {
+      router.push("/singles");
+    }
+  };
+
+  const filters = (
+    <>
       <div className="mb-5 font-pixel text-[12px] text-brand">FILTROS</div>
 
       {games.length > 1 && (
@@ -220,12 +257,16 @@ export default function SinglesBrowse({
           </div>
         </div>
       )}
-    </aside>
+    </>
   );
 
   return (
     <Container className="grid gap-7 py-9 md:grid-cols-[270px_1fr] md:items-start">
-      <div className="hidden md:block">{sidebar}</div>
+      <div className="hidden md:block">
+        <aside className="sticker h-max rounded-[14px] bg-surface p-5 [--sh:6px]">
+          {filters}
+        </aside>
+      </div>
 
       <div className="min-w-0">
         {/* Toolbar */}
@@ -235,7 +276,8 @@ export default function SinglesBrowse({
               {title}
             </h1>
             <div className="mt-2 font-pixel text-[9px] text-faint">
-              {filtered.length.toLocaleString("pt-BR")} RESULTADOS
+              {filtered.length.toLocaleString("pt-BR")}{" "}
+              {filtered.length === 1 ? "RESULTADO" : "RESULTADOS"}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -257,13 +299,37 @@ export default function SinglesBrowse({
         {/* Mobile filters toggle */}
         <button
           type="button"
-          onClick={() => setSheetOpen((v) => !v)}
-          className="arcade-press sticker mb-5 flex items-center gap-2 rounded-[10px] bg-surface px-4 py-2.5 font-pixel text-[10px] text-white md:hidden"
-          style={{ ["--sh" as string]: "4px" }}
+          onClick={() => setSheetOpen(true)}
+          className="arcade-press sticker mb-5 flex items-center gap-2 rounded-[10px] bg-surface px-4 py-2.5 font-pixel text-[10px] text-white [--sh:4px] md:hidden"
         >
           <SlidersHorizontal className="h-3.5 w-3.5" /> FILTROS
+          {activeFilters > 0 && (
+            <span className="grid h-5 min-w-5 place-items-center rounded-full border-2 border-outline bg-brand-soft px-1 font-pixel text-[9px] text-outline">
+              {activeFilters}
+            </span>
+          )}
         </button>
-        {sheetOpen && <div className="mb-6 md:hidden">{sidebar}</div>}
+        {sheetOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col justify-end md:hidden">
+            <button
+              type="button"
+              aria-label="Fechar filtros"
+              onClick={() => setSheetOpen(false)}
+              className="absolute inset-0 bg-outline/70"
+            />
+            <div className="relative max-h-[80dvh] overflow-y-auto rounded-t-[20px] border-t-4 border-brand bg-surface p-5">
+              {filters}
+              <button
+                type="button"
+                onClick={() => setSheetOpen(false)}
+                className="arcade-press sticker mt-2 w-full rounded-[10px] bg-brand px-6 py-3.5 font-pixel text-[11px] text-white [--sh:4px]"
+              >
+                VER {filtered.length.toLocaleString("pt-BR")}{" "}
+                {filtered.length === 1 ? "RESULTADO" : "RESULTADOS"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {shown.length === 0 ? (
           <div className="sticker rounded-[14px] bg-surface p-10 text-center">
@@ -273,6 +339,25 @@ export default function SinglesBrowse({
             <p className="mt-2 font-pixel text-[9px] text-brand-soft">
               TENTE OUTRO FILTRO
             </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="arcade-press sticker rounded-[10px] bg-brand px-5 py-3 font-pixel text-[10px] text-white [--sh:4px]"
+              >
+                LIMPAR FILTROS
+              </button>
+              <Link
+                href={
+                  gameSel.length === 1
+                    ? `/selado?jogo=${gameSel[0]}`
+                    : "/selado"
+                }
+                className="arcade-press sticker rounded-[10px] bg-brand-soft px-5 py-3 font-pixel text-[10px] text-outline [--sh:4px]"
+              >
+                VER SELADOS
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
@@ -283,20 +368,29 @@ export default function SinglesBrowse({
         )}
 
         {pages > 1 && (
-          <div className="mt-9 flex items-center justify-center gap-2.5">
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-2.5">
             <PageChip
               label="‹"
               disabled={current === 1}
               onClick={() => setPage(current - 1)}
             />
-            {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
-              <PageChip
-                key={n}
-                label={String(n)}
-                active={n === current}
-                onClick={() => setPage(n)}
-              />
-            ))}
+            {pageItems(pages, current).map((it, i) =>
+              it === "gap" ? (
+                <span
+                  key={`gap-${i}`}
+                  className="px-1 font-pixel text-[10px] text-faint"
+                >
+                  …
+                </span>
+              ) : (
+                <PageChip
+                  key={it}
+                  label={String(it)}
+                  active={it === current}
+                  onClick={() => setPage(it)}
+                />
+              ),
+            )}
             <PageChip
               label="›"
               disabled={current === pages}
@@ -307,6 +401,27 @@ export default function SinglesBrowse({
       </div>
     </Container>
   );
+}
+
+function pageItems(pages: number, current: number): (number | "gap")[] {
+  if (pages <= 7) {
+    return Array.from({ length: pages }, (_, i) => i + 1);
+  }
+  const wanted = [
+    ...new Set(
+      [1, current - 1, current, current + 1, pages].filter(
+        (n) => n >= 1 && n <= pages,
+      ),
+    ),
+  ].sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  wanted.forEach((n, i) => {
+    if (i > 0 && n - wanted[i - 1] > 1) {
+      out.push("gap");
+    }
+    out.push(n);
+  });
+  return out;
 }
 
 function FilterGroup({
