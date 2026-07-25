@@ -59,9 +59,10 @@ function slugFor(it: RawItem): string {
   );
 }
 
-// Absolute art URL: the backend's exact TCGplayer image when known, else a
-// same-origin proxy to the Go card-image endpoint (keeps the backend host off
-// the client).
+// Art URL: a seller-supplied photo when there is one, else a same-origin proxy
+// to the Go card-image endpoint (keeps the backend host off the client). The
+// productID goes along so the backend serves the exact print's TCGplayer art,
+// falling back to the Liga page image for prints the TCG CDN has no photo for.
 function resolveImage(it: RawItem): string | undefined {
   if (it.imageURL) {
     return it.imageURL;
@@ -70,6 +71,9 @@ function resolveImage(it: RawItem): string | undefined {
     return undefined;
   }
   const p = new URLSearchParams({ game: it.game, set: it.set, number: it.number });
+  if (it.productID) {
+    p.set("productID", String(it.productID));
+  }
   return `/img?${p.toString()}`;
 }
 

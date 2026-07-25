@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 type Hue = "brand" | "royal" | "soft";
 type Angle = "90" | "45" | "135";
@@ -35,8 +38,9 @@ function canOptimize(src: string): boolean {
 }
 
 // The striped brand-color stand-in for product photography. When `imageURL` is
-// set (real photo), the stripes/label are replaced. Aspect ratio is owned by
-// the caller so the same block serves 5:7 cards and 4:3 boxes.
+// set (real photo), the stripes/label are replaced — and if that photo fails to
+// load, the stripes come back instead of a broken-image icon. Aspect ratio is
+// owned by the caller so the same block serves 5:7 cards and 4:3 boxes.
 export default function ArtPlaceholder({
   hue = "royal",
   angle = "90",
@@ -54,7 +58,12 @@ export default function ArtPlaceholder({
   sizes?: string;
   priority?: boolean;
 }) {
-  if (imageURL) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [imageURL]);
+
+  if (imageURL && !failed) {
     if (canOptimize(imageURL)) {
       return (
         <Image
@@ -63,6 +72,7 @@ export default function ArtPlaceholder({
           fill
           sizes={sizes}
           priority={priority}
+          onError={() => setFailed(true)}
           className="object-cover"
         />
       );
@@ -73,6 +83,7 @@ export default function ArtPlaceholder({
         src={imageURL}
         alt={alt}
         loading={priority ? "eager" : "lazy"}
+        onError={() => setFailed(true)}
         className="h-full w-full object-cover"
       />
     );

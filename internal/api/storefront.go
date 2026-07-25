@@ -75,16 +75,18 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 				AskBRL:    round2(t.AskBRL),
 			}
 			// A seller-supplied image wins over everything (the only art for
-			// products without TCG data, e.g. sealed starters). Otherwise fall
-			// back to the exact TCGplayer image for singles.
+			// products without TCG data, e.g. sealed starters). Otherwise the
+			// catalog resolves art through /api/card-image, which tries the
+			// TCGplayer product art first and falls back to the Liga page image
+			// when that print has none — the same chain the dashboard uses. The
+			// product id only names the print; it is never turned into a bare
+			// CDN url here, because a 404 there would leave a broken image with
+			// nothing behind it.
 			if t.ImageURL != "" {
 				item.ImageURL = t.ImageURL
 			} else if t.Kind != "sealed" && lookup != nil {
 				if _, url, ok := lookup(t.Number, t.Name, t.Set); ok {
-					if pid := productIDFromURL(url); pid > 0 {
-						item.ProductID = pid
-						item.ImageURL = tcgImageURL(pid)
-					}
+					item.ProductID = productIDFromURL(url)
 				}
 			}
 			if fx > 0 {
@@ -169,10 +171,6 @@ func productIDFromURL(url string) int {
 		return 0
 	}
 	return id
-}
-
-func tcgImageURL(productID int) string {
-	return "https://product-images.tcgplayer.com/fit-in/440x614/" + strconv.Itoa(productID) + ".jpg"
 }
 
 func round2(v float64) float64 {
