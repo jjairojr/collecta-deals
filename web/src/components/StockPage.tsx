@@ -1,5 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, Store, Check, X, Wand2, Save, Combine, ImagePlus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronsUpDown,
+  Combine,
+  ImagePlus,
+  Save,
+  Search,
+  Store,
+  Wand2,
+  X,
+} from "lucide-react";
 import {
   gameHasDeals,
   getGame,
@@ -55,6 +67,97 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+type SortKey = "name" | "qty" | "ref" | "ask" | "total" | "listed";
+interface SortState {
+  key: SortKey;
+  dir: "asc" | "desc";
+}
+
+// listedRank orders the vitrine column by how close a card is to being sold:
+// on sale > listed but missing a price > hidden.
+function listedRank(row: RowState | undefined): number {
+  if (!row?.listed) {
+    return 0;
+  }
+  return row.askBRL > 0 ? 2 : 1;
+}
+
+function sortValue(
+  t: TradeView,
+  key: SortKey,
+  fx: number,
+  row: RowState | undefined,
+): number | string {
+  switch (key) {
+    case "name":
+      return (cleanName(t.name) || t.number).toLowerCase();
+    case "qty":
+      return t.qty;
+    case "ref":
+      return refBRL(t, fx);
+    case "ask":
+      return row?.askBRL ?? 0;
+    case "total":
+      return (row?.askBRL ?? 0) * Math.max(t.qty, 1);
+    case "listed":
+      return listedRank(row);
+  }
+}
+
+function sortStock(
+  list: TradeView[],
+  sort: SortState,
+  fx: number,
+  rows: Record<string, RowState>,
+): TradeView[] {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const av = sortValue(a, sort.key, fx, rows[a.id]);
+    const bv = sortValue(b, sort.key, fx, rows[b.id]);
+    if (typeof av === "string" && typeof bv === "string") {
+      return av.localeCompare(bv) * dir;
+    }
+    if (typeof av === "number" && typeof bv === "number") {
+      return (av - bv) * dir;
+    }
+    return 0;
+  });
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = "right",
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+  align?: "left" | "right" | "center";
+}) {
+  const activeCol = sort.key === sortKey;
+  const alignClass =
+    align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return (
+    <th className={`px-3 py-2 font-bold ${alignClass}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 hover:text-slate-300 ${align === "right" ? "flex-row-reverse" : ""} ${activeCol ? "text-slate-300" : ""}`}
+      >
+        {label}
+        {activeCol ? (
+          sort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ChevronsUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </th>
+  );
+}
+
 export default function StockPage() {
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +170,7 @@ export default function StockPage() {
   const [confirmMerge, setConfirmMerge] = useState(false);
   const [merging, setMerging] = useState(false);
   const [imgEditId, setImgEditId] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortState>({ key: "total", dir: "desc" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,14 +205,29 @@ export default function StockPage() {
   const fx = data?.fxRate ?? 0;
   const holdings = useMemo(() => (data?.trades ?? []).filter((t) => !t.realized), [data]);
 
+  // Sorting reads the draft prices/listings through a ref so a row never jumps
+  // out from under the cursor while it is being edited: the order is only
+  // recomputed when the sort, the search or the loaded data changes.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+
   const q = query.trim().toLowerCase();
   const visible = useMemo(
     () =>
-      holdings.filter((t) =>
-        `${t.name} ${t.number} ${t.store ?? ""}`.toLowerCase().includes(q),
+      sortStock(
+        holdings.filter((t) =>
+          `${t.name} ${t.number} ${t.store ?? ""}`.toLowerCase().includes(q),
+        ),
+        sort,
+        fx,
+        rowsRef.current,
       ),
-    [holdings, q],
+    [holdings, q, sort, fx],
   );
+
+  const onSort = useCallback((key: SortKey) => {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+  }, []);
 
   const dirty = useMemo(() => {
     if (!data) {
@@ -372,12 +491,17 @@ export default function StockPage() {
                     aria-label="Selecionar todas as visíveis"
                   />
                 </th>
-                <th className="px-3 py-2 font-bold">Carta</th>
-                <th className="px-3 py-2 text-right font-bold">Qtd</th>
-                <th className="px-3 py-2 text-right font-bold">{isBRGame() ? "Floor" : "TCG"} R$</th>
-                <th className="px-3 py-2 text-right font-bold">Preço R$ (un.)</th>
-                <th className="px-3 py-2 text-right font-bold">Total</th>
-                <th className="px-3 py-2 text-center font-bold">Na vitrine</th>
+                <SortableTh label="Carta" sortKey="name" sort={sort} onSort={onSort} align="left" />
+                <SortableTh label="Qtd" sortKey="qty" sort={sort} onSort={onSort} />
+                <SortableTh
+                  label={`${isBRGame() ? "Floor" : "TCG"} R$`}
+                  sortKey="ref"
+                  sort={sort}
+                  onSort={onSort}
+                />
+                <SortableTh label="Preço R$ (un.)" sortKey="ask" sort={sort} onSort={onSort} />
+                <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} />
+                <SortableTh label="Na vitrine" sortKey="listed" sort={sort} onSort={onSort} align="center" />
               </tr>
             </thead>
             <tbody>
