@@ -68,6 +68,9 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+const PREVIEW_W = 240;
+const PREVIEW_H = 336;
+
 type SortKey = "name" | "qty" | "ref" | "ask" | "total" | "listed";
 interface SortState {
   key: SortKey;
@@ -683,6 +686,17 @@ function StockRow({
   const live = listed && ask > 0;
   const total = ask * Math.max(t.qty, 1);
   const askUSD = fx > 0 ? ask * fx : 0;
+  const [preview, setPreview] = useState<{ x: number; y: number } | null>(null);
+
+  const openPreview = (e: React.SyntheticEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(r.right + 12, window.innerWidth - PREVIEW_W - 12);
+    const y = Math.min(
+      Math.max(r.top + r.height / 2 - PREVIEW_H / 2, 12),
+      window.innerHeight - PREVIEW_H - 12,
+    );
+    setPreview({ x, y });
+  };
 
   return (
     <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${selected ? "bg-brand/10" : ""}`}>
@@ -694,6 +708,10 @@ function StockRow({
           <button
             type="button"
             onClick={() => onEditImage(t.id)}
+            onMouseEnter={openPreview}
+            onMouseLeave={() => setPreview(null)}
+            onFocus={openPreview}
+            onBlur={() => setPreview(null)}
             title="Definir imagem do produto"
             className="group relative h-12 w-[34px] shrink-0 overflow-hidden rounded"
           >
@@ -723,6 +741,21 @@ function StockRow({
             </div>
           </div>
         </div>
+        {preview && (
+          <div
+            className="pointer-events-none fixed z-40 overflow-hidden rounded-[12px] border-[3px] border-outline bg-surface shadow-2xl shadow-black/60"
+            style={{ left: preview.x, top: preview.y, width: PREVIEW_W, height: PREVIEW_H }}
+          >
+            <CardArt
+              set={t.set}
+              number={t.number}
+              name={t.name}
+              productID={productIDFromTcgURL(t.tcgUrl)}
+              imageURL={row?.imageURL}
+              className="h-full w-full"
+            />
+          </div>
+        )}
       </td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-300">{t.qty}</td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-400">{ref > 0 ? brl0(ref) : "—"}</td>
