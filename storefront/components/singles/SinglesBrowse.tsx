@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import Container from "@/components/ui/Container";
 import FilterChip from "@/components/ui/FilterChip";
 import SingleCard from "@/components/SingleCard";
@@ -226,21 +226,20 @@ export default function SinglesBrowse({
       </FilterGroup>
 
       {colecaoOpts.length > 1 && (
-        <FilterGroup heading="COLECAO">
-          {colecaoOpts.map((o) => (
-            <FilterChip
-              key={o}
-              active={colecao.includes(o)}
-              onClick={() => {
-                trackFilterChange("colecao", o, !colecao.includes(o));
-                setColecao((s) => toggle(s, o));
-                reset();
-              }}
-            >
-              {o}
-            </FilterChip>
-          ))}
-        </FilterGroup>
+        <div className="mb-6">
+          <div className="mb-3 font-pixel text-[9px] text-brand-soft">
+            COLECAO
+          </div>
+          <FilterSelect
+            value={colecaoSel[0] ?? ""}
+            options={colecaoOpts}
+            onChange={(v) => {
+              trackFilterChange("colecao", v || "todas", Boolean(v));
+              setColecao(v ? [v] : []);
+              reset();
+            }}
+          />
+        </div>
       )}
 
       {estadoOpts.length > 0 && (
@@ -515,6 +514,69 @@ function FilterGroup({
     <div className="mb-6">
       <div className="mb-3 font-pixel text-[9px] text-brand-soft">{heading}</div>
       <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+// Single-choice dropdown styled like the filter chips: chip trigger (pink when
+// a collection is picked) and a sticker panel with the options.
+function FilterSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pick = (v: string) => {
+    onChange(v);
+    setOpen(false);
+  };
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={`flex w-full items-center justify-between gap-2 rounded-[8px] border-[3px] border-outline px-3 py-2 text-xs font-bold transition-colors ${
+          value
+            ? "bg-brand text-white"
+            : "bg-outline text-[#c9c9d1] hover:text-white"
+        }`}
+      >
+        <span className="truncate">{value || "Todas"}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Fechar coleções"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+          <div className="sticker absolute inset-x-0 top-full z-20 mt-2 max-h-60 overflow-y-auto rounded-[10px] bg-surface p-1.5 [--sh:4px]">
+            {["", ...options].map((o) => (
+              <button
+                key={o || "todas"}
+                type="button"
+                onClick={() => pick(o)}
+                className={`block w-full rounded-[6px] px-3 py-2 text-left text-xs font-bold transition-colors ${
+                  o === (value || "")
+                    ? "bg-brand text-white"
+                    : "text-[#c9c9d1] hover:bg-outline hover:text-white"
+                }`}
+              >
+                {o || "Todas"}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
