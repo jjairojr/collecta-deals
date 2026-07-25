@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, DM_Sans, Press_Start_2P } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart";
 import { loadCatalog } from "@/lib/catalog";
@@ -83,6 +84,9 @@ export default async function RootLayout({
           <CartToast />
         </CartProvider>
       </body>
+      {process.env.NEXT_PUBLIC_GA_ID && (
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+      )}
     </html>
   );
 }

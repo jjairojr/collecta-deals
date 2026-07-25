@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { singleItem, trackAddToCart, trackSelectItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
 import { gameArtHue } from "@/lib/games";
@@ -35,11 +36,13 @@ export default function SingleCard({
     e.preventDefault();
     e.stopPropagation();
     add(singleToCartLine(item));
+    trackAddToCart(singleItem(item));
   };
 
   return (
     <Link
       href={`/carta/${item.slug}`}
+      onClick={() => trackSelectItem(singleItem(item))}
       className="arcade-press sticker animate-rise flex flex-col overflow-hidden rounded-[14px] bg-surface"
     >
       <div className="relative aspect-[5/7] border-b-4 border-outline">

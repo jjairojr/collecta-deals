@@ -68,6 +68,13 @@
   resolved "https://registry.npmjs.org/@next/swc-darwin-arm64/-/swc-darwin-arm64-15.5.21.tgz"
   integrity sha512-ZfjqPEdi6TRC/fWx7UDbwb1fbVgyh2uD5tVTRKIDZDlYM+UNuE/LafDG2fwuAoZilADpABh46OY/F5qf9JjqLQ==
 
+"@next/third-parties@^15.5.21":
+  version "15.5.21"
+  resolved "https://registry.npmjs.org/@next/third-parties/-/third-parties-15.5.21.tgz"
+  integrity sha512-dE+ef20bElB/yRrlwsK+uONLbKTaCaMkT28Fj4Gr3396Qv/OPrCvGEbD9aExDt41Mn0lvvCzfB1Q7akC3llM6w==
+  dependencies:
+    third-party-capital "1.0.20"
+
 "@swc/helpers@0.5.15":
   version "0.5.15"
   resolved "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.15.tgz"
@@ -220,7 +227,7 @@ nanoid@^3.3.16, nanoid@^3.3.6:
   resolved "https://registry.npmjs.org/nanoid/-/nanoid-3.3.16.tgz"
   integrity sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==
 
-next@15.5.21:
+"next@^13.0.0 || ^14.0.0 || ^15.0.0", next@15.5.21:
   version "15.5.21"
   resolved "https://registry.npmjs.org/next/-/next-15.5.21.tgz"
   integrity sha512-/TsdBtkWLhkl+NVL3Uqws2UphNd6IPzOtzSk1fHaf+0P7GQKLZDUytyhns/Ykbzdy9+YRjwG7ONvrHaaTDdFqQ==
@@ -341,6 +348,11 @@ tapable@^2.3.3:
   version "2.3.3"
   resolved "https://registry.npmjs.org/tapable/-/tapable-2.3.3.tgz"
   integrity sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==
+
+third-party-capital@1.0.20:
+  version "1.0.20"
+  resolved "https://registry.npmjs.org/third-party-capital/-/third-party-capital-1.0.20.tgz"
+  integrity sha512-oB7yIimd8SuGptespDAZnNkzIz+NWaJCu2RMsbs4Wmp9zSDUM8Nhi3s2OOcqYuv3mN4hitXc8DVx+LyUmbUDiA==
 
 tslib@^2.8.0:
   version "2.8.1"

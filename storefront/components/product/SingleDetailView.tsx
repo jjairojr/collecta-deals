@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Heart } from "lucide-react";
 import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
+import {
+  singleItem,
+  trackAddToCart,
+  trackAddToWishlist,
+  trackViewItem,
+} from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gameArtHue, gamePixel } from "@/lib/games";
@@ -19,7 +25,11 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
 
   const meta = [item.set, item.number, item.rarity].filter(Boolean).join(" · ");
 
-  const addMain = () =>
+  useEffect(() => {
+    trackViewItem(singleItem(item));
+  }, [item]);
+
+  const addMain = () => {
     add(
       {
         slug: item.slug,
@@ -33,6 +43,8 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
       },
       qty,
     );
+    trackAddToCart(singleItem(item, qty));
+  };
 
   return (
     <Container className="py-9">
@@ -127,7 +139,12 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
               </button>
               <button
                 type="button"
-                onClick={() => setWished((w) => !w)}
+                onClick={() => {
+                  if (!wished) {
+                    trackAddToWishlist(singleItem(item));
+                  }
+                  setWished((w) => !w);
+                }}
                 aria-label="Adicionar à lista de desejos"
                 aria-pressed={wished}
                 className="order-2 grid w-14 place-items-center rounded-[10px] border-4 border-brand-soft py-2.5 text-brand-soft sm:order-3"

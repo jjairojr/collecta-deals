@@ -7,6 +7,12 @@ import { SlidersHorizontal } from "lucide-react";
 import Container from "@/components/ui/Container";
 import FilterChip from "@/components/ui/FilterChip";
 import SingleCard from "@/components/SingleCard";
+import {
+  singleItem,
+  trackFilterChange,
+  trackSortChange,
+  trackViewItemList,
+} from "@/lib/analytics";
 import { brl } from "@/lib/format";
 import type { Single } from "@/lib/types";
 
@@ -139,13 +145,22 @@ export default function SinglesBrowse({
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
-  const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const shown = useMemo(
+    () => filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
+    [filtered, current],
+  );
 
   const selectedLabel =
     gameSel.length === 1
       ? navGames.find((g) => g.id === gameSel[0])?.label
       : undefined;
   const title = selectedLabel ? `${selectedLabel} · Singles` : "Todos · Singles";
+
+  useEffect(() => {
+    if (shown.length > 0) {
+      trackViewItemList(shown.map((s) => singleItem(s)), "singles_browse", title);
+    }
+  }, [shown, title]);
 
   const reset = () => setPage(1);
 
@@ -181,6 +196,7 @@ export default function SinglesBrowse({
               key={o.id}
               active={gameSel.includes(o.id)}
               onClick={() => {
+                trackFilterChange("jogo", o.id, !gameSel.includes(o.id));
                 setGameSel((g) => toggle(g, o.id));
                 reset();
               }}
@@ -216,6 +232,7 @@ export default function SinglesBrowse({
               key={o}
               active={colecao.includes(o)}
               onClick={() => {
+                trackFilterChange("colecao", o, !colecao.includes(o));
                 setColecao((s) => toggle(s, o));
                 reset();
               }}
@@ -233,6 +250,7 @@ export default function SinglesBrowse({
               key={o}
               active={estado.includes(o)}
               onClick={() => {
+                trackFilterChange("estado", o, !estado.includes(o));
                 setEstado((e) => toggle(e, o));
                 reset();
               }}
@@ -250,6 +268,7 @@ export default function SinglesBrowse({
               key={o}
               active={idioma.includes(o)}
               onClick={() => {
+                trackFilterChange("idioma", o, !idioma.includes(o));
                 setIdioma((l) => toggle(l, o));
                 reset();
               }}
@@ -342,6 +361,9 @@ export default function SinglesBrowse({
                 key={s.id}
                 active={sort === s.id}
                 onClick={() => {
+                  if (sort !== s.id) {
+                    trackSortChange(s.id);
+                  }
                   setSort(s.id);
                   reset();
                 }}

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { sealedItem, trackSelectItem } from "@/lib/analytics";
 import { brl } from "@/lib/format";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import type { Sealed } from "@/lib/types";
@@ -9,6 +12,7 @@ export default function SealedCard({ item }: { item: Sealed }) {
   return (
     <Link
       href={`/selado/${item.slug}`}
+      onClick={() => trackSelectItem(sealedItem(item))}
       className="arcade-press sticker animate-rise flex flex-col overflow-hidden rounded-[14px] bg-brand-soft"
     >
       <div className="relative h-[196px] border-b-4 border-outline">

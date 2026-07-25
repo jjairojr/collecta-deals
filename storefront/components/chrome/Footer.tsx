@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Container from "@/components/ui/Container";
+import WhatsAppLink from "@/components/chrome/WhatsAppLink";
 
 export default function Footer() {
   const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP;
@@ -30,14 +31,13 @@ export default function Footer() {
           >
             Produto selado
           </Link>
-          <a
+          <WhatsAppLink
             href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
+            origin="footer"
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
           >
             Fale no WhatsApp
-          </a>
+          </WhatsAppLink>
         </nav>
       </Container>
       <div className="border-t-[3px] border-outline py-4 text-center font-pixel text-[8px] text-outline">

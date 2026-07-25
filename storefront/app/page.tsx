@@ -6,6 +6,7 @@ import SectionHead from "@/components/ui/SectionHead";
 import HighScores from "@/components/home/HighScores";
 import SingleCard from "@/components/SingleCard";
 import SealedCard from "@/components/SealedCard";
+import TrackViewItemList from "@/components/analytics/TrackViewItemList";
 import { loadCatalog } from "@/lib/catalog";
 import { pixelText } from "@/lib/format";
 
@@ -119,6 +120,11 @@ export default async function HomePage() {
             action={{ label: "VER TODOS ›", href: "/selado" }}
           />
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            <TrackViewItemList
+              items={featuredSealed}
+              listId="home_selados"
+              listName="Home · Produtos selados"
+            />
             {featuredSealed.map((s) => (
               <SealedCard key={s.slug} item={s} />
             ))}
@@ -133,6 +139,11 @@ export default async function HomePage() {
           action={{ label: "VER TODAS ›", href: "/singles" }}
         />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+          <TrackViewItemList
+            items={featured}
+            listId="home_destaques"
+            listName="Home · Singles em destaque"
+          />
           {featured.map((s) => (
             <SingleCard key={s.slug} item={s} showLanguage />
           ))}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { trackSearch } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import Container from "@/components/ui/Container";
 
@@ -15,6 +16,9 @@ export default function Header() {
   const search = (e: React.FormEvent) => {
     e.preventDefault();
     const term = q.trim();
+    if (term) {
+      trackSearch(term);
+    }
     router.push(term ? `/singles?q=${encodeURIComponent(term)}` : "/singles");
   };
 

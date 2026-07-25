@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Container from "@/components/ui/Container";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
+import {
+  trackApplyCoupon,
+  trackBeginCheckout,
+  trackGenerateLead,
+  trackRemoveFromCart,
+  trackViewCart,
+} from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
 import { COUPON } from "@/lib/mock";
@@ -14,6 +21,14 @@ export default function CartView() {
   const { lines, total: subtotal, setQty, remove } = useCart();
   const [coupon, setCoupon] = useState("");
   const [applied, setApplied] = useState(false);
+  const viewed = useRef(false);
+
+  useEffect(() => {
+    if (!viewed.current && lines.length > 0) {
+      viewed.current = true;
+      trackViewCart(lines);
+    }
+  }, [lines]);
 
   if (lines.length === 0) {
     return (
@@ -52,11 +67,16 @@ export default function CartView() {
 
   const applyCoupon = () => {
     if (coupon.trim().toUpperCase() === COUPON.code) {
+      if (!applied) {
+        trackApplyCoupon(COUPON.code, Math.round((subtotal * COUPON.pct) / 100));
+      }
       setApplied(true);
     }
   };
 
   const checkout = () => {
+    trackBeginCheckout(lines, total, applied ? COUPON.code : undefined);
+    trackGenerateLead(total);
     const number = process.env.NEXT_PUBLIC_WHATSAPP ?? "";
     const text = buildOrder(lines, total, applied ? COUPON.code : null);
     const url = number
@@ -116,7 +136,10 @@ export default function CartView() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => remove(l)}
+                    onClick={() => {
+                      trackRemoveFromCart(l);
+                      remove(l);
+                    }}
                     className="-mr-2 mt-0.5 rounded px-2 py-1.5 text-xs text-faint hover:text-brand"
                   >
                     remover

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
+import { sealedItem, trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
@@ -23,7 +24,11 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
     " · ",
   );
 
-  const addToCart = () =>
+  useEffect(() => {
+    trackViewItem(sealedItem(item));
+  }, [item]);
+
+  const addToCart = () => {
     add(
       {
         slug: item.slug,
@@ -37,6 +42,8 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
       },
       qty,
     );
+    trackAddToCart(sealedItem(item, qty));
+  };
 
   return (
     <Container className="py-9">

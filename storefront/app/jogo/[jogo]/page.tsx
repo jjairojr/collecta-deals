@@ -64,7 +64,11 @@ export default async function JogoPage({
             heading={hasSingles ? "h2" : "h1"}
             action={{ label: "VER TODOS ›", href: `/selado/${jogo}` }}
           />
-          <SealedGrid list={sealedList} />
+          <SealedGrid
+            list={sealedList}
+            listId={`jogo_${jogo}_selado`}
+            listName={`${name} · Selado`}
+          />
         </Container>
       )}
       {(hasSingles || sealedList.length === 0) && (

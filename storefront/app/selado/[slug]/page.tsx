@@ -63,7 +63,11 @@ export default async function SeladoSlugPage({
           heading="h1"
         />
         <KindToggle singlesHref={`/singles/${slug}`} />
-        <SealedGrid list={list} />
+        <SealedGrid
+          list={list}
+          listId={`selado_${slug}`}
+          listName={`${gameName} · Selado`}
+        />
       </Container>
     );
   }
