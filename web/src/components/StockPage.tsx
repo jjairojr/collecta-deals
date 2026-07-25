@@ -5,6 +5,7 @@ import {
   Check,
   ChevronsUpDown,
   Combine,
+  Copy,
   ImagePlus,
   Save,
   Search,
@@ -373,19 +374,12 @@ export default function StockPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-lg font-extrabold text-white">Estoque</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Defina o preço de venda (R$) e marque o que deve aparecer na vitrine pública.
-            Uma carta só entra na vitrine quando está <strong className="text-slate-300">à venda</strong> e tem preço.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="accent" onClick={save} disabled={!dirty || saving}>
-            <Save /> {saving ? "Salvando…" : dirty ? "Salvar alterações" : savedAt ? "Salvo" : "Salvar"}
-          </Button>
-        </div>
+      <div>
+        <h1 className="font-display text-lg font-extrabold text-white">Estoque</h1>
+        <p className="mt-1 max-w-2xl text-sm text-slate-400">
+          Defina o preço de venda (R$) e marque o que deve aparecer na vitrine pública.
+          Uma carta só entra na vitrine quando está <strong className="text-slate-300">à venda</strong> e tem preço.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -454,25 +448,6 @@ export default function StockPage() {
         </div>
       </div>
 
-      {selected.size > 0 && (
-        <div className="sticker flex flex-wrap items-center gap-3 rounded-[12px] bg-surface px-4 py-3">
-          <span className="font-pixel text-[9px] uppercase text-brand-soft">
-            {selected.size} selecionada{selected.size > 1 ? "s" : ""}
-          </span>
-          {selected.size < 2 && (
-            <span className="text-xs text-slate-500">selecione 2+ para combinar</span>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="accent" onClick={() => setConfirmMerge(true)} disabled={selected.size < 2}>
-              <Combine /> Combinar ({selected.size})
-            </Button>
-            <Button variant="ghost" onClick={() => setSelected(new Set())}>
-              Limpar
-            </Button>
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <Panel>Carregando estoque…</Panel>
       ) : holdings.length === 0 ? (
@@ -521,6 +496,44 @@ export default function StockPage() {
           </table>
         </div>
       )}
+
+      <div className="sticky bottom-0 z-30 -mx-4 border-t-[3px] border-outline bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex flex-wrap items-center gap-3">
+          {selected.size > 0 ? (
+            <>
+              <span className="font-pixel text-[9px] uppercase text-brand-soft">
+                {selected.size} selecionada{selected.size > 1 ? "s" : ""}
+              </span>
+              {selected.size < 2 && (
+                <span className="text-xs text-slate-500">selecione 2+ para combinar</span>
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-slate-500">
+              {stats.onSale} de {holdings.length} na vitrine · {brl0(stats.value)}
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {selected.size > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmMerge(true)}
+                  disabled={selected.size < 2}
+                >
+                  <Combine /> Combinar ({selected.size})
+                </Button>
+                <Button variant="ghost" onClick={() => setSelected(new Set())}>
+                  Limpar
+                </Button>
+              </>
+            )}
+            <Button variant="accent" onClick={save} disabled={!dirty || saving}>
+              <Save /> {saving ? "Salvando…" : dirty ? "Salvar alterações" : savedAt ? "Salvo" : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {confirmMerge && mergePreview && (
         <div
@@ -697,8 +710,11 @@ function StockRow({
             </span>
           </button>
           <div className="min-w-0">
-            <div className="truncate font-medium text-slate-100" title={t.name}>
-              {cleanName(t.name) || t.number}
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="truncate font-medium text-slate-100" title={t.name}>
+                {cleanName(t.name) || t.number}
+              </div>
+              <CopyButton text={cleanName(t.name) || t.number} />
             </div>
             <div className="font-mono text-[10px] text-slate-500">
               {t.number}
@@ -743,6 +759,36 @@ function StockRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      title={copied ? "Copiado" : "Copiar nome"}
+      aria-label={`Copiar nome ${text}`}
+      className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-emerald-400" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+    </button>
   );
 }
 
