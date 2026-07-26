@@ -51,6 +51,7 @@ func run() error {
 	captureOnce := flag.Bool("capture-once", false, "run one tracking capture then exit (for cron); does not start the HTTP server")
 	trackSchedule := flag.Bool("track-schedule", false, "auto-capture tracking snapshots on track-interval; off by default — trigger manually via POST /api/tracking/capture or -capture-once")
 	backfillImages := flag.Bool("backfill-images", false, "resolve and cache card image URLs for all tracked cards then exit")
+	backfillImagesGame := flag.String("backfill-images-game", "onepiece", "game whose tracked cards -backfill-images resolves (onepiece, pokemon, riftbound, lorcana, gundam)")
 	trackDir := flag.String("track-dir", "data/tracking", "directory to store daily tracking snapshots")
 	trackSealed := flag.Bool("track-sealed", true, "also capture sealed-product (boxes/packs/decks) per-store stock as the SEALED set")
 	captureSealedOnce := flag.Bool("capture-sealed-once", false, "run one sealed-product capture then exit (skips the singles scan)")
@@ -121,7 +122,7 @@ func run() error {
 
 	oneShot := *captureOnce || *captureSealedOnce || *pkmCaptureOnce || *pkmCaptureSealedOnce ||
 		*rftCaptureOnce || *rftCaptureSealedOnce || *lorCaptureOnce || *lorCaptureSealedOnce ||
-		*gndCaptureOnce || *gndCaptureSealedOnce
+		*gndCaptureOnce || *gndCaptureSealedOnce || *backfillImages
 	// The unified scheduler owns all refresh timing, so the per-store background
 	// refresh goroutines are suppressed alongside one-shot runs (Load still happens).
 	// Serve-only never scrapes, so it also only loads.
@@ -230,10 +231,6 @@ func run() error {
 	}
 	opStack.Deals = st
 
-	if *backfillImages {
-		return backfillCardImages(context.Background(), trackLog, opStack.Track, opStack.Cardimg)
-	}
-
 	pkmLog := logger.WithPrefix("POKEMON")
 	pkmStack, pkmCapturer, err := buildStack(stackParams{
 		game:        game.Pokemon(),
@@ -322,6 +319,22 @@ func run() error {
 	}
 	gndStack.Deals = gndDealsStore
 
+	games := map[string]*api.GameStack{
+		opStack.Game.ID:  opStack,
+		pkmStack.Game.ID: pkmStack,
+		rftStack.Game.ID: rftStack,
+		lorStack.Game.ID: lorStack,
+		gndStack.Game.ID: gndStack,
+	}
+
+	if *backfillImages {
+		gs, ok := games[*backfillImagesGame]
+		if !ok {
+			return fmt.Errorf("backfill-images-game: unknown game %q", *backfillImagesGame)
+		}
+		return backfillCardImages(context.Background(), trackLog, gs.Track, gs.Cardimg)
+	}
+
 	if *captureSealedOnce || *captureOnce {
 		if opCapturer == nil {
 			return fmt.Errorf("capture-once requires -track enabled")
@@ -399,13 +412,6 @@ func run() error {
 		trackLog.Printf("scheduler off; trigger via POST /api/tracking/capture(?game=) or -capture-once (enable with -schedule)")
 	}
 
-	games := map[string]*api.GameStack{
-		opStack.Game.ID:  opStack,
-		pkmStack.Game.ID: pkmStack,
-		rftStack.Game.ID: rftStack,
-		lorStack.Game.ID: lorStack,
-		gndStack.Game.ID: gndStack,
-	}
 	srv := api.New(*webDir, games, opStack.Game.ID, *serveOnly, *adminToken)
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
