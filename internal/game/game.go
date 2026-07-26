@@ -350,7 +350,7 @@ func Pokemon() Game {
 		DefaultSet: "DRI",
 		DefaultTrackSets: []string{
 			"PBL", "M5", "CRI", "POR", "M4", "ASC", "M3", "M2a", "PFL", "m2", "MEG",
-			"M1S", "M1L", "WHT", "BLK", "DRI", "SV10", "JTG",
+			"M1S", "M1L", "WHT", "BLK", "DRI", "SV10", "JTG", "SSP", "MEW",
 		},
 		Challenged: true,
 	}
