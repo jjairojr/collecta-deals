@@ -945,7 +945,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
       <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
-            <CardArt set={t.set} number={t.number} name={t.name} productID={productIDFromTcgURL(t.tcgUrl)} className="h-12 w-[34px] shrink-0 rounded" />
+            <CardArt set={t.set} number={t.number} name={t.name} productID={productIDFromTcgURL(t.tcgUrl)} imageURL={t.imageURL} className="h-12 w-[34px] shrink-0 rounded" />
             <div className="min-w-0">
               <div className="truncate font-medium text-slate-100" title={t.name}>
                 {cleanName(t.name) || t.number}
@@ -1145,6 +1145,7 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
   const [condition, setCondition] = useState("NM");
   const [store, setStore] = useState("");
   const [buyDate, setBuyDate] = useState("");
+  const [imageURL, setImageURL] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1187,6 +1188,7 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
         refUSD: Number(refUSD) || 0,
         store,
         buyDate,
+        imageURL: imageURL.trim(),
         status: "holding",
       });
       onAdded();
@@ -1209,7 +1211,7 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
           />
         </Field>
         {matches.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
+          <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
             {matches.map((m) => (
               <li key={`${m.number}-${m.name}`}>
                 <button
@@ -1217,9 +1219,18 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
                   onClick={() => pick(m)}
                   className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-800"
                 >
-                  <span className="min-w-0">
-                    <span className="truncate text-slate-100">{cleanName(m.name)}</span>{" "}
-                    <span className="font-mono text-[11px] text-slate-500">{m.number}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <CardArt
+                      set={m.set}
+                      number={m.number}
+                      name={m.name}
+                      productID={m.productID}
+                      className="h-14 w-[40px] shrink-0 rounded"
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-slate-100">{cleanName(m.name)}</span>
+                      <span className="font-mono text-[11px] text-slate-500">{m.number}</span>
+                    </span>
                   </span>
                   <span className="shrink-0 tabular-nums text-emerald-300">{marketMoney(m.marketUSD)}</span>
                 </button>
@@ -1265,6 +1276,14 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
         </Field>
         <Field label="Buy date">
           <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
+        </Field>
+        <Field label="Image URL (optional)">
+          <div className="flex items-center gap-2">
+            <Input value={imageURL} onChange={(e) => setImageURL(e.target.value)} placeholder="https://…" />
+            {imageURL.trim() && (
+              <CardArt set="" number={number} name={name} imageURL={imageURL.trim()} className="h-10 w-[28px] shrink-0 rounded" />
+            )}
+          </div>
         </Field>
       </div>
 
@@ -1323,9 +1342,13 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
       <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
-            <div className="art-stripes-90 flex h-12 w-[34px] shrink-0 items-center justify-center rounded bg-brand text-white">
-              <Package className="h-5 w-5" />
-            </div>
+            {t.imageURL ? (
+              <CardArt set="" number={t.number} name={t.name} imageURL={t.imageURL} className="h-12 w-[34px] shrink-0 rounded" />
+            ) : (
+              <div className="art-stripes-90 flex h-12 w-[34px] shrink-0 items-center justify-center rounded bg-brand text-white">
+                <Package className="h-5 w-5" />
+              </div>
+            )}
             <div className="min-w-0">
               <div className="truncate font-medium text-slate-100" title={t.name}>
                 {t.name || t.number}
@@ -1436,6 +1459,7 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
   const [condition, setCondition] = useState(t.condition ?? "");
   const [store, setStore] = useState(t.store ?? "");
   const [buyDate, setBuyDate] = useState(t.buyDate ?? "");
+  const [imageURL, setImageURL] = useState(t.imageURL ?? "");
   const [saving, setSaving] = useState(false);
 
   const nextQty = Math.max(Number(qty) || 1, 1);
@@ -1454,6 +1478,7 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
         condition,
         store,
         buyDate,
+        imageURL: imageURL.trim(),
         ...(sealed ? { manualBRL: Number(manualBRL) || 0 } : {}),
       });
       onDone();
@@ -1489,6 +1514,14 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
       <Field label="Buy date">
         <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} className="w-40" />
       </Field>
+      <Field label="Image URL">
+        <div className="flex items-center gap-2">
+          <Input value={imageURL} onChange={(e) => setImageURL(e.target.value)} className="w-52" placeholder="https://…" />
+          {imageURL.trim() && (
+            <CardArt set="" number={t.number} name={t.name} imageURL={imageURL.trim()} className="h-10 w-[28px] shrink-0 rounded" />
+          )}
+        </div>
+      </Field>
       <div className="pb-2 text-xs text-slate-400">
         Cost <span className="font-semibold text-slate-200">{brl0(nextCost)}</span>
         {nextCost !== t.costBRL ? <span className="text-slate-500"> · was {brl0(t.costBRL)}</span> : ""}
@@ -1511,6 +1544,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
   const [qty, setQty] = useState("1");
   const [store, setStore] = useState("");
   const [buyDate, setBuyDate] = useState("");
+  const [imageURL, setImageURL] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1551,6 +1585,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
         manualBRL: Number(manualBRL) || 0,
         store,
         buyDate,
+        imageURL: imageURL.trim(),
         status: "holding",
       });
       onAdded();
@@ -1611,6 +1646,14 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
         </Field>
         <Field label="Buy date">
           <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
+        </Field>
+        <Field label="Image URL (optional)">
+          <div className="flex items-center gap-2">
+            <Input value={imageURL} onChange={(e) => setImageURL(e.target.value)} placeholder="https://…" />
+            {imageURL.trim() && (
+              <CardArt set="" number={number} name={name} imageURL={imageURL.trim()} className="h-10 w-[28px] shrink-0 rounded" />
+            )}
+          </div>
         </Field>
       </div>
 
