@@ -125,6 +125,7 @@ type Listing struct {
 	AskBRL   float64
 	Listed   bool
 	ImageURL string
+	Featured bool
 }
 
 // SetListings applies storefront listing state to many trades in a single
@@ -146,6 +147,7 @@ func (s *Store) SetListings(updates map[string]Listing) (int, error) {
 		all[i].AskBRL = u.AskBRL
 		all[i].Listed = u.Listed
 		all[i].ImageURL = u.ImageURL
+		all[i].Featured = u.Featured
 		all[i].UpdatedAt = now
 		n++
 	}

@@ -26,6 +26,7 @@ interface RawItem {
   imageURL?: string;
   askBRL: number;
   askUSD?: number;
+  featured?: boolean;
 }
 
 interface RawResponse {
@@ -132,6 +133,7 @@ function mapSealed(it: RawItem): Sealed {
     qty: it.qty > 0 ? it.qty : 1,
     badge: "LACRADO",
     imageURL: resolveImage(it),
+    featured: it.featured,
   };
 }
 
@@ -179,6 +181,7 @@ function dedupSealed(items: Sealed[]): Sealed[] {
     const cur = bySlug.get(s.slug);
     if (cur) {
       cur.qty += s.qty;
+      cur.featured = cur.featured || s.featured;
     } else {
       bySlug.set(s.slug, { ...s });
     }

@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Save,
   Search,
+  Star,
   Store,
   Wand2,
   X,
@@ -52,6 +53,7 @@ interface RowState {
   askBRL: number;
   listed: boolean;
   imageURL: string;
+  featured: boolean;
 }
 
 // refBRL is a card's per-unit market reference in reais: for deals games the live
@@ -190,6 +192,7 @@ export default function StockPage() {
           askBRL: t.askBRL ?? 0,
           listed: Boolean(t.listed),
           imageURL: t.imageURL ?? "",
+          featured: Boolean(t.featured),
         };
       }
       setRows(seeded);
@@ -243,7 +246,8 @@ export default function StockPage() {
         r &&
         (round2(r.askBRL) !== round2(t.askBRL ?? 0) ||
           r.listed !== Boolean(t.listed) ||
-          (r.imageURL ?? "") !== (t.imageURL ?? ""))
+          (r.imageURL ?? "") !== (t.imageURL ?? "") ||
+          r.featured !== Boolean(t.featured))
       );
     });
   }, [holdings, rows, data]);
@@ -360,6 +364,7 @@ export default function StockPage() {
         askBRL: rows[t.id]?.askBRL ?? 0,
         listed: Boolean(rows[t.id]?.listed),
         imageURL: rows[t.id]?.imageURL ?? "",
+        featured: Boolean(rows[t.id]?.featured),
       }));
       await setListings(items);
       setSavedAt(Date.now());
@@ -682,6 +687,7 @@ function StockRow({
 }) {
   const ask = row?.askBRL ?? 0;
   const listed = Boolean(row?.listed);
+  const featured = Boolean(row?.featured);
   const ref = refBRL(t, fx);
   const live = listed && ask > 0;
   const total = ask * Math.max(t.qty, 1);
@@ -776,20 +782,36 @@ function StockRow({
       </td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-300">{ask > 0 ? brl0(total) : "—"}</td>
       <td className="px-3 py-2 text-center">
-        <button
-          onClick={() => onPatch(t.id, { listed: !listed })}
-          title={live ? "Na vitrine — clique para ocultar" : listed ? "À venda, mas falta preço" : "Oculta — clique para colocar à venda"}
-          className={`inline-flex items-center gap-1 rounded-[8px] border-2 border-outline px-2 py-1 text-xs font-bold ${
-            live
-              ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
-              : listed
-                ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                : "bg-surface text-slate-400 hover:bg-slate-800"
-          }`}
-        >
-          {live ? <Check className="h-3 w-3" /> : <Store className="h-3 w-3" />}
-          {live ? "À venda" : listed ? "Sem preço" : "Oculta"}
-        </button>
+        <div className="inline-flex items-center gap-1">
+          <button
+            onClick={() => onPatch(t.id, { listed: !listed })}
+            title={live ? "Na vitrine — clique para ocultar" : listed ? "À venda, mas falta preço" : "Oculta — clique para colocar à venda"}
+            className={`inline-flex items-center gap-1 rounded-[8px] border-2 border-outline px-2 py-1 text-xs font-bold ${
+              live
+                ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                : listed
+                  ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                  : "bg-surface text-slate-400 hover:bg-slate-800"
+            }`}
+          >
+            {live ? <Check className="h-3 w-3" /> : <Store className="h-3 w-3" />}
+            {live ? "À venda" : listed ? "Sem preço" : "Oculta"}
+          </button>
+          {t.kind === "sealed" && (
+            <button
+              onClick={() => onPatch(t.id, { featured: !featured })}
+              title={featured ? "Destaque na home — clique para remover" : "Marcar como destaque na home"}
+              aria-label={featured ? `Remover destaque de ${t.name}` : `Destacar ${t.name}`}
+              className={`inline-flex items-center rounded-[8px] border-2 border-outline p-1 ${
+                featured
+                  ? "bg-brand/20 text-brand-soft hover:bg-brand/30"
+                  : "bg-surface text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+              }`}
+            >
+              <Star className={`h-3 w-3 ${featured ? "fill-current" : ""}`} />
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );

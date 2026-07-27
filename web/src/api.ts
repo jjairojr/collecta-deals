@@ -562,6 +562,7 @@ export interface Trade {
   askBRL?: number;
   listed?: boolean;
   imageURL?: string;
+  featured?: boolean;
   status: "holding" | "sold";
   sellPrice?: number;
   sellCurrency?: "BRL" | "USD";
@@ -716,6 +717,7 @@ export interface ListingInput {
   askBRL: number;
   listed: boolean;
   imageURL: string;
+  featured: boolean;
 }
 
 // setListings persists storefront state (asking price + listed flag) for one or

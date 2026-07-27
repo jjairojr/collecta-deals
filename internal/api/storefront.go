@@ -28,6 +28,7 @@ type storefrontItem struct {
 	ImageURL  string  `json:"imageURL,omitempty"`
 	AskBRL    float64 `json:"askBRL"`
 	AskUSD    float64 `json:"askUSD,omitempty"`
+	Featured  bool    `json:"featured,omitempty"`
 }
 
 type storefrontResponse struct {
@@ -73,6 +74,7 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 				Condition: t.Condition,
 				Qty:       qty,
 				AskBRL:    round2(t.AskBRL),
+				Featured:  t.Featured,
 			}
 			// A seller-supplied image wins over everything (the only art for
 			// products without TCG data, e.g. sealed starters). Otherwise the
@@ -120,6 +122,7 @@ type listingInput struct {
 	AskBRL   float64 `json:"askBRL"`
 	Listed   bool    `json:"listed"`
 	ImageURL string  `json:"imageURL"`
+	Featured bool    `json:"featured"`
 }
 
 // handleTradesListings sets storefront state (asking price + listed flag) on one
@@ -147,7 +150,7 @@ func (s *Server) handleTradesListings(w http.ResponseWriter, r *http.Request) {
 		if ask < 0 {
 			ask = 0
 		}
-		updates[it.ID] = trades.Listing{AskBRL: ask, Listed: it.Listed, ImageURL: strings.TrimSpace(it.ImageURL)}
+		updates[it.ID] = trades.Listing{AskBRL: ask, Listed: it.Listed, ImageURL: strings.TrimSpace(it.ImageURL), Featured: it.Featured}
 	}
 	n, err := gs.Trades.SetListings(updates)
 	if err != nil {

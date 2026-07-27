@@ -75,6 +75,7 @@ export interface Sealed {
   qty: number;
   badge?: string;
   imageURL?: string;
+  featured?: boolean;
 }
 
 export interface SealedDetail extends Sealed {
