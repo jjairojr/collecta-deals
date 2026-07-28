@@ -95,6 +95,48 @@ func (s *Store) Add(t Trade) (Trade, error) {
 	return t, nil
 }
 
+// Take removes every trade matching pred and returns them unchanged, so records
+// can move to another ledger keeping their ids, timestamps and listing state.
+func (s *Store) Take(pred func(Trade) bool) ([]Trade, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return nil, err
+	}
+	taken := make([]Trade, 0)
+	kept := make([]Trade, 0, len(all))
+	for _, t := range all {
+		if pred(t) {
+			taken = append(taken, t)
+			continue
+		}
+		kept = append(kept, t)
+	}
+	if len(taken) == 0 {
+		return nil, nil
+	}
+	if err := s.persist(kept); err != nil {
+		return nil, err
+	}
+	return taken, nil
+}
+
+// Append writes trades exactly as given — the counterpart of Take when moving
+// records between ledgers. Add is what creates a new trade.
+func (s *Store) Append(ts []Trade) error {
+	if len(ts) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return err
+	}
+	return s.persist(append(all, ts...))
+}
+
 func (s *Store) Update(id string, mut func(*Trade)) (Trade, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

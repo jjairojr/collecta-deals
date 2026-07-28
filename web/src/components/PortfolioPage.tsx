@@ -400,7 +400,7 @@ export default function PortfolioPage() {
             {isSealed
               ? "Your sealed buys and sales, valued at your own current-value estimate — no TCGplayer or Liga comparison."
               : section === "accessories"
-                ? "Your accessories (sleeves, deckboxes, playmats…), valued at your own current-value estimate."
+                ? "Your accessories (sleeves, deckboxes, playmats…), valued at your own current-value estimate. They belong to no game — the same list shows up whichever game is selected."
                 : isBRGame()
                 ? "Your buys and sales, valued against the current Liga Brazil floor. Track what you're up — and down — across the whole collection."
                 : "Your buys and sales, valued against live TCGplayer prices. Track what you're up — and down — across the whole collection."}

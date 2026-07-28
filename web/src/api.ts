@@ -675,6 +675,8 @@ export interface AllPortfolioResponse {
   targetPct: number;
   total: PortfolioSummary;
   games: GamePortfolio[];
+  // Accessories belong to no game, so they are counted once, outside the games.
+  accessories?: PortfolioSummary;
 }
 
 export function getAllPortfolio(pct: number): Promise<AllPortfolioResponse> {

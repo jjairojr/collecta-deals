@@ -37,6 +37,7 @@ func run() error {
 	webDir := flag.String("web", "web/dist", "directory of built frontend to serve (empty to disable)")
 	cachePath := flag.String("cache", "data/snapshot.json", "path to persist the scan snapshot")
 	tradesPath := flag.String("trades", "data/trades.json", "path to the trade ledger (portfolio)")
+	accessoriesPath := flag.String("accessories", "data/accessories.json", "path to the shared accessories ledger (sleeves, deckboxes… — not tied to a game)")
 	quotesPath := flag.String("quotes", "data/quotes.json", "path to the saved buy quotes (orçamentos)")
 	setsFlag := flag.String("sets", "", "comma-separated Liga set codes to limit (default all)")
 	fxOverride := flag.Float64("fx", 0, "BRL->USD rate override (0 = fetch live)")
@@ -327,6 +328,11 @@ func run() error {
 		gndStack.Game.ID: gndStack,
 	}
 
+	accessoryStore := trades.NewStore(*accessoriesPath, logger)
+	if err := migrateAccessories(games, accessoryStore, logger); err != nil {
+		return fmt.Errorf("accessories migration: %w", err)
+	}
+
 	if *backfillImages {
 		gs, ok := games[*backfillImagesGame]
 		if !ok {
@@ -412,9 +418,35 @@ func run() error {
 		trackLog.Printf("scheduler off; trigger via POST /api/tracking/capture(?game=) or -capture-once (enable with -schedule)")
 	}
 
-	srv := api.New(*webDir, games, opStack.Game.ID, *serveOnly, *adminToken)
+	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, *serveOnly, *adminToken)
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
+}
+
+// migrateAccessories moves accessory holdings out of the per-game ledgers into
+// the shared one. Accessories were first logged under whichever game happened to
+// be selected, but they belong to none: one stock of sleeves serves every game.
+// Ids, prices and listing state travel with them, so the storefront and the
+// Estoque tab keep pointing at the same records.
+func migrateAccessories(games map[string]*api.GameStack, dst *trades.Store, log *logx.Logger) error {
+	moved := 0
+	for _, gs := range games {
+		if gs.Trades == nil {
+			continue
+		}
+		taken, err := gs.Trades.Take(func(t trades.Trade) bool { return t.Kind == trades.KindAccessory })
+		if err != nil {
+			return err
+		}
+		if err := dst.Append(taken); err != nil {
+			return err
+		}
+		moved += len(taken)
+	}
+	if moved > 0 {
+		log.Printf("moved %d accessory holdings out of the per-game ledgers into the shared one", moved)
+	}
+	return nil
 }
 
 // scheduleDealsRefresh loads a deals store's cached snapshot and starts its

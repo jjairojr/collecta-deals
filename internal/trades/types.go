@@ -2,6 +2,10 @@ package trades
 
 import "time"
 
+// KindAccessory marks a holding that belongs to no game (sleeves, deckboxes,
+// playmats…). Those live in a single shared ledger instead of a per-game one.
+const KindAccessory = "accessory"
+
 type Trade struct {
 	ID        string `json:"id"`
 	Kind      string `json:"kind,omitempty"`

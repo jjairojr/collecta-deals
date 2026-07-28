@@ -42,6 +42,18 @@ function cleanName(n: string): string {
   return n.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
+// rowMeta is the small line under a product's name. Accessories say so, since
+// they are shared by every game and show up in all of them.
+function rowMeta(t: TradeView): string {
+  return [
+    t.kind === "accessory" ? "Acessório · todos os jogos" : t.number,
+    t.condition,
+    t.store,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 const suggestOptions = [
   { value: "80", label: "80%" },
   { value: "85", label: "85%" },
@@ -387,6 +399,7 @@ export default function StockPage() {
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Defina o preço de venda (R$) e marque o que deve aparecer na vitrine pública.
           Uma carta só entra na vitrine quando está <strong className="text-slate-300">à venda</strong> e tem preço.
+          Os acessórios não pertencem a nenhum jogo: aparecem nesta lista em todos eles.
         </p>
       </div>
 
@@ -740,11 +753,7 @@ function StockRow({
               </div>
               <CopyButton text={cleanName(t.name) || t.number} />
             </div>
-            <div className="font-mono text-[10px] text-slate-500">
-              {t.number}
-              {t.condition ? ` · ${t.condition}` : ""}
-              {t.store ? ` · ${t.store}` : ""}
-            </div>
+            <div className="font-mono text-[10px] text-slate-500">{rowMeta(t)}</div>
           </div>
         </div>
         {preview && (

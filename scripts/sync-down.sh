@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pull prod-owned portfolio files (trades*.json + quotes*.json) down to local.
+# Pull prod-owned portfolio files (trades*.json, quotes*.json, accessories.json)
+# down to local. accessories.json is the game-independent ledger (sleeves, etc).
 # Never touches local snapshots or tracking. Backs up local copies first.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
@@ -17,19 +18,19 @@ try:
 except Exception:
     fs = []
 for f in fs:
-    if f.get("type") == "file" and re.match(r"^(trades|quotes).*\.json$", f.get("name", "")):
+    if f.get("type") == "file" and re.match(r"^(trades|quotes|accessories).*\.json$", f.get("name", "")):
         print(f["name"])
 ')
 
 if [ ${#files[@]} -eq 0 ]; then
-	echo "nothing to pull (prod has no trades*/quotes* files yet)."
+	echo "nothing to pull (prod has no trades*/quotes*/accessories files yet)."
 	exit 0
 fi
 
 # Back up whatever we're about to overwrite.
 bak="$DATA_DIR/.sync-bak/portfolio-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$bak"
-( cd "$DATA_DIR" && cp -p trades*.json quotes*.json "$bak"/ 2>/dev/null || true )
+( cd "$DATA_DIR" && cp -p trades*.json quotes*.json accessories.json "$bak"/ 2>/dev/null || true )
 
 for f in "${files[@]}"; do
 	echo ">> $f"

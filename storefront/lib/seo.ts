@@ -73,9 +73,9 @@ export function accessoryProductJsonLd(item: Accessory) {
     "@context": "https://schema.org",
     "@type": "Product",
     name: item.name,
-    description: `${item.name} — acessório de ${item.gameLabel}, produto novo.`,
+    description: `${item.name} — acessório para TCG, produto novo, serve para qualquer jogo.`,
     image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
-    brand: { "@type": "Brand", name: item.gameLabel },
+    brand: { "@type": "Brand", name: "Collecta" },
     category: "Trading Card Game",
     offers: offerJsonLd(
       `/acessorio/${item.slug}`,

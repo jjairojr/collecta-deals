@@ -54,16 +54,21 @@ export default function SealedDetailView({
   return (
     <Container className="py-9">
       <Breadcrumb
-        items={[
-          {
-            label: gamePixel(item.game, item.gameLabel),
-            href: `/singles/${item.game}`,
-          },
+        items={
           sealed
-            ? { label: "SELADOS", href: `/selado/${item.game}` }
-            : { label: "ACESSORIOS", href: "/acessorios" },
-          { label: pixelText(item.name) },
-        ]}
+            ? [
+                {
+                  label: gamePixel(item.game, item.gameLabel),
+                  href: `/singles/${item.game}`,
+                },
+                { label: "SELADOS", href: `/selado/${item.game}` },
+                { label: pixelText(item.name) },
+              ]
+            : [
+                { label: "ACESSORIOS", href: "/acessorios" },
+                { label: pixelText(item.name) },
+              ]
+        }
       />
 
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
@@ -172,9 +177,9 @@ export default function SealedDetailView({
               </>
             ) : (
               <>
-                {item.name} é um acessório de {item.gameLabel}, novo e
-                conferido antes do envio. Adicione ao carrinho, finalize o
-                pedido pelo WhatsApp e receba em todo o Brasil.
+                {item.name} é um acessório para TCG, novo e conferido antes do
+                envio — serve para qualquer jogo da loja. Adicione ao carrinho,
+                finalize o pedido pelo WhatsApp e receba em todo o Brasil.
               </>
             )}
           </p>

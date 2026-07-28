@@ -42,6 +42,10 @@ type Server struct {
 	webDir      string
 	games       map[string]*GameStack
 	defaultGame string
+	// accessories is the single, game-independent ledger for sleeves, deckboxes,
+	// playmats and the like: they are stocked once and sold to buyers of any
+	// game, so every game's portfolio and stock page reads the same one.
+	accessories *trades.Store
 	readOnly    bool
 	adminToken  string
 }
@@ -50,8 +54,15 @@ type Server struct {
 // (refresh/capture) so a serve-only prod instance never scrapes; adminToken (when
 // non-empty) enables POST /api/admin/reload to reload deals snapshots from disk
 // after a local scrape pushes fresh files onto the volume.
-func New(webDir string, games map[string]*GameStack, defaultGame string, readOnly bool, adminToken string) *Server {
-	return &Server{webDir: webDir, games: games, defaultGame: defaultGame, readOnly: readOnly, adminToken: adminToken}
+func New(webDir string, games map[string]*GameStack, defaultGame string, accessories *trades.Store, readOnly bool, adminToken string) *Server {
+	return &Server{
+		webDir:      webDir,
+		games:       games,
+		defaultGame: defaultGame,
+		accessories: accessories,
+		readOnly:    readOnly,
+		adminToken:  adminToken,
+	}
 }
 
 // stackFor resolves the game stack for a request's query, defaulting to the

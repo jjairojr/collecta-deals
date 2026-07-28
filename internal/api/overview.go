@@ -16,6 +16,9 @@ type portfolioAllResponse struct {
 	TargetPct float64         `json:"targetPct"`
 	Total     trades.Summary  `json:"total"`
 	Games     []gamePortfolio `json:"games"`
+	// Accessories are shared by every game, so they are counted once here instead
+	// of inside any game's row. Absent when there is no accessories ledger.
+	Accessories *trades.Summary `json:"accessories,omitempty"`
 }
 
 func (s *Server) orderedGameIDs() []string {
@@ -39,6 +42,14 @@ func (s *Server) handlePortfolioAll(w http.ResponseWriter, r *http.Request) {
 		Total:     trades.Summary{TargetPct: pct},
 		Games:     []gamePortfolio{},
 	}
+	addTotal := func(sum trades.Summary) {
+		resp.Total.Holdings += sum.Holdings
+		resp.Total.InvestedBRL += sum.InvestedBRL
+		resp.Total.MarketBRL += sum.MarketBRL
+		resp.Total.Sold += sum.Sold
+		resp.Total.CostOfSoldBRL += sum.CostOfSoldBRL
+		resp.Total.ProceedsBRL += sum.ProceedsBRL
+	}
 	for _, id := range s.orderedGameIDs() {
 		gs := s.games[id]
 		if gs.Trades == nil {
@@ -52,13 +63,18 @@ func (s *Server) handlePortfolioAll(w http.ResponseWriter, r *http.Request) {
 		lookup, fx := s.priceLookup(gs)
 		p := trades.BuildPortfolio(all, pct, fx, lookup)
 		resp.Games = append(resp.Games, gamePortfolio{Game: s.gameInfoFor(gs), Summary: p.Summary})
-
-		resp.Total.Holdings += p.Summary.Holdings
-		resp.Total.InvestedBRL += p.Summary.InvestedBRL
-		resp.Total.MarketBRL += p.Summary.MarketBRL
-		resp.Total.Sold += p.Summary.Sold
-		resp.Total.CostOfSoldBRL += p.Summary.CostOfSoldBRL
-		resp.Total.ProceedsBRL += p.Summary.ProceedsBRL
+		addTotal(p.Summary)
+	}
+	if s.accessories != nil {
+		all, err := s.accessories.List()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// Accessories carry their own manual value, so no price lookup and fx = 1.
+		p := trades.BuildPortfolio(all, pct, 1, nil)
+		resp.Accessories = &p.Summary
+		addTotal(p.Summary)
 	}
 	resp.Total.UnrealizedBRL = resp.Total.MarketBRL - resp.Total.InvestedBRL
 	resp.Total.RealizedBRL = resp.Total.ProceedsBRL - resp.Total.CostOfSoldBRL

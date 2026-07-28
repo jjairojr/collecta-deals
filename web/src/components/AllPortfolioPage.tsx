@@ -25,6 +25,17 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
   }
 
   const total = data.total;
+  // Accessories are shared by every game, so they get their own row after the
+  // games instead of being folded into one of them — and it opens no portfolio.
+  const rows: { id: string; name: string; summary: PortfolioSummary; game?: string }[] = data.games.map((g) => ({
+    id: g.game.id,
+    name: g.game.name,
+    summary: g.summary,
+    game: g.game.id,
+  }));
+  if (data.accessories) {
+    rows.push({ id: "acessorios", name: "Acessórios", summary: data.accessories });
+  }
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -43,6 +54,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
         <h1 className="font-display text-lg font-extrabold text-white">All Portfolios</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Every game's holdings and sales combined in reais. Click a game to open its portfolio.
+          Accessories belong to no game, so they are counted once in their own row.
         </p>
       </div>
 
@@ -74,13 +86,14 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
             </tr>
           </thead>
           <tbody>
-            {data.games.map((g) => {
-              const open = expanded.has(g.game.id);
+            {rows.map((row) => {
+              const open = expanded.has(row.id);
+              const game = row.game;
               return (
-                <Fragment key={g.game.id}>
+                <Fragment key={row.id}>
                   <tr
-                    onClick={() => onOpenGame(g.game.id)}
-                    className="cursor-pointer border-b-2 border-outline/40 transition-colors hover:bg-slate-800/40"
+                    onClick={game ? () => onOpenGame(game) : undefined}
+                    className={`border-b-2 border-outline/40 transition-colors hover:bg-slate-800/40 ${game ? "cursor-pointer" : ""}`}
                   >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -88,7 +101,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggle(g.game.id);
+                            toggle(row.id);
                           }}
                           aria-label={open ? "Hide details" : "Show details"}
                           className="rounded p-0.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-slate-200"
@@ -96,24 +109,28 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
                         </button>
                         <div>
-                          <div className="font-medium text-slate-100">{g.game.name}</div>
+                          <div className="font-medium text-slate-100">{row.name}</div>
                           <div className="text-[10px] text-slate-500">
-                            {g.summary.sold > 0 ? `${g.summary.sold} sold` : "no sales yet"}
+                            {game
+                              ? row.summary.sold > 0
+                                ? `${row.summary.sold} sold`
+                                : "no sales yet"
+                              : "shared across every game"}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-300">{g.summary.holdings}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-200">{brl0(totalInvested(g.summary))}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-200">{brl0(g.summary.marketBRL)}</td>
-                    <PnlCell value={g.summary.unrealizedBRL} />
-                    <PnlCell value={g.summary.realizedBRL} />
-                    <PnlCell value={g.summary.totalPnLBRL} strong />
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-300">{row.summary.holdings}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-200">{brl0(totalInvested(row.summary))}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-200">{brl0(row.summary.marketBRL)}</td>
+                    <PnlCell value={row.summary.unrealizedBRL} />
+                    <PnlCell value={row.summary.realizedBRL} />
+                    <PnlCell value={row.summary.totalPnLBRL} strong />
                   </tr>
                   {open && (
                     <tr className="border-b-2 border-outline/40 bg-slate-950/40">
                       <td colSpan={7} className="px-3 py-4">
-                        <GameDetails summary={g.summary} />
+                        <GameDetails summary={row.summary} />
                       </td>
                     </tr>
                   )}

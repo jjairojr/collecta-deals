@@ -54,6 +54,39 @@ func (s *Server) brFloor(gs *GameStack, set, number string) (float64, bool) {
 	return 0, false
 }
 
+// ledgersFor returns the trade ledgers a request may touch, in lookup order: the
+// active game's first, then the shared accessories one. Accessories belong to no
+// game, so they are stocked once and show up in every game's portfolio.
+func (s *Server) ledgersFor(gs *GameStack) []*trades.Store {
+	out := make([]*trades.Store, 0, 2)
+	if gs.Trades != nil {
+		out = append(out, gs.Trades)
+	}
+	if s.accessories != nil {
+		out = append(out, s.accessories)
+	}
+	return out
+}
+
+// onLedger runs a write against whichever ledger actually holds the id. Trade ids
+// are unique across ledgers and every mutation reports ErrNotFound before it
+// persists anything, so trying the game's ledger first is free: a miss just means
+// the record is an accessory. Callers therefore never have to say which ledger a
+// trade lives in.
+func onLedger[T any](stores []*trades.Store, fn func(*trades.Store) (T, error)) (T, error) {
+	var zero T
+	if len(stores) == 0 {
+		return zero, trades.ErrNotFound
+	}
+	for _, st := range stores[:len(stores)-1] {
+		v, err := fn(st)
+		if !errors.Is(err, trades.ErrNotFound) {
+			return v, err
+		}
+	}
+	return fn(stores[len(stores)-1])
+}
+
 func (s *Server) handleTradesList(w http.ResponseWriter, r *http.Request) {
 	gs := s.stackFor(r.URL.Query())
 	if gs.Trades == nil {
@@ -65,6 +98,17 @@ func (s *Server) handleTradesList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if s.accessories != nil {
+		acc, err := s.accessories.List()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		all = append(all, acc...)
+		sort.SliceStable(all, func(i, j int) bool {
+			return all[i].CreatedAt.After(all[j].CreatedAt)
+		})
 	}
 	lookup, fx := s.priceLookup(gs)
 	writeJSON(w, trades.BuildPortfolio(all, pct, fx, lookup))
@@ -97,7 +141,13 @@ func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
 			t.RefUSD = brl
 		}
 	}
-	created, err := gs.Trades.Add(t)
+	// The kind decides the ledger: an accessory is never filed under the game
+	// that happened to be selected when it was logged.
+	ledger := gs.Trades
+	if t.Kind == trades.KindAccessory && s.accessories != nil {
+		ledger = s.accessories
+	}
+	created, err := ledger.Add(t)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -118,7 +168,7 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Number = model.NormalizeNumber(in.Number)
-	updated, err := gs.Trades.Update(id, func(t *trades.Trade) {
+	mutate := func(t *trades.Trade) {
 		in.ID = t.ID
 		in.CreatedAt = t.CreatedAt
 		if in.RefUSD == 0 {
@@ -134,6 +184,9 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 			in.Status = t.Status
 		}
 		*t = in
+	}
+	updated, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
+		return st.Update(id, mutate)
 	})
 	if errors.Is(err, trades.ErrNotFound) {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -163,12 +216,15 @@ func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	sold, err := gs.Trades.Sell(r.PathValue("id"), trades.Sale{
+	sale := trades.Sale{
 		Qty:          in.Qty,
 		SellPrice:    in.SellPrice,
 		SellCurrency: in.SellCurrency,
 		SellDate:     in.SellDate,
 		Buyer:        in.Buyer,
+	}
+	sold, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
+		return st.Sell(r.PathValue("id"), sale)
 	})
 	if errors.Is(err, trades.ErrNotFound) {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -187,7 +243,9 @@ func (s *Server) handleTradesDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	err := gs.Trades.Delete(r.PathValue("id"))
+	_, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (struct{}, error) {
+		return struct{}{}, st.Delete(r.PathValue("id"))
+	})
 	if errors.Is(err, trades.ErrNotFound) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -199,8 +257,10 @@ func (s *Server) handleTradesDelete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
-// handleTradesMerge collapses several holdings of the active game into one,
-// summing quantity/shipping and averaging the buy price (see trades.Store.Merge).
+// handleTradesMerge collapses several holdings into one, summing quantity and
+// shipping and averaging the buy price (see trades.Store.Merge). The selection
+// must sit in a single ledger: game holdings merge with game holdings and
+// accessories with accessories, never across the two.
 func (s *Server) handleTradesMerge(w http.ResponseWriter, r *http.Request) {
 	gs := s.stackFor(r.URL.Query())
 	if gs.Trades == nil {
@@ -214,7 +274,9 @@ func (s *Server) handleTradesMerge(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	merged, err := gs.Trades.Merge(in.IDs)
+	merged, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
+		return st.Merge(in.IDs)
+	})
 	if errors.Is(err, trades.ErrNotFound) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return

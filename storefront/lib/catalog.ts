@@ -147,15 +147,19 @@ function mapSealed(it: RawItem): Sealed {
   };
 }
 
+// Accessories belong to no game — the backend publishes them under a neutral
+// "acessorios" id — so their meta line carries the product's own set/brand when
+// there is one instead of a game name.
 function mapAccessory(it: RawItem): Accessory {
+  const set = cleanSet(it.set);
   return {
     kind: "accessory",
     slug: slugFor(it),
     game: it.game,
     gameLabel: it.gameLabel,
     name: it.name,
-    set: cleanSet(it.set),
-    meta: it.gameLabel,
+    set,
+    meta: set || "Acessório",
     price: Math.round(it.askBRL * 100),
     qty: it.qty > 0 ? it.qty : 1,
     badge: "ACESSORIO",

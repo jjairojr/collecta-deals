@@ -610,3 +610,156 @@ e lógica — só a camada visual muda.
   reais (via vite :5173 → :8080). Sem comentários no código; não commitado.
 - **Nota:** `marginTier.ring`/`liftTier.ring` viraram campos de objeto não-usados (não são
   variáveis soltas; TS não acusa) — deixados colocados com o resto da config de tier.
+
+# Acessórios na vitrine e no dashboard (2026-07-27)
+
+Plan: ~/.claude/plans/agile-doodling-cook.md — novo `Trade.Kind == "accessory"` reusando os trilhos do sealed.
+
+- [x] Go: guards de kind manual (valuation.go, trades.go, storefront.go, main.go heldCardKeys)
+- [x] Dashboard: tipo kind em api.ts
+- [x] Dashboard: seção Acessórios no PortfolioPage (toggle, filtro, form generalizado, tabela)
+- [x] Dashboard: estrela de destaque para acessórios no StockPage
+- [x] Vitrine: types.ts + catalog.ts (bucket accessories, mapAccessory, detail)
+- [x] Vitrine: rotas /acessorios e /acessorio/[slug]
+- [x] Vitrine: generalizar SealedCard/Grid/DetailView
+- [x] Vitrine: aba ACESSÓRIOS no TabBar (condicional)
+- [x] Vitrine: seção Acessórios na home
+- [x] Vitrine: carrinho hue + sitemap
+- [x] Verificação: go build/vet/test, npm build web e storefront, e2e com server descartável
+
+## Review
+- Acessório = `Trade.Kind == "accessory"` nos mesmos trilhos do sealed: nenhum endpoint ou campo
+  novo no Go. Os guards `Kind != "sealed"` viraram `Kind == ""` (kind vazio = single), então
+  qualquer kind manual pula lookup de mercado, vale `ManualBRL × Qty`, sai do live-pricing
+  (heldCardKeys) e depende só do `imageURL` do vendedor na vitrine.
+- Dashboard: Portfolio ganhou toggle Singles/Sealed/Accessories; `AddSealedForm` virou
+  `AddManualForm` (prop kind; acessório esconde a busca no catálogo Liga e grava `set:"ACESSORIO"`);
+  `SealedTable/Row` viraram `ManualTable/Row` (compartilhadas); flag `sealed` do EditTradeForm
+  renomeada `manual`. Estrela de destaque no Estoque agora aceita sealed E accessory.
+- Vitrine: `Accessory`/`AccessoryDetail` espelham Sealed via Omit; bucket `accessories` no
+  catalog (dedupSealed generalizado em `dedupProducts<T>`); SealedCard/Grid/DetailView aceitam
+  a união e derivam href (/selado vs /acessorio), badge (LACRADO vs ACESSORIO) e wording
+  (CAIXAS vs UNIDADES) do kind. Aba global ACESSORIOS no TabBar (só quando há estoque, decisão
+  do usuário), página /acessorios agregando todos os jogos, detalhe /acessorio/[slug] com
+  JSON-LD próprio, seção na home (destaques via estrela, fallback 4 primeiros), sitemap.
+- Verificado: go build/vet/test limpos; npm build limpo em web/ e storefront/; e2e com server
+  descartável no scratchpad (POST /api/trades kind accessory → valueBRL 200 = 40×5 sem lookup;
+  /api/storefront expõe kind/askBRL/featured sem custo; vitrine dev renderizou aba, lista,
+  detalhe "RESTAM 5 UNIDADES" e home). /selado e /singles sem regressão.
+
+# Lote Ikenson refeito para R$ 13.000 (2026-07-27)
+
+- [x] `ikenson-novo.csv`: preços proporcionais (fator 13000/19316 = 0,673017), % vs Liga recalculado
+- [x] 135 lotes adicionados ao portfolio Riftbound (`store: Ikenson`, buyDate 2026-07-27)
+
+- **Resultado:** soma exata R$ 13.000,00 (365 cartas). Arredondamento a 2 casas deixava residual de
+  -R$ 0,43, corrigido com ajustes de 1 centavo nas linhas de maior erro de arredondamento, então
+  `sum(qtd × unit)` fecha em 13.000,00 sem depender de linha de total.
+- **Verificação:** `GET /api/trades?game=riftbound` → 135 holdings Ikenson, qty 365, costBRL 13000,0,
+  marketKnown 135/135 (todos casaram com preço TCGplayer, refUSD preenchido). Portfolio total foi de
+  60 para 195 holdings.
+- **Gotcha:** o id do jogo na API é `riftbound`, não `rft` (o `rft` é só o sufixo do arquivo). Com
+  `?game=rft` o `stackFor` cai silenciosamente no jogo default (One Piece) e grava no portfolio errado.
+- [x] Merge dos 14 lotes que duplicavam cartas já existentes (195 → 181 holdings). Custo médio
+  ponderado preserva a base; drift de arredondamento do `round2` no unitário: −R$ 0,01 no total.
+  O primário do merge é o lote **mais antigo**, então esses 14 perderam a tag `store: Ikenson` e a
+  buyDate virou 2026-07-21 (restam 121 lotes marcados Ikenson, R$ 11.038,11).
+- [x] Vitrine: 135 lotes listados a **piso Liga EN × 1,10** (R$ 25.200,30 pedido, 395 unidades).
+  Fonte do piso: `data/tracking-rft/<SET>/2026-07-25T00.json` `lowBRL` (NM + idioma 2 + em estoque,
+  via `liga.FloorNM`) — **não** o `LowBRL` das listings do snapshot de deals, que inclui idioma 10
+  (chinês) e por isso subestima o piso em 29 das 135 cartas (ex.: Zenith Blade OGN 262 → 49,90
+  chinês vs 69,00 EN). A coluna `Liga_unit_BRL` do CSV do Ikenson vem dessa fonte contaminada.
+- [x] **Replicado no PROD** (Railway `collecta-deals`) via API, não por arquivo. O prod estava muito
+  à frente do local (14 vendas, 32 listagens, correções de unitário, 4 lotes inéditos), então
+  `sync-up` dos trades teria destruído tudo isso — o runbook já marca `trades*.json` como
+  prod-owned justamente por isso. Sequência: 135 POST /api/trades → 14 POST /api/trades/merge →
+  122 itens em POST /api/trades/listings.
+  Decisão do usuário: nas 14 duplicadas, **preservar o preço já definido no prod** (piso cravado);
+  só as 121 novas + Pyke (que não tinha preço) entraram a piso×1,10. O merge preserva isso sozinho,
+  porque o primário é o lote mais antigo — verificado lote a lote, 0 preços antigos alterados.
+  Vitrine prod: 221 → 343 itens (riftbound 31 → 153). One Piece e Pokémon intocados.
+  Usuário optou por NÃO rodar sync-down, então local e prod seguem divergentes de propósito.
+- [x] Prod: Thrill of the Hunt mesclado (3+8=11 a R$ 100). O lote antigo estava com **número errado**
+  (`UNL 114` = Nidalee - Cat Form), por isso não casava com o do Ikenson (`UNL 184`) na dedupe por
+  (set, número) e era avaliado contra a carta errada (US$ 0,70 em vez de US$ 2,10). Corrigi o número
+  via PUT antes de mesclar — o merge mantém a identidade do primário, então mesclar antes teria
+  perpetuado o `114`.
+- **Não mesclados (não são duplicatas):** os 6 grupos de runas repetem só o NOME — cada set é uma
+  impressão distinta com productID e preço próprios (Fury Rune Alt: OGN 007A pid 652778 US$3,16 /
+  SFD R01A pid 678224 US$3,42 / UNL R01A pid 692932 US$5,96). Mesclar destruiria a identidade de set.
+- **Pendente de decisão:** lote `OGN-PR 58 Lillia - Protector of Dreams` (R$ 65/un, sem preço e sem
+  arte). OGN-PR não tem número 58 na Liga; o TCG só tem Lillia em UNL 058/058A e **ROPP 058** (duas
+  impressões promo, US$ 6,29 e US$ 118,66). É provável erro de set, mas o preço pago descarta que
+  seja a UNL 058 (piso R$ 10,82) — precisa o usuário dizer qual promo é.
+
+---
+
+# Acessórios "não apareceram" — diagnóstico (2026-07-27)
+
+Sintoma: usuário não via a aba de Acessórios no dashboard nem na vitrine, apesar do commit
+b8a44ce ("acessorios no portfolio/estoque e na vitrine").
+
+## Causa
+- **Dashboard:** `localhost:8080` é o container Docker, e o Dockerfile assa `web/dist` na imagem
+  (só `./data` é volume). O container estava de pé havia 45h servindo `index-D0YpYjbW.js`
+  (0 ocorrências de "Add accessory"); o build local `index-Pmm29pWl.js` já tinha a aba.
+  Fix: `docker compose up -d --build opdeals` → :8080 passou a servir o bundle novo.
+- **Vitrine:** já estava no ar (`/acessorios` responde 200 em www.collectatcg.com.br, com
+  "NENHUM ACESSORIO DISPONIVEL"). A aba ACESSORIOS no TabBar é condicional
+  (`showAccessories = accessories.length > 0`) e o prod Railway serve 338 itens — 326 singles,
+  12 selados, **0 acessórios** —, então a aba fica escondida até existir acessório listado.
+
+## Verificação end-to-end (local, com limpeza)
+- POST /api/trades (kind=accessory) → POST /api/trades/listings (askBRL, listed, featured, imageURL)
+  → GET /api/storefront devolveu o item com `kind: "accessory"`, `featured: true`, askUSD convertido.
+- Item de teste deletado depois (DELETE /api/trades/{id}); `data/trades.json` limpo, 0 acessórios.
+
+## Pendente (decisão do usuário)
+- Cadastrar os acessórios reais no Portfolio → Accessories e listá-los no Estoque.
+- Replicar no prod (o prod é dono dos trades — usar API, não sync de arquivo) para a aba aparecer
+  na vitrine pública.
+
+---
+
+# Acessórios independentes de jogo (2026-07-27)
+
+Antes: um acessório era gravado no ledger do jogo que estivesse selecionado
+(`data/trades*.json`), então sleeves cadastradas em One Piece sumiam na aba do Pokémon.
+
+## Modelo novo
+- Ledger único `data/accessories.json` (flag `-accessories`), fora do `GameStack`,
+  guardado em `Server.accessories`.
+- **Roteamento por kind, não por parâmetro:** `POST /api/trades` com `kind:"accessory"`
+  grava no ledger compartilhado. O front não precisou de nenhum parâmetro novo.
+- **Escritas por id:** `onLedger()` tenta o ledger do jogo e cai para o de acessórios
+  quando dá `ErrNotFound` — ids são únicos e toda mutação (Update/Sell/Delete/Merge)
+  devolve ErrNotFound *antes* de persistir, então a tentativa é gratuita. Editar/vender/
+  excluir um acessário funciona a partir de qualquer jogo.
+- `GET /api/trades?game=X` devolve o ledger do jogo **+** os acessórios (ordenado por
+  data), então Portfolio e Estoque mostram os mesmos acessórios em todos os jogos.
+- `POST /api/trades/listings` grava nos dois ledgers (cada um ignora ids que não são
+  seus) — o Estoque salva cartas e acessórios num batch só.
+- Merge é intra-ledger: cartas com cartas, acessórios com acessórios.
+- `/api/storefront` publica os acessórios sob game `acessorios` / label `Acessórios`.
+- `/api/portfolio/all` ganhou o campo `accessories` (contado uma vez, fora dos jogos).
+- Migração no boot (`migrateAccessories`): tira `kind == accessory` de cada ledger de
+  jogo e move para o compartilhado preservando id, preço e estado de listagem.
+
+## Vitrine
+- `mapAccessory` usa o set do produto (ou "Acessório") no meta, não mais o nome do jogo.
+- Detalhe do acessório: breadcrumb sem o jogo, textos/SEO sem "acessório de Acessórios".
+
+## Verificação
+- `go build/vet/test ./...` limpo; `tsc --noEmit` limpo nos dois fronts.
+- Novo `internal/api/accessories_test.go` (5 casos): grava fora do ledger do jogo,
+  aparece em todos os jogos, edita/exclui de outro jogo, storefront sob `acessorios`,
+  listings nos dois ledgers.
+- Servidor isolado em :8099 com um acessório legado plantado em `trades.json`:
+  log "moved 1 accessory holdings…", id/preço/listed/featured preservados; criar pelo
+  Pokémon não criou `trades-pkm.json`; vender/excluir por Lorcana/Gundam funcionou.
+- Container rebuildado; smoke test no :8080 (criar pelo Pokémon → visível em onepiece/
+  riftbound/gundam, `trades-pkm.json` intacto) e teste removido no fim.
+
+## Pendente
+- `data/accessories.json` é **prod-owned**: sync-down/seed-prod e RAILWAY.md já cobrem,
+  mas o prod só passa a ter o arquivo depois do próximo deploy do binário.

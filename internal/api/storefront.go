@@ -37,9 +37,15 @@ type storefrontResponse struct {
 	Items  []storefrontItem `json:"items"`
 }
 
-// handleStorefront returns every listed, in-stock holding across all games,
-// stripped of cost/profit, for the public catalog site. A card appears only when
-// it is a holding (not sold), has qty, is flagged Listed, and has an asking price.
+// Accessories are stocked for no game in particular, so the catalog publishes
+// them under a neutral id instead of whichever game's ledger they used to sit in.
+const (
+	accessoryGameID    = "acessorios"
+	accessoryGameLabel = "Acessórios"
+)
+
+// handleStorefront returns every listed, in-stock holding across all games plus
+// the shared accessories, stripped of cost/profit, for the public catalog site.
 func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 	resp := storefrontResponse{Items: []storefrontItem{}}
 	fx := s.storefrontFX()
@@ -54,51 +60,70 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		lookup, _ := s.priceLookup(gs)
-		label := gs.Game.Name
 		for _, t := range all {
-			if t.Status != "holding" || !t.Listed || t.AskBRL <= 0 {
-				continue
+			if item, ok := storefrontItemFor(t, gs.Game.ID, gs.Game.Name, fx, lookup); ok {
+				resp.Items = append(resp.Items, item)
 			}
-			qty := t.Qty
-			if qty <= 0 {
-				qty = 1
+		}
+	}
+	if s.accessories != nil {
+		all, err := s.accessories.List()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, t := range all {
+			if item, ok := storefrontItemFor(t, accessoryGameID, accessoryGameLabel, fx, nil); ok {
+				resp.Items = append(resp.Items, item)
 			}
-			item := storefrontItem{
-				Game:      gs.Game.ID,
-				GameLabel: label,
-				Kind:      t.Kind,
-				Number:    t.Number,
-				Name:      t.Name,
-				Set:       t.Set,
-				Variant:   t.Variant,
-				Condition: t.Condition,
-				Qty:       qty,
-				AskBRL:    round2(t.AskBRL),
-				Featured:  t.Featured,
-			}
-			// A seller-supplied image wins over everything (the only art for
-			// products without TCG data, e.g. sealed starters). Otherwise the
-			// catalog resolves art through /api/card-image, which tries the
-			// TCGplayer product art first and falls back to the Liga page image
-			// when that print has none — the same chain the dashboard uses. The
-			// product id only names the print; it is never turned into a bare
-			// CDN url here, because a 404 there would leave a broken image with
-			// nothing behind it.
-			if t.ImageURL != "" {
-				item.ImageURL = t.ImageURL
-			} else if t.Kind == "" && lookup != nil {
-				if _, url, ok := lookup(t.Number, t.Name, t.Set); ok {
-					item.ProductID = productIDFromURL(url)
-				}
-			}
-			if fx > 0 {
-				item.AskUSD = round2(t.AskBRL * fx)
-			}
-			resp.Items = append(resp.Items, item)
 		}
 	}
 	resp.Count = len(resp.Items)
 	writeJSON(w, resp)
+}
+
+// storefrontItemFor maps one holding to its public catalog entry. It reports
+// false for anything the buyer must not see: sold, unlisted, or without an
+// asking price.
+func storefrontItemFor(t trades.Trade, gameID, gameLabel string, fx float64, lookup trades.PriceLookup) (storefrontItem, bool) {
+	if t.Status != "holding" || !t.Listed || t.AskBRL <= 0 {
+		return storefrontItem{}, false
+	}
+	qty := t.Qty
+	if qty <= 0 {
+		qty = 1
+	}
+	item := storefrontItem{
+		Game:      gameID,
+		GameLabel: gameLabel,
+		Kind:      t.Kind,
+		Number:    t.Number,
+		Name:      t.Name,
+		Set:       t.Set,
+		Variant:   t.Variant,
+		Condition: t.Condition,
+		Qty:       qty,
+		AskBRL:    round2(t.AskBRL),
+		Featured:  t.Featured,
+	}
+	// A seller-supplied image wins over everything (the only art for products
+	// without TCG data, e.g. sealed starters). Otherwise the catalog resolves art
+	// through /api/card-image, which tries the TCGplayer product art first and
+	// falls back to the Liga page image when that print has none — the same chain
+	// the dashboard uses. The product id only names the print; it is never turned
+	// into a bare CDN url here, because a 404 there would leave a broken image
+	// with nothing behind it.
+	if t.ImageURL != "" {
+		item.ImageURL = t.ImageURL
+	} else if t.Kind == "" && lookup != nil {
+		if _, url, ok := lookup(t.Number, t.Name, t.Set); ok {
+			item.ProductID = productIDFromURL(url)
+		}
+	}
+	if fx > 0 {
+		item.AskUSD = round2(t.AskBRL * fx)
+	}
+	return item, true
 }
 
 // storefrontFX returns a single USD-per-BRL rate (from the first deals-enabled
@@ -152,12 +177,18 @@ func (s *Server) handleTradesListings(w http.ResponseWriter, r *http.Request) {
 		}
 		updates[it.ID] = trades.Listing{AskBRL: ask, Listed: it.Listed, ImageURL: strings.TrimSpace(it.ImageURL), Featured: it.Featured}
 	}
-	n, err := gs.Trades.SetListings(updates)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// The Estoque tab saves the game's cards and the shared accessories in one
+	// batch, so the write goes to both ledgers; each ignores the ids it doesn't own.
+	updated := 0
+	for _, st := range s.ledgersFor(gs) {
+		n, err := st.SetListings(updates)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		updated += n
 	}
-	writeJSON(w, map[string]int{"updated": n})
+	writeJSON(w, map[string]int{"updated": updated})
 }
 
 var productIDRe = regexp.MustCompile(`/product/(\d+)`)

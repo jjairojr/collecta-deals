@@ -12,7 +12,8 @@ still works because `images.json` holds resolved CDN URLs and the bytes come fro
 
 **Data ownership** (the two sides never touch each other's files):
 
-- **Prod-owned** — edited live via the UI: `trades*.json`, `quotes*.json`.
+- **Prod-owned** — edited live via the UI: `trades*.json`, `quotes*.json`,
+  `accessories.json` (the game-independent accessories ledger).
   Pulled **down** with `scripts/sync-down.sh`.
 - **Local-owned** — produced by your scrapes: `snapshot*.json`, `tracking*` dirs
   (day snapshots + each dir's `images.json`). Pushed **up** with `scripts/sync-up.sh`.
@@ -70,7 +71,7 @@ scripts/seed-prod.sh
 ```
 
 This uploads `snapshot*.json`, the `tracking*` dirs, and your initial
-`trades*/quotes*` (minus `*.bak*`/`*.old*`), then reloads. Verify:
+`trades*/quotes*/accessories.json` (minus `*.bak*`/`*.old*`), then reloads. Verify:
 
 ```sh
 railway volume files -v <volume> list /
@@ -94,8 +95,8 @@ Hit the domain — the SPA loads, the portfolio is populated and editable.
    - `scripts/sync-up.sh -s` pushes only the (tiny) snapshots and skips the heavy
      tracking re-upload — use it when you just want fresh deals/portfolio prices.
 
-`scripts/sync-down.sh` pulls `trades*.json` + `quotes*.json` back down (backing up
-the local copies to `data/.sync-bak/` first).
+`scripts/sync-down.sh` pulls `trades*.json`, `quotes*.json` and `accessories.json`
+back down (backing up the local copies to `data/.sync-bak/` first).
 
 ---
 

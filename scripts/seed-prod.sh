@@ -8,7 +8,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 cd "$DATA_DIR"
 
 items=()
-for f in snapshot*.json trades*.json quotes*.json; do
+for f in snapshot*.json trades*.json quotes*.json accessories.json; do
 	case "$f" in
 		*.bak*|*.old*|*.tmp) continue ;;
 	esac

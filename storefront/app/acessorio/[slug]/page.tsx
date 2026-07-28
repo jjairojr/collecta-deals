@@ -20,8 +20,8 @@ export async function generateMetadata({
   }
   const { item, live } = res;
   return {
-    title: `${item.name} · ${item.gameLabel}`,
-    description: `${item.name} — acessório de ${item.gameLabel}, produto novo, por ${brl(item.price)}. Pedido pelo WhatsApp e envio para todo o Brasil na Collecta.`,
+    title: `${item.name} · Acessórios`,
+    description: `${item.name} — acessório para TCG, produto novo, por ${brl(item.price)}. Serve para qualquer jogo. Pedido pelo WhatsApp e envio para todo o Brasil na Collecta.`,
     alternates: { canonical: `/acessorio/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: item.imageURL ? { images: [item.imageURL] } : undefined,
