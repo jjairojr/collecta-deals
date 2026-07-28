@@ -49,6 +49,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     title: "All Games",
     description: "Combined portfolio across every game.",
   },
+  acessorios: {
+    title: "Acessórios",
+    description: "Sleeves, deckboxes, playmats — estoque único, o mesmo em todos os jogos.",
+  },
   estoque: {
     title: "Estoque",
     description: "Defina preços e escolha o que aparece na vitrine pública.",
@@ -177,6 +181,10 @@ export default function App() {
                       setView("portfolio");
                     }}
                   />
+                </div>
+              ) : activeView === "acessorios" ? (
+                <div className="mt-6">
+                  <PortfolioPage lockedSection="accessories" />
                 </div>
               ) : activeView === "estoque" ? (
                 <div className="mt-6">

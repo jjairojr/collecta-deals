@@ -278,9 +278,11 @@ function computeInsights(list: TradeView[]): Insights {
   return r;
 }
 
-export default function PortfolioPage() {
+// lockedSection pins the page to one section and drops the section switcher — how
+// the sidebar's Acessórios entry opens straight into the accessories ledger.
+export default function PortfolioPage({ lockedSection }: { lockedSection?: Section }) {
   const [pct, setPct] = useState(90);
-  const [section, setSection] = useState<Section>("singles");
+  const [section, setSection] = useState<Section>(lockedSection ?? "singles");
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -395,7 +397,9 @@ export default function PortfolioPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-lg font-extrabold text-white">Portfolio</h1>
+          <h1 className="font-display text-lg font-extrabold text-white">
+            {lockedSection === "accessories" ? "Acessórios" : "Portfolio"}
+          </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {isSealed
               ? "Your sealed buys and sales, valued at your own current-value estimate — no TCGplayer or Liga comparison."
@@ -407,19 +411,21 @@ export default function PortfolioPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <ToggleGroup
-            value={section}
-            onChange={(v) => {
-              setSection(v === "sealed" ? "sealed" : v === "accessories" ? "accessories" : "singles");
-              setAdding(false);
-              setSharing(false);
-            }}
-            options={[
-              { value: "singles", label: "Singles" },
-              { value: "sealed", label: "Sealed" },
-              { value: "accessories", label: "Accessories" },
-            ]}
-          />
+          {!lockedSection && (
+            <ToggleGroup
+              value={section}
+              onChange={(v) => {
+                setSection(v === "sealed" ? "sealed" : v === "accessories" ? "accessories" : "singles");
+                setAdding(false);
+                setSharing(false);
+              }}
+              options={[
+                { value: "singles", label: "Singles" },
+                { value: "sealed", label: "Sealed" },
+                { value: "accessories", label: "Accessories" },
+              ]}
+            />
+          )}
           {!isManual && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
