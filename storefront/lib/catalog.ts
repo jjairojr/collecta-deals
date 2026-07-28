@@ -4,11 +4,20 @@ import {
   SEALED,
   buildSingleDetail,
   buildSealedDetail,
+  buildAccessoryDetail,
   curatedSingle,
   sealedBySlug,
 } from "@/lib/mock";
 import { gameSurface } from "@/lib/games";
-import type { Game, Sealed, SealedDetail, Single, SingleDetail } from "@/lib/types";
+import type {
+  Accessory,
+  AccessoryDetail,
+  Game,
+  Sealed,
+  SealedDetail,
+  Single,
+  SingleDetail,
+} from "@/lib/types";
 
 // Shape of one item from the Go backend's GET /api/storefront (see
 // internal/api/storefront.go). Prices are in reais; there is no slug/language.
@@ -38,6 +47,7 @@ interface RawResponse {
 export interface Catalog {
   singles: Single[];
   sealed: Sealed[];
+  accessories: Accessory[];
   games: Game[]; // games that have singles — home cabinets + /singles JOGO filter
   navGames: Game[]; // games with any stock (singles or sealed) — header nav
   live: boolean; // true when served by the real backend, false when mock fallback
@@ -114,7 +124,7 @@ function sealedLanguage(name: string): string | undefined {
 
 function cleanSet(set: string): string {
   const s = set.trim();
-  return /^sealed$/i.test(s) ? "" : s;
+  return /^(sealed|acessorio)$/i.test(s) ? "" : s;
 }
 
 function mapSealed(it: RawItem): Sealed {
@@ -132,6 +142,23 @@ function mapSealed(it: RawItem): Sealed {
     price: Math.round(it.askBRL * 100),
     qty: it.qty > 0 ? it.qty : 1,
     badge: "LACRADO",
+    imageURL: resolveImage(it),
+    featured: it.featured,
+  };
+}
+
+function mapAccessory(it: RawItem): Accessory {
+  return {
+    kind: "accessory",
+    slug: slugFor(it),
+    game: it.game,
+    gameLabel: it.gameLabel,
+    name: it.name,
+    set: cleanSet(it.set),
+    meta: it.gameLabel,
+    price: Math.round(it.askBRL * 100),
+    qty: it.qty > 0 ? it.qty : 1,
+    badge: "ACESSORIO",
     imageURL: resolveImage(it),
     featured: it.featured,
   };
@@ -175,8 +202,10 @@ function dedup(items: Single[]): Single[] {
 }
 
 // Collapse duplicate slugs, summing quantity.
-function dedupSealed(items: Sealed[]): Sealed[] {
-  const bySlug = new Map<string, Sealed>();
+function dedupProducts<T extends { slug: string; qty: number; featured?: boolean }>(
+  items: T[],
+): T[] {
+  const bySlug = new Map<string, T>();
   for (const s of items) {
     const cur = bySlug.get(s.slug);
     if (cur) {
@@ -197,6 +226,7 @@ function mockCatalog(): Catalog {
   return {
     singles,
     sealed,
+    accessories: [],
     games: deriveGames(singles),
     navGames: deriveGames([...singles, ...sealed]),
     live: false,
@@ -217,14 +247,18 @@ export async function loadCatalog(): Promise<Catalog> {
     }
     const data = (await res.json()) as RawResponse;
     const raw = data.items ?? [];
-    const singles = dedup(raw.filter((it) => it.kind !== "sealed").map(mapItem));
-    const sealed = dedupSealed(raw.filter((it) => it.kind === "sealed").map(mapSealed));
-    if (singles.length === 0 && sealed.length === 0) {
+    const singles = dedup(raw.filter((it) => !it.kind).map(mapItem));
+    const sealed = dedupProducts(raw.filter((it) => it.kind === "sealed").map(mapSealed));
+    const accessories = dedupProducts(
+      raw.filter((it) => it.kind === "accessory").map(mapAccessory),
+    );
+    if (singles.length === 0 && sealed.length === 0 && accessories.length === 0) {
       return mockCatalog();
     }
     return {
       singles,
       sealed,
+      accessories,
       games: deriveGames(singles),
       navGames: deriveGames([...singles, ...sealed]),
       live: true,
@@ -268,4 +302,12 @@ export async function loadSealedDetail(
   }
   const s = catalog.sealed.find((c) => c.slug === slug);
   return s ? { item: buildSealedDetail(s), live: catalog.live } : null;
+}
+
+export async function loadAccessoryDetail(
+  slug: string,
+): Promise<DetailResult<AccessoryDetail> | null> {
+  const catalog = await loadCatalog();
+  const a = catalog.accessories.find((c) => c.slug === slug);
+  return a ? { item: buildAccessoryDetail(a), live: catalog.live } : null;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { sendGAEvent } from "@next/third-parties/google";
-import type { CartLine, Sealed, Single } from "@/lib/types";
+import type { Accessory, CartLine, ProductKind, Sealed, Single } from "@/lib/types";
 
 export const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
@@ -11,7 +11,7 @@ export interface GAItem {
   item_id: string;
   item_name: string;
   item_category?: string;
-  item_category2: "single" | "sealed";
+  item_category2: ProductKind;
   item_category3?: string;
   item_variant?: string;
   item_brand?: string;
@@ -58,12 +58,12 @@ export function singleItem(item: Single, quantity = 1): GAItem {
   };
 }
 
-export function sealedItem(item: Sealed, quantity = 1): GAItem {
+export function sealedItem(item: Sealed | Accessory, quantity = 1): GAItem {
   return {
     item_id: item.slug,
     item_name: item.name,
     item_category: item.game,
-    item_category2: "sealed",
+    item_category2: item.kind,
     item_category3: item.set,
     item_variant: item.language,
     price: reais(item.price),
@@ -83,7 +83,7 @@ export function cartLineItem(l: CartLine): GAItem {
   };
 }
 
-export function catalogItem(item: Single | Sealed): GAItem {
+export function catalogItem(item: Single | Sealed | Accessory): GAItem {
   return item.kind === "single" ? singleItem(item) : sealedItem(item);
 }
 

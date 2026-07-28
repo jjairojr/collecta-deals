@@ -37,7 +37,7 @@ func value(t Trade, pct, fxRate float64, lookup PriceLookup) TradeView {
 	v.CostBRL = float64(v.Qty)*t.BuyBRL + t.ShippingBRL
 
 	market, ok := 0.0, false
-	if t.Kind != "sealed" {
+	if t.Kind == "" {
 		if lookup != nil {
 			market, v.TCGURL, ok = lookup(t.Number, t.Name, t.Set)
 		}
@@ -51,7 +51,7 @@ func value(t Trade, pct, fxRate float64, lookup PriceLookup) TradeView {
 	if t.Status == "sold" {
 		v.Realized = true
 		v.ValueBRL = proceedsBRL(t, fxRate)
-	} else if t.Kind == "sealed" {
+	} else if t.Kind != "" {
 		v.ValueBRL = t.ManualBRL * float64(v.Qty)
 	} else if ok && fxRate > 0 {
 		v.ValueBRL = pct / 100 * market * float64(v.Qty) / fxRate

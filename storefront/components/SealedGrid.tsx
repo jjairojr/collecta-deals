@@ -1,20 +1,22 @@
 import SealedCard from "@/components/SealedCard";
 import TrackViewItemList from "@/components/analytics/TrackViewItemList";
-import type { Sealed } from "@/lib/types";
+import type { Accessory, Sealed } from "@/lib/types";
 
 export default function SealedGrid({
   list,
   listId = "selado",
   listName = "Produto selado",
+  empty = "NENHUM SELADO DISPONIVEL NO MOMENTO",
 }: {
-  list: Sealed[];
+  list: (Sealed | Accessory)[];
   listId?: string;
   listName?: string;
+  empty?: string;
 }) {
   if (list.length === 0) {
     return (
       <p className="font-pixel text-[10px] leading-relaxed text-faint">
-        NENHUM SELADO DISPONIVEL NO MOMENTO
+        {empty}
       </p>
     );
   }

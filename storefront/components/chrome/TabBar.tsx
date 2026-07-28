@@ -12,7 +12,13 @@ interface NavGame {
   name: string;
 }
 
-export default function TabBar({ games }: { games: NavGame[] }) {
+export default function TabBar({
+  games,
+  showAccessories,
+}: {
+  games: NavGame[];
+  showAccessories?: boolean;
+}) {
   const pathname = usePathname();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [fade, setFade] = useState({ left: false, right: false });
@@ -48,6 +54,13 @@ export default function TabBar({ games }: { games: NavGame[] }) {
           {games.map((g) => (
             <GameMenu key={g.id} game={g} />
           ))}
+          {showAccessories && (
+            <TabLink
+              href="/acessorios"
+              label="ACESSORIOS"
+              active={pathname.startsWith("/acessorio")}
+            />
+          )}
         </div>
         {fade.left && (
           <div

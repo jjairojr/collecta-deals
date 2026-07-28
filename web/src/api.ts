@@ -545,7 +545,7 @@ export async function exportImage(cards: { set: string; number: string }[]): Pro
 
 export interface Trade {
   id: string;
-  kind?: "sealed";
+  kind?: "sealed" | "accessory";
   number: string;
   name: string;
   set: string;

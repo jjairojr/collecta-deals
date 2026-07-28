@@ -17,7 +17,7 @@ import (
 type storefrontItem struct {
 	Game      string  `json:"game"`
 	GameLabel string  `json:"gameLabel"`
-	Kind      string  `json:"kind,omitempty"` // "sealed" for sealed product, empty for singles
+	Kind      string  `json:"kind,omitempty"` // "sealed" | "accessory" for manual products, empty for singles
 	Number    string  `json:"number"`
 	Name      string  `json:"name"`
 	Set       string  `json:"set"`
@@ -86,7 +86,7 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			// nothing behind it.
 			if t.ImageURL != "" {
 				item.ImageURL = t.ImageURL
-			} else if t.Kind != "sealed" && lookup != nil {
+			} else if t.Kind == "" && lookup != nil {
 				if _, url, ok := lookup(t.Number, t.Name, t.Set); ok {
 					item.ProductID = productIDFromURL(url)
 				}

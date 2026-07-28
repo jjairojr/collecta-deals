@@ -5,12 +5,20 @@ import { absoluteURL } from "@/lib/site";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { singles, sealed, games, navGames, live } = await loadCatalog();
+  const { singles, sealed, accessories, games, navGames, live } =
+    await loadCatalog();
   const urls: MetadataRoute.Sitemap = [
     { url: absoluteURL("/"), changeFrequency: "daily", priority: 1 },
     { url: absoluteURL("/singles"), changeFrequency: "daily", priority: 0.9 },
     { url: absoluteURL("/selado"), changeFrequency: "daily", priority: 0.9 },
   ];
+  if (live && accessories.length > 0) {
+    urls.push({
+      url: absoluteURL("/acessorios"),
+      changeFrequency: "daily",
+      priority: 0.9,
+    });
+  }
   if (!live) {
     return urls;
   }
@@ -46,6 +54,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const s of sealed) {
     urls.push({
       url: absoluteURL(`/selado/${s.slug}`),
+      changeFrequency: "weekly",
+      priority: 0.7,
+    });
+  }
+  for (const a of accessories) {
+    urls.push({
+      url: absoluteURL(`/acessorio/${a.slug}`),
       changeFrequency: "weekly",
       priority: 0.7,
     });

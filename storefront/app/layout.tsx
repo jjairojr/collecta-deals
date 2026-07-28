@@ -64,8 +64,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { navGames } = await loadCatalog();
+  const { navGames, accessories } = await loadCatalog();
   const games = navGames.map((g) => ({ id: g.id, name: g.name }));
+  const showAccessories = accessories.length > 0;
   return (
     <html
       lang="pt-BR"
@@ -78,7 +79,7 @@ export default async function RootLayout({
           <Scanlines />
           <AnnouncementBar />
           <Header />
-          <TabBar games={games} />
+          <TabBar games={games} showAccessories={showAccessories} />
           <main className="min-h-[60vh]">{children}</main>
           <Footer />
           <CartToast />

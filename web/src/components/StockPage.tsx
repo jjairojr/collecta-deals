@@ -797,7 +797,7 @@ function StockRow({
             {live ? <Check className="h-3 w-3" /> : <Store className="h-3 w-3" />}
             {live ? "À venda" : listed ? "Sem preço" : "Oculta"}
           </button>
-          {t.kind === "sealed" && (
+          {(t.kind === "sealed" || t.kind === "accessory") && (
             <button
               onClick={() => onPatch(t.id, { featured: !featured })}
               title={featured ? "Destaque na home — clique para remover" : "Marcar como destaque na home"}

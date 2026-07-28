@@ -105,7 +105,7 @@ export default function CartView() {
             >
               <div className="relative aspect-[5/7] w-16 overflow-hidden rounded-[6px] border-[3px] border-outline sm:w-[78px]">
                 <ArtPlaceholder
-                  hue={l.kind === "sealed" ? "royal" : "brand"}
+                  hue={l.kind === "single" ? "brand" : "royal"}
                   angle="90"
                   label=""
                   imageURL={l.imageURL}

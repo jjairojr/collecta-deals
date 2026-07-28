@@ -13,7 +13,7 @@ export interface Game {
   hue: "pink" | "royal" | "soft";
 }
 
-export type ProductKind = "single" | "sealed";
+export type ProductKind = "single" | "sealed" | "accessory";
 
 export interface Seller {
   id: string;
@@ -82,6 +82,16 @@ export interface SealedDetail extends Sealed {
   stockLeft: number;
   stockTotal: number;
   specs: { key: string; value: string }[];
+}
+
+// An accessory (sleeves, deckbox, playmat…): same boxy-product shape as Sealed,
+// added manually by the seller with its own photo and price.
+export interface Accessory extends Omit<Sealed, "kind"> {
+  kind: "accessory";
+}
+
+export interface AccessoryDetail extends Omit<SealedDetail, "kind"> {
+  kind: "accessory";
 }
 
 export interface HighScore {

@@ -26,10 +26,13 @@ const heroLayers =
 
 export default async function HomePage() {
   // Real catalog; high-scores stay mock until the backend serves them.
-  const { singles, sealed, games } = await loadCatalog();
+  const { singles, sealed, accessories, games } = await loadCatalog();
   const featured = [...singles].sort((a, b) => b.price - a.price).slice(0, 8);
   const picked = sealed.filter((s) => s.featured);
   const featuredSealed = picked.length > 0 ? picked : sealed.slice(0, 4);
+  const pickedAccessories = accessories.filter((a) => a.featured);
+  const featuredAccessories =
+    pickedAccessories.length > 0 ? pickedAccessories : accessories.slice(0, 4);
   return (
     <>
       {/* Hero */}
@@ -150,6 +153,26 @@ export default async function HomePage() {
           ))}
         </div>
       </Container>
+
+      {/* Acessórios */}
+      {featuredAccessories.length > 0 && (
+        <Container className="py-6">
+          <SectionHead
+            title="Acessórios"
+            action={{ label: "VER TODOS ›", href: "/acessorios" }}
+          />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            <TrackViewItemList
+              items={featuredAccessories}
+              listId="home_acessorios"
+              listName="Home · Acessórios"
+            />
+            {featuredAccessories.map((a) => (
+              <SealedCard key={a.slug} item={a} />
+            ))}
+          </div>
+        </Container>
+      )}
 
       {/* High scores */}
       <Container className="py-6">

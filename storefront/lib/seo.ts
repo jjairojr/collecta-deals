@@ -1,5 +1,5 @@
 import { absoluteURL, siteURL } from "@/lib/site";
-import type { Sealed, Single } from "@/lib/types";
+import type { Accessory, Sealed, Single } from "@/lib/types";
 
 export function organizationJsonLd() {
   return {
@@ -62,6 +62,23 @@ export function sealedProductJsonLd(item: Sealed) {
     category: "Trading Card Game",
     offers: offerJsonLd(
       `/selado/${item.slug}`,
+      item.price,
+      "https://schema.org/NewCondition",
+    ),
+  };
+}
+
+export function accessoryProductJsonLd(item: Accessory) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: item.name,
+    description: `${item.name} — acessório de ${item.gameLabel}, produto novo.`,
+    image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
+    brand: { "@type": "Brand", name: item.gameLabel },
+    category: "Trading Card Game",
+    offers: offerJsonLd(
+      `/acessorio/${item.slug}`,
       item.price,
       "https://schema.org/NewCondition",
     ),

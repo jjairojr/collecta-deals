@@ -46,7 +46,13 @@ function cleanName(n: string): string {
   return n.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
-type Section = "singles" | "sealed";
+type Section = "singles" | "sealed" | "accessories";
+
+const SECTION_KIND: Record<Section, "sealed" | "accessory" | undefined> = {
+  singles: undefined,
+  sealed: "sealed",
+  accessories: "accessory",
+};
 
 interface SectionSummary {
   holdings: number;
@@ -146,10 +152,9 @@ function round2(n: number): number {
 
 function csvRows(list: TradeView[]): (string | number)[][] {
   return list.map((t) => {
-    const marketUnit =
-      t.kind === "sealed"
-        ? (t.manualBRL ? round2(t.manualBRL) : "")
-        : (t.marketKnown ? round2(t.marketUSD) : "");
+    const marketUnit = t.kind
+      ? (t.manualBRL ? round2(t.manualBRL) : "")
+      : (t.marketKnown ? round2(t.marketUSD) : "");
     return [
       t.realized ? "sold" : "held",
       t.number,
@@ -308,7 +313,7 @@ export default function PortfolioPage() {
 
   const trades = data?.trades ?? [];
   const active = useMemo(
-    () => trades.filter((t) => (t.kind === "sealed") === (section === "sealed")),
+    () => trades.filter((t) => (t.kind || undefined) === SECTION_KIND[section]),
     [trades, section],
   );
   const summary = useMemo(() => sectionSummary(active), [active]);
@@ -350,6 +355,7 @@ export default function PortfolioPage() {
     [holdings],
   );
   const isSealed = section === "sealed";
+  const isManual = section !== "singles";
   const anyExpanded = expanded.size > 0;
 
   const onSort = useCallback((key: SortKey) => {
@@ -393,7 +399,9 @@ export default function PortfolioPage() {
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {isSealed
               ? "Your sealed buys and sales, valued at your own current-value estimate — no TCGplayer or Liga comparison."
-              : isBRGame()
+              : section === "accessories"
+                ? "Your accessories (sleeves, deckboxes, playmats…), valued at your own current-value estimate."
+                : isBRGame()
                 ? "Your buys and sales, valued against the current Liga Brazil floor. Track what you're up — and down — across the whole collection."
                 : "Your buys and sales, valued against live TCGplayer prices. Track what you're up — and down — across the whole collection."}
           </p>
@@ -402,16 +410,17 @@ export default function PortfolioPage() {
           <ToggleGroup
             value={section}
             onChange={(v) => {
-              setSection(v === "sealed" ? "sealed" : "singles");
+              setSection(v === "sealed" ? "sealed" : v === "accessories" ? "accessories" : "singles");
               setAdding(false);
               setSharing(false);
             }}
             options={[
               { value: "singles", label: "Singles" },
               { value: "sealed", label: "Sealed" },
+              { value: "accessories", label: "Accessories" },
             ]}
           />
-          {!isSealed && (
+          {!isManual && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
                 Value holdings at
@@ -428,8 +437,8 @@ export default function PortfolioPage() {
 
       {data && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <Kpi icon={<Wallet className="h-5 w-5" />} label="Invested (holding)" value={brl0(summary.investedBRL)} sub={`${summary.holdings} ${isSealed ? "products" : "cards"}`} />
-          <Kpi icon={<Coins className="h-5 w-5" />} label="Current value" value={brl0(summary.marketBRL)} sub={isSealed ? "your estimate" : `@ ${pct}% of ${isBRGame() ? "floor" : "TCG"}`} />
+          <Kpi icon={<Wallet className="h-5 w-5" />} label="Invested (holding)" value={brl0(summary.investedBRL)} sub={`${summary.holdings} ${isManual ? "products" : "cards"}`} />
+          <Kpi icon={<Coins className="h-5 w-5" />} label="Current value" value={brl0(summary.marketBRL)} sub={isManual ? "your estimate" : `@ ${pct}% of ${isBRGame() ? "floor" : "TCG"}`} />
           <PnlKpi icon={<TrendingUp className="h-5 w-5" />} label="Unrealized P&L" value={summary.unrealizedBRL} />
           <PnlKpi icon={<PiggyBank className="h-5 w-5" />} label={`Realized (${summary.sold} sold)`} value={summary.realizedBRL} />
           <PnlKpi icon={<TrendingUp className="h-5 w-5" />} label="Total P&L" value={summary.totalPnLBRL} strong />
@@ -457,7 +466,7 @@ export default function PortfolioPage() {
           />
           <Insight
             label="In transit"
-            primary={insights.transitCount ? `${insights.transitCount} ${isSealed ? "items" : "cards"}` : "None"}
+            primary={insights.transitCount ? `${insights.transitCount} ${isManual ? "items" : "cards"}` : "None"}
             secondary={insights.transitCount ? brl0(insights.transitValue) : undefined}
           />
         </div>
@@ -475,7 +484,7 @@ export default function PortfolioPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={isSealed ? "Search products, store…" : "Search cards, number, store…"}
+            placeholder={isManual ? "Search products, store…" : "Search cards, number, store…"}
             className="w-full pl-9 pr-8"
           />
           {query && (
@@ -497,7 +506,7 @@ export default function PortfolioPage() {
           >
             <Download /> Export CSV
           </Button>
-          {!isSealed && (
+          {!isManual && (
             <Button
               variant="outline"
               onClick={() => setSharing(true)}
@@ -508,7 +517,7 @@ export default function PortfolioPage() {
             </Button>
           )}
           <Button onClick={() => setAdding((a) => !a)}>
-            <Plus /> {adding ? "Close" : isSealed ? "Add sealed" : "Add trade"}
+            <Plus /> {adding ? "Close" : isSealed ? "Add sealed" : section === "accessories" ? "Add accessory" : "Add trade"}
           </Button>
         </div>
       </div>
@@ -548,8 +557,9 @@ export default function PortfolioPage() {
       )}
 
       {adding &&
-        (isSealed ? (
-          <AddSealedForm
+        (isManual ? (
+          <AddManualForm
+            kind={isSealed ? "sealed" : "accessory"}
             onAdded={() => {
               setAdding(false);
               refresh();
@@ -565,7 +575,7 @@ export default function PortfolioPage() {
           />
         ))}
 
-      {sharing && !isSealed && holdings.length > 0 && (
+      {sharing && !isManual && holdings.length > 0 && (
         <ShareList holdings={holdings} fxRate={data?.fxRate ?? 0} onClose={() => setSharing(false)} />
       )}
 
@@ -575,7 +585,9 @@ export default function PortfolioPage() {
         <Panel>
           {isSealed
             ? "No sealed products yet. Click “Add sealed” to log your first box."
-            : "No trades yet. Click “Add trade” to log your first buy."}
+            : section === "accessories"
+              ? "No accessories yet. Click “Add accessory” to log your first product."
+              : "No trades yet. Click “Add trade” to log your first buy."}
         </Panel>
       ) : (
         <div className="space-y-6">
@@ -589,11 +601,11 @@ export default function PortfolioPage() {
               </span>
             </div>
             {groupBy === "none" ? (
-              isSealed ? (
-                <SealedTable
+              isManual ? (
+                <ManualTable
                   trades={visibleHoldings}
                   onChanged={refresh}
-                  empty={q || quick !== "all" ? "No products match your filters." : "No sealed products held right now."}
+                  empty={q || quick !== "all" ? "No products match your filters." : "No products held right now."}
                   sort={sort}
                   onSort={onSort}
                   maxValue={maxValue}
@@ -616,7 +628,7 @@ export default function PortfolioPage() {
                   <GroupBlock
                     key={g.key}
                     g={g}
-                    isSealed={isSealed}
+                    manual={isManual}
                     open={expanded.has(g.key)}
                     onToggle={() => toggleGroup(g.key)}
                     sort={sort}
@@ -649,8 +661,8 @@ export default function PortfolioPage() {
               </button>
               {soldOpen &&
                 (groupBy === "none" ? (
-                  isSealed ? (
-                    <SealedTable trades={soldVisible} onChanged={refresh} empty="" sort={sort} onSort={onSort} maxValue={0} />
+                  isManual ? (
+                    <ManualTable trades={soldVisible} onChanged={refresh} empty="" sort={sort} onSort={onSort} maxValue={0} />
                   ) : (
                     <TradeTable trades={soldVisible} onChanged={refresh} empty="" sort={sort} onSort={onSort} maxValue={0} />
                   )
@@ -660,7 +672,7 @@ export default function PortfolioPage() {
                       <GroupBlock
                         key={g.key}
                         g={g}
-                        isSealed={isSealed}
+                        manual={isManual}
                         open={expanded.has(g.key)}
                         onToggle={() => toggleGroup(g.key)}
                         sort={sort}
@@ -749,7 +761,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 function GroupBlock({
   g,
-  isSealed,
+  manual,
   open,
   onToggle,
   sort,
@@ -758,14 +770,14 @@ function GroupBlock({
   onChanged,
 }: SortableProps & {
   g: Group;
-  isSealed: boolean;
+  manual: boolean;
   open: boolean;
   onToggle: () => void;
   maxValue: number;
   onChanged: () => void;
 }) {
   const up = g.pnl >= 0;
-  const noun = isSealed ? (g.count === 1 ? "item" : "items") : g.count === 1 ? "card" : "cards";
+  const noun = manual ? (g.count === 1 ? "item" : "items") : g.count === 1 ? "card" : "cards";
   return (
     <div className="overflow-hidden rounded-[14px] border-[3px] border-outline bg-surface">
       <button
@@ -795,8 +807,8 @@ function GroupBlock({
       </button>
       {open && (
         <div className="border-t-2 border-outline">
-          {isSealed ? (
-            <SealedTable trades={g.trades} onChanged={onChanged} empty="" sort={sort} onSort={onSort} maxValue={maxValue} bare />
+          {manual ? (
+            <ManualTable trades={g.trades} onChanged={onChanged} empty="" sort={sort} onSort={onSort} maxValue={maxValue} bare />
           ) : (
             <TradeTable trades={g.trades} onChanged={onChanged} empty="" sort={sort} onSort={onSort} maxValue={maxValue} bare />
           )}
@@ -1296,7 +1308,7 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
   );
 }
 
-function SealedTable({
+function ManualTable({
   trades,
   onChanged,
   empty,
@@ -1325,7 +1337,7 @@ function SealedTable({
         </thead>
         <tbody>
           {trades.map((t) => (
-            <SealedRow key={t.id} t={t} onChanged={onChanged} maxValue={maxValue} />
+            <ManualRow key={t.id} t={t} onChanged={onChanged} maxValue={maxValue} />
           ))}
         </tbody>
       </table>
@@ -1333,7 +1345,7 @@ function SealedTable({
   );
 }
 
-function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => void; maxValue: number }) {
+function ManualRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => void; maxValue: number }) {
   const [selling, setSelling] = useState(false);
   const [editing, setEditing] = useState(false);
   const up = t.profitBRL >= 0;
@@ -1421,7 +1433,7 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
           <td colSpan={8} className="px-3 py-3">
             <EditTradeForm
               t={t}
-              sealed
+              manual
               onDone={() => {
                 setEditing(false);
                 onChanged();
@@ -1449,9 +1461,9 @@ function SealedRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
 
 // EditTradeForm fixes an already-logged trade: what you paid (buy + frete + qty)
 // plus the descriptive fields, so a mistyped cost no longer needs a delete/re-add.
-// The sealed variant swaps Condition for the manual current-value estimate, which
-// is what values a sealed holding (valuation.go uses ManualBRL * Qty).
-function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; onDone: () => void }) {
+// The manual variant (sealed/accessory) swaps Condition for the current-value
+// estimate, which is what values those holdings (valuation.go uses ManualBRL * Qty).
+function EditTradeForm({ t, manual, onDone }: { t: TradeView; manual?: boolean; onDone: () => void }) {
   const [manualBRL, setManualBRL] = useState(t.manualBRL ? String(t.manualBRL) : "");
   const [buyBRL, setBuyBRL] = useState(t.buyBRL ? String(t.buyBRL) : "");
   const [shippingBRL, setShippingBRL] = useState(t.shippingBRL ? String(t.shippingBRL) : "");
@@ -1479,7 +1491,7 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
         store,
         buyDate,
         imageURL: imageURL.trim(),
-        ...(sealed ? { manualBRL: Number(manualBRL) || 0 } : {}),
+        ...(manual ? { manualBRL: Number(manualBRL) || 0 } : {}),
       });
       onDone();
     } finally {
@@ -1489,7 +1501,7 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      {sealed && (
+      {manual && (
         <Field label="Current value R$ (per unit)">
           <Input type="number" value={manualBRL} onChange={(e) => setManualBRL(e.target.value)} className="w-36" placeholder="0,00" />
         </Field>
@@ -1503,7 +1515,7 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
       <Field label="Qty">
         <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-20" />
       </Field>
-      {!sealed && (
+      {!manual && (
         <Field label="Condition">
           <Input value={condition} onChange={(e) => setCondition(e.target.value)} className="w-24" placeholder="NM" />
         </Field>
@@ -1533,7 +1545,8 @@ function EditTradeForm({ t, sealed, onDone }: { t: TradeView; sealed?: boolean; 
   );
 }
 
-function AddSealedForm({ onAdded }: { onAdded: () => void }) {
+function AddManualForm({ kind, onAdded }: { kind: "sealed" | "accessory"; onAdded: () => void }) {
+  const sealed = kind === "sealed";
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<QuoteMatch[]>([]);
   const [number, setNumber] = useState("");
@@ -1548,7 +1561,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
+    if (!sealed || query.trim().length < 2) {
       setMatches([]);
       return;
     }
@@ -1562,7 +1575,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
       current = false;
       window.clearTimeout(h);
     };
-  }, [query]);
+  }, [query, sealed]);
 
   const pick = (m: QuoteMatch) => {
     setNumber(m.number);
@@ -1575,10 +1588,10 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
     setSaving(true);
     try {
       await createTrade({
-        kind: "sealed",
+        kind,
         number,
         name,
-        set: "SEALED",
+        set: sealed ? "SEALED" : "ACESSORIO",
         qty: Number(qty) || 1,
         buyBRL: Number(buyBRL) || 0,
         shippingBRL: Number(shippingBRL) || 0,
@@ -1598,6 +1611,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
 
   return (
     <Card className="space-y-3 p-4">
+      {sealed && (
       <div className="relative">
         <Field label="Find sealed product (Liga catalog)">
           <Input
@@ -1624,10 +1638,11 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
           </ul>
         )}
       </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Field label="Name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Booster Box OP-16" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={sealed ? "Booster Box OP-16" : "Sleeves Ultra Pro (100)"} />
         </Field>
         <Field label="Current value R$ (per unit)">
           <Input type="number" value={manualBRL} onChange={(e) => setManualBRL(e.target.value)} placeholder="0,00" />
@@ -1659,7 +1674,7 @@ function AddSealedForm({ onAdded }: { onAdded: () => void }) {
 
       <div className="flex justify-end">
         <Button onClick={submit} disabled={!valid || saving}>
-          {saving ? "Saving…" : "Save sealed"}
+          {saving ? "Saving…" : sealed ? "Save sealed" : "Save accessory"}
         </Button>
       </div>
     </Card>

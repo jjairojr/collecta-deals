@@ -4,14 +4,15 @@ import Link from "next/link";
 import { sealedItem, trackSelectItem } from "@/lib/analytics";
 import { brl } from "@/lib/format";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
-import type { Sealed } from "@/lib/types";
+import type { Accessory, Sealed } from "@/lib/types";
 
-// Grid item for sealed product. Light-pink sticker with a blue box-art block.
-// Links to the sealed product page.
-export default function SealedCard({ item }: { item: Sealed }) {
+// Grid item for a boxy product (sealed or accessory). Light-pink sticker with a
+// blue box-art block. Links to the product page for its kind.
+export default function SealedCard({ item }: { item: Sealed | Accessory }) {
+  const sealed = item.kind === "sealed";
   return (
     <Link
-      href={`/selado/${item.slug}`}
+      href={`${sealed ? "/selado" : "/acessorio"}/${item.slug}`}
       onClick={() => trackSelectItem(sealedItem(item))}
       className="arcade-press sticker animate-rise flex flex-col overflow-hidden rounded-[14px] bg-brand-soft"
     >
@@ -19,7 +20,7 @@ export default function SealedCard({ item }: { item: Sealed }) {
         <ArtPlaceholder
           hue="royal"
           angle="45"
-          label="FOTO DA CAIXA"
+          label={sealed ? "FOTO DA CAIXA" : "FOTO DO PRODUTO"}
           imageURL={item.imageURL}
           alt={item.name}
         />

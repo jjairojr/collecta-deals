@@ -2,14 +2,14 @@
 
 import { useEffect } from "react";
 import { catalogItem, trackViewItemList } from "@/lib/analytics";
-import type { Sealed, Single } from "@/lib/types";
+import type { Accessory, Sealed, Single } from "@/lib/types";
 
 export default function TrackViewItemList({
   items,
   listId,
   listName,
 }: {
-  items: (Single | Sealed)[];
+  items: (Single | Sealed | Accessory)[];
   listId: string;
   listName: string;
 }) {

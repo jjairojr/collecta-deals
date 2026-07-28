@@ -639,7 +639,7 @@ func heldCardKeys(ledger *trades.Store, m compare.Matcher) func() []string {
 		}
 		keys := make([]string, 0, len(all))
 		for _, t := range all {
-			if t.Status == "sold" || t.Kind == "sealed" {
+			if t.Status == "sold" || t.Kind != "" {
 				continue
 			}
 			keys = append(keys, m.LookupKey(t.Number, t.Name, t.Set))

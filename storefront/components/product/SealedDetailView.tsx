@@ -9,12 +9,18 @@ import { sealedItem, trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
-import type { SealedDetail } from "@/lib/types";
+import type { AccessoryDetail, SealedDetail } from "@/lib/types";
 
-export default function SealedDetailView({ item }: { item: SealedDetail }) {
+export default function SealedDetailView({
+  item,
+}: {
+  item: SealedDetail | AccessoryDetail;
+}) {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
 
+  const sealed = item.kind === "sealed";
+  const stockNoun = sealed ? "CAIXAS" : "UNIDADES";
   const preorder = item.badge === "PRE-VENDA";
   const soldPct = Math.round(
     ((item.stockTotal - item.stockLeft) / item.stockTotal) * 100,
@@ -32,7 +38,7 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
     add(
       {
         slug: item.slug,
-        kind: "sealed",
+        kind: item.kind,
         name: item.name,
         meta: subtitle,
         seller: "Collecta Oficial",
@@ -53,7 +59,9 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
             label: gamePixel(item.game, item.gameLabel),
             href: `/singles/${item.game}`,
           },
-          { label: "SELADOS", href: `/selado/${item.game}` },
+          sealed
+            ? { label: "SELADOS", href: `/selado/${item.game}` }
+            : { label: "ACESSORIOS", href: "/acessorios" },
           { label: pixelText(item.name) },
         ]}
       />
@@ -69,7 +77,7 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
               <ArtPlaceholder
                 hue="royal"
                 angle="45"
-                label={"FOTO DA CAIXA\nLACRE VISIVEL"}
+                label={sealed ? "FOTO DA CAIXA\nLACRE VISIVEL" : "FOTO DO PRODUTO"}
                 imageURL={item.imageURL}
                 alt={item.name}
                 sizes="(min-width: 1024px) 45vw, 90vw"
@@ -88,7 +96,7 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
               </span>
             )}
             <span className="bg-brand-soft px-2.5 py-1.5 font-pixel text-[8px] text-outline">
-              LACRADO
+              {sealed ? "LACRADO" : "ACESSORIO"}
             </span>
           </div>
 
@@ -107,8 +115,8 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
             </span>
             <div className="mt-4 font-pixel text-[9px] text-brand-soft">
               {soldPct > 0
-                ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} CAIXAS`
-                : `RESTAM ${item.stockLeft} CAIXAS`}
+                ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} ${stockNoun}`
+                : `RESTAM ${item.stockLeft} ${stockNoun}`}
             </div>
             {soldPct > 0 && (
               <div className="mt-2 h-[18px] overflow-hidden rounded-[10px] border-[3px] border-brand bg-outline">
@@ -154,11 +162,21 @@ export default function SealedDetailView({ item }: { item: SealedDetail }) {
           </div>
 
           <p className="mt-6 text-[14px] leading-relaxed text-muted">
-            {item.name} é um produto selado de {item.gameLabel}
-            {item.language ? ` em ${item.language.toLowerCase()}` : ""}, com
-            lacre original de fábrica conferido antes do envio. Adicione ao
-            carrinho, finalize o pedido pelo WhatsApp e receba em todo o
-            Brasil.
+            {sealed ? (
+              <>
+                {item.name} é um produto selado de {item.gameLabel}
+                {item.language ? ` em ${item.language.toLowerCase()}` : ""}, com
+                lacre original de fábrica conferido antes do envio. Adicione ao
+                carrinho, finalize o pedido pelo WhatsApp e receba em todo o
+                Brasil.
+              </>
+            ) : (
+              <>
+                {item.name} é um acessório de {item.gameLabel}, novo e
+                conferido antes do envio. Adicione ao carrinho, finalize o
+                pedido pelo WhatsApp e receba em todo o Brasil.
+              </>
+            )}
           </p>
         </div>
       </div>

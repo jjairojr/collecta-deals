@@ -86,7 +86,7 @@ func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "number or name required", http.StatusBadRequest)
 		return
 	}
-	if t.RefUSD == 0 && t.Kind != "sealed" {
+	if t.RefUSD == 0 && t.Kind == "" {
 		if gs.Deals != nil {
 			if lookup, _ := s.priceLookup(gs); lookup != nil {
 				if usd, _, ok := lookup(t.Number, t.Name, t.Set); ok {

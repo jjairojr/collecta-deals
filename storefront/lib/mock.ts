@@ -3,6 +3,8 @@
 // from here so swapping in a real data layer later is a localized change.
 
 import type {
+  Accessory,
+  AccessoryDetail,
   HighScore,
   Sealed,
   SealedDetail,
@@ -430,6 +432,19 @@ export function buildSealedDetail(s: Sealed): SealedDetail {
     stockLeft: s.qty,
     stockTotal: s.qty,
     specs,
+  };
+}
+
+export function buildAccessoryDetail(a: Accessory): AccessoryDetail {
+  return {
+    ...a,
+    stockLeft: a.qty,
+    stockTotal: a.qty,
+    specs: [
+      { key: "JOGO", value: a.gameLabel },
+      { key: "TIPO", value: "Acessório" },
+      { key: "GARANTIA", value: "Produto novo, conferido antes do envio" },
+    ],
   };
 }
 
