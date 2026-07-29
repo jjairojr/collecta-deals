@@ -31,6 +31,12 @@ export default function Footer() {
           >
             Produto selado
           </Link>
+          <Link
+            href="/politica-de-devolucao"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Devoluções
+          </Link>
           <WhatsAppLink
             href={whatsappHref}
             origin="footer"
