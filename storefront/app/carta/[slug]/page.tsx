@@ -2,11 +2,19 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SingleDetailView from "@/components/product/SingleDetailView";
 import JsonLd from "@/components/seo/JsonLd";
-import { loadSingleDetail } from "@/lib/catalog";
+import { loadCatalog, loadSingleDetail } from "@/lib/catalog";
 import { breadcrumbJsonLd, singleProductJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
 
 export const revalidate = 60;
+
+// Without this the route is server-rendered on demand and never lands in the
+// CDN. Listing the slugs turns every card into an ISR page; cards added between
+// builds still render on first request.
+export async function generateStaticParams() {
+  const { singles } = await loadCatalog();
+  return singles.map((s) => ({ slug: s.slug }));
+}
 
 export async function generateMetadata({
   params,

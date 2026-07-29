@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { loadCatalog } from "@/lib/catalog";
+import { pageCount } from "@/lib/paging";
 import { absoluteURL } from "@/lib/site";
 
 export const revalidate = 3600;
@@ -35,6 +36,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.8,
     });
+    for (let n = 2; n <= pageCount(g.count); n += 1) {
+      urls.push({
+        url: absoluteURL(`/singles/${g.id}/pagina/${n}`),
+        changeFrequency: "daily",
+        priority: 0.6,
+      });
+    }
   }
   const sealedGames = [...new Set(sealed.map((s) => s.game))];
   for (const id of sealedGames) {

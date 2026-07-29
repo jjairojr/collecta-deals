@@ -2,11 +2,16 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SealedDetailView from "@/components/product/SealedDetailView";
 import JsonLd from "@/components/seo/JsonLd";
-import { loadAccessoryDetail } from "@/lib/catalog";
+import { loadAccessoryDetail, loadCatalog } from "@/lib/catalog";
 import { accessoryProductJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
 
 export const revalidate = 60;
+
+export async function generateStaticParams() {
+  const { accessories } = await loadCatalog();
+  return accessories.map((a) => ({ slug: a.slug }));
+}
 
 export async function generateMetadata({
   params,

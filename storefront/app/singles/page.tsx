@@ -19,11 +19,25 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SinglesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jogo?: string; q?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { jogo, q } = await searchParams;
+  const params = await searchParams;
+  const jogo = typeof params.jogo === "string" ? params.jogo : undefined;
+  const q = typeof params.q === "string" ? params.q : undefined;
   if (jogo && isGameId(jogo)) {
-    permanentRedirect(`/singles/${jogo}`);
+    // Forward shareable filter params, but not q: /singles/[jogo] is static
+    // and does not apply a search query.
+    const rest = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (key === "jogo" || key === "q" || value === undefined) {
+        continue;
+      }
+      for (const v of Array.isArray(value) ? value : [value]) {
+        rest.append(key, v);
+      }
+    }
+    const qs = rest.toString();
+    permanentRedirect(`/singles/${jogo}${qs ? `?${qs}` : ""}`);
   }
   const { singles, games, navGames } = await loadCatalog();
   const gameOpts = games.map((g) => ({ id: g.id, label: g.name }));

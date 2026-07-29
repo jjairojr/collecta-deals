@@ -48,6 +48,7 @@ export default async function SinglesGamePage({
       games={gameOpts}
       navGames={navOpts}
       initialGame={jogo}
+      basePath={`/singles/${jogo}`}
     />
   );
 }

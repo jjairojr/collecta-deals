@@ -13,6 +13,14 @@ import { brl } from "@/lib/format";
 
 export const revalidate = 60;
 
+// This segment serves both the per-game listings (/selado/pokemon) and the
+// product pages (/selado/<slug>), so both go into the static set.
+export async function generateStaticParams() {
+  const { sealed } = await loadCatalog();
+  const gameIDs = [...new Set(sealed.map((s) => s.game))];
+  return [...gameIDs, ...sealed.map((s) => s.slug)].map((slug) => ({ slug }));
+}
+
 export async function generateMetadata({
   params,
 }: {
