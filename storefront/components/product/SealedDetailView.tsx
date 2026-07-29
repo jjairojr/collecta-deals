@@ -85,7 +85,6 @@ export default function SealedDetailView({
                 label={sealed ? "FOTO DA CAIXA\nLACRE VISIVEL" : "FOTO DO PRODUTO"}
                 imageURL={item.imageURL}
                 alt={item.name}
-                sizes="(min-width: 1024px) 45vw, 90vw"
                 priority
               />
             </div>

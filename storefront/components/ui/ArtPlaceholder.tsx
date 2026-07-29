@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 
 type Hue = "brand" | "royal" | "soft";
@@ -24,19 +23,6 @@ const stripes: Record<Angle, string> = {
   "135": "art-stripes-135",
 };
 
-const OPTIMIZED_HOSTS = ["product-images.tcgplayer.com"];
-
-function canOptimize(src: string): boolean {
-  if (src.startsWith("/")) {
-    return true;
-  }
-  try {
-    return OPTIMIZED_HOSTS.includes(new URL(src).hostname);
-  } catch {
-    return false;
-  }
-}
-
 // The striped brand-color stand-in for product photography. When `imageURL` is
 // set (real photo), the stripes/label are replaced — and if that photo fails to
 // load, the stripes come back instead of a broken-image icon. Aspect ratio is
@@ -47,7 +33,6 @@ export default function ArtPlaceholder({
   label,
   imageURL,
   alt = "",
-  sizes = "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw",
   priority = false,
 }: {
   hue?: Hue;
@@ -55,7 +40,6 @@ export default function ArtPlaceholder({
   label: string;
   imageURL?: string;
   alt?: string;
-  sizes?: string;
   priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
@@ -64,19 +48,6 @@ export default function ArtPlaceholder({
   }, [imageURL]);
 
   if (imageURL && !failed) {
-    if (canOptimize(imageURL)) {
-      return (
-        <Image
-          src={imageURL}
-          alt={alt}
-          fill
-          sizes={sizes}
-          priority={priority}
-          onError={() => setFailed(true)}
-          className="object-cover"
-        />
-      );
-    }
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img

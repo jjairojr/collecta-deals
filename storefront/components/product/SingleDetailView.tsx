@@ -77,7 +77,6 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                 }
                 imageURL={item.imageURL}
                 alt={item.name}
-                sizes="(min-width: 1024px) 40vw, 90vw"
                 priority
               />
             </div>
