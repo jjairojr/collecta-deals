@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { loadCatalog } from "@/lib/catalog";
 import { absoluteURL } from "@/lib/site";
 import type { Accessory, Sealed, Single } from "@/lib/types";
@@ -36,6 +37,23 @@ const MAKERS: Record<string, string> = {
 const CAT_CARDS =
   "Arts & Entertainment > Hobbies & Creative Arts > Collectibles > Collectible Trading Cards";
 const CAT_GAMES = "Toys & Games > Games > Card Games";
+
+// Merchant Center caps `id` at 50 characters and rejects the whole row past it.
+// Slugs that already fit are used verbatim so ids stay readable and, more
+// importantly, stable — the id is the key Merchant Center tracks a product by,
+// and rewriting it orphans the product and resets its review. Longer slugs get
+// trimmed with a digest of the full slug appended, which keeps them unique and
+// deterministic across builds.
+const MAX_ID = 50;
+const DIGEST = 8;
+
+function feedID(slug: string): string {
+  if (slug.length <= MAX_ID) {
+    return slug;
+  }
+  const hash = createHash("sha1").update(slug).digest("hex").slice(0, DIGEST);
+  return `${slug.slice(0, MAX_ID - DIGEST - 1)}-${hash}`;
+}
 
 function money(cents: number): string {
   return `${(cents / 100).toFixed(2)} BRL`;
@@ -94,7 +112,7 @@ function singleRow(s: Single): FeedItem | null {
   const numberNote = s.number ? ` (${s.number})` : "";
   const setNote = s.set ? `, set ${s.set}` : "";
   return {
-    id: s.slug,
+    id: feedID(s.slug),
     title: clamp(
       `${s.name}${number} — Carta ${s.gameLabel}${s.set ? ` ${s.set}` : ""} ${s.condition}`,
       150,
@@ -126,7 +144,7 @@ async function sealedRow(s: Sealed): Promise<FeedItem | null> {
   }
   const lang = s.language ? ` em ${s.language}` : "";
   return {
-    id: s.slug,
+    id: feedID(s.slug),
     title: clamp(`${s.name} — ${s.gameLabel} lacrado`, 150),
     description: clamp(
       `${s.name} — produto selado de ${s.gameLabel}${lang}, com lacre original. Pedido pelo WhatsApp e envio para todo o Brasil na Collecta.`,
@@ -151,7 +169,7 @@ async function accessoryRow(a: Accessory): Promise<FeedItem | null> {
     return null;
   }
   return {
-    id: a.slug,
+    id: feedID(a.slug),
     title: clamp(`${a.name} — Acessório TCG`, 150),
     description: clamp(
       `${a.name} — acessório para card game, produto novo, serve para qualquer jogo. Pedido pelo WhatsApp e envio para todo o Brasil na Collecta.`,
