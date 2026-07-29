@@ -1,57 +1,10 @@
 @import "tailwindcss";
-@import "../../shared/arcade.css";
+@import "./theme.css";
 
-/* Arcade reskin. The brand tokens, sticker helpers and keyframes come from
-   shared/arcade.css (shared with the public storefront). Here we (a) load the
-   raw font families, and (b) remap the dashboard's legacy `accent-*` and
-   `slate-*` ramps onto the arcade palette so every existing utility class
-   (bg-slate-900, text-slate-400, bg-accent-500, …) renders arcade colors with
-   no per-component edits. emerald(gain)/rose(loss)/amber(live) stay as the
-   three data-signal hues. */
-@theme {
-  --font-baloo: "Baloo 2";
-  --font-dm-sans: "DM Sans";
-  --font-press-start: "Press Start 2P";
-
-  /* Primary accent → arcade pink. sky/violet/fuchsia/indigo alias to this so
-     all four per-game colors and every interactive accent unify. */
-  --color-accent-200: #fdd3e9;
-  --color-accent-300: #fdc4e5;
-  --color-accent-400: #f877ac;
-  --color-accent-500: #f6559b;
-  --color-accent-600: #e23d85;
-  --color-accent-700: #c72f72;
-
-  /* Neutral shell → arcade ink/surface. 950 = page, 900 = surface, 400 =
-     muted, 500 = faint (matches the arcade tokens). */
-  --color-slate-50: #ffffff;
-  --color-slate-100: #f5f5f7;
-  --color-slate-200: #e6e6ea;
-  --color-slate-300: #c8c8d0;
-  --color-slate-400: #9a9aa2;
-  --color-slate-500: #6f6f77;
-  --color-slate-600: #4a4a52;
-  --color-slate-700: #34343a;
-  --color-slate-800: #2a2a2e;
-  --color-slate-900: #1f1f22;
-  --color-slate-950: #141416;
-
-  --color-sky-200: var(--color-accent-200);
-  --color-sky-300: var(--color-accent-300);
-  --color-sky-400: var(--color-accent-400);
-  --color-sky-500: var(--color-accent-500);
-  --color-sky-600: var(--color-accent-600);
-
-  --color-violet-200: var(--color-accent-200);
-  --color-violet-300: var(--color-accent-300);
-  --color-violet-400: var(--color-accent-400);
-  --color-violet-500: var(--color-accent-500);
-
-  --color-fuchsia-300: var(--color-accent-300);
-  --color-fuchsia-500: var(--color-accent-500);
-
-  --color-indigo-500: var(--color-accent-500);
-}
+/* The dashboard runs the light arcade theme from theme.css. The public
+   storefront keeps its own dark theme in shared/arcade.css — the two apps
+   share the class vocabulary (sticker, pill, font-display, font-pixel,
+   art-stripes-*), not the tokens. */
 
 :root {
   color-scheme: dark;
@@ -65,8 +18,8 @@ body,
 
 body {
   margin: 0;
-  background-color: var(--color-ink);
-  color: #ffffff;
+  background-color: var(--color-page);
+  color: var(--color-fg);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;

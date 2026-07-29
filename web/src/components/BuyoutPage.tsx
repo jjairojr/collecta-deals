@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import EmptyState from "./EmptyState";
 import { ExternalLink, LayoutGrid, List } from "lucide-react";
 import { getBuyout, getGame, type BuyoutCandidate, type BuyoutMode, type BuyoutSort } from "../api";
 import { brl, usd } from "../format";
@@ -99,9 +100,6 @@ export default function BuyoutPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-lg font-extrabold text-white">
-            {snipe ? "Snipe underpriced cards" : "Best Cards to Buyout"}
-          </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {snipe ? (
               <>
@@ -228,13 +226,13 @@ export default function BuyoutPage() {
               {date && <span className="ml-2 text-xs text-slate-500">snapshot {date}</span>}
               {loading && <span className="ml-2 text-xs text-slate-500">updating…</span>}
             </span>
-            <div className="inline-flex rounded-[8px] border-2 border-outline bg-surface p-0.5">
+            <div className="inline-flex rounded-[8px] border-2 border-outline bg-panel p-0.5">
               <button
                 onClick={() => setLayout("grid")}
                 aria-label="Grid view"
                 className={`rounded-[6px] p-1.5 transition-colors ${
                   layout === "grid"
-                    ? "bg-brand/20 text-brand-soft"
+                    ? "bg-brand/20 text-brand-label"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -245,7 +243,7 @@ export default function BuyoutPage() {
                 aria-label="Table view"
                 className={`rounded-[6px] p-1.5 transition-colors ${
                   layout === "table"
-                    ? "bg-brand/20 text-brand-soft"
+                    ? "bg-brand/20 text-brand-label"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -307,7 +305,7 @@ function BuyoutTable({
   toggle: (item: PickedCard) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+    <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
       <Table className="min-w-[1040px]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -414,8 +412,8 @@ function BuyoutTable({
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
+    <EmptyState>
       {children}
-    </div>
+    </EmptyState>
   );
 }

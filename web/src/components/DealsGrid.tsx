@@ -42,7 +42,7 @@ function DealArt({ deal }: { deal: Deal }) {
   const src = dealImageURL(deal);
   if (!src || failed) {
     return (
-      <div className="flex aspect-[350/489] w-full items-center justify-center bg-slate-800 p-3 text-center">
+      <div className="flex art-stripes-90 aspect-[350/489] w-full items-center justify-center bg-brand-soft p-3 text-center">
         <span className="font-mono text-xs text-slate-500">{deal.number}</span>
       </div>
     );
@@ -53,7 +53,7 @@ function DealArt({ deal }: { deal: Deal }) {
       alt={deal.name}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="aspect-[350/489] w-full bg-slate-800 object-cover"
+      className="aspect-[350/489] w-full bg-panel object-cover"
     />
   );
 }
@@ -69,7 +69,7 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
       <div className="relative">
         <DealArt deal={deal} />
         {pick && (
-          <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] border-2 border-outline bg-ink">
+          <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] border-2 border-outline bg-page">
             <Checkbox
               accent="emerald"
               checked={has(pick.set, pick.number)}
@@ -78,7 +78,7 @@ function DealCard({ deal, showDepth }: { deal: Deal; showDepth: boolean }) {
           </label>
         )}
         <div
-          className={`absolute right-2 top-2 flex items-center gap-1 rounded-[8px] border-2 border-outline bg-ink px-2 py-1 text-sm font-bold tabular-nums ${tier.text}`}
+          className={`absolute right-2 top-2 flex items-center gap-1 rounded-[8px] border-2 border-outline bg-page px-2 py-1 text-sm font-bold tabular-nums ${tier.text}`}
         >
           <TrendingUp className="h-3.5 w-3.5" />
           {rounded > 0 ? "+" : ""}

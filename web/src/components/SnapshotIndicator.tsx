@@ -33,10 +33,10 @@ export default function SnapshotIndicator() {
       <button
         type="button"
         onClick={toggle}
-        className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5 transition-colors hover:border-slate-700 hover:bg-slate-900"
+        className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-panel px-3 py-1.5 transition-colors hover:bg-raised"
       >
-        <Clock className="h-3.5 w-3.5 text-brand" />
-        <span className="font-pixel text-[9px] uppercase text-brand-soft">
+        <Clock className="h-3.5 w-3.5 text-brand-label" />
+        <span className="font-pixel text-[9px] uppercase text-brand-label">
           Snapshot
         </span>
         <span className="text-sm font-semibold tabular-nums text-slate-200">
@@ -56,8 +56,8 @@ export default function SnapshotIndicator() {
             className="fixed inset-0 z-10 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 z-20 mt-1 w-56 rounded-[12px] border-2 border-outline bg-surface shadow-xl">
-            <div className="border-b-2 border-outline px-3 py-2 font-pixel text-[9px] uppercase text-brand-soft">
+          <div className="absolute right-0 z-20 mt-1 w-56 sticker sticker-sm rounded-[12px] bg-panel">
+            <div className="border-b-2 border-outline px-3 py-2 font-pixel text-[9px] uppercase text-brand-label">
               Recent snapshots
             </div>
             {dates.length === 0 ? (
@@ -67,7 +67,7 @@ export default function SnapshotIndicator() {
                 {dates.map((d, i) => (
                   <li
                     key={d}
-                    className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-slate-800/50"
+                    className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-raised/70"
                   >
                     <span className="tabular-nums text-slate-200">{stampLabel(d)}</span>
                     {i === 0 && (

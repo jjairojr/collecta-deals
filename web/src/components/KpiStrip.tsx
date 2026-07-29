@@ -20,14 +20,14 @@ function Kpi({
   tone?: "slate" | "emerald" | "sky";
 }) {
   const valueTone =
-    tone === "emerald" ? "text-emerald-300" : tone === "sky" ? "text-brand-soft" : "text-white";
+    tone === "emerald" ? "text-emerald-300" : tone === "sky" ? "text-brand-label" : "text-fg";
   return (
-    <div className="sticker flex items-center gap-3 rounded-[14px] bg-surface p-4">
+    <div className="sticker flex items-center gap-3 rounded-[14px] bg-panel p-4">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="font-pixel truncate text-[8px] uppercase text-brand-soft">{label}</div>
+        <div className="font-pixel text-[8px] uppercase leading-[1.5] text-brand-label">{label}</div>
         <div className={`mt-1 truncate text-xl font-bold tabular-nums ${valueTone}`}>{value}</div>
         {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
       </div>

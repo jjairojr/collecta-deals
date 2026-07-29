@@ -1,8 +1,11 @@
 import { Fragment, useState } from "react";
+import EmptyState from "./EmptyState";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { StoreStat } from "../api";
 import { brl } from "../format";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Window } from "./ui/card";
+import { ToggleGroup } from "./ui/toggle-group";
 
 export default function StoreLeaderboard({
   stores,
@@ -16,36 +19,24 @@ export default function StoreLeaderboard({
   const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-base font-extrabold text-white">Top selling stores</h2>
-        <div className="inline-flex rounded-[8px] border-2 border-outline bg-surface p-0.5 text-xs">
-          <button
-            onClick={() => onSortChange("units")}
-            className={`rounded-[6px] px-3 py-1 font-bold transition-colors ${
-              sort === "units" ? "bg-sky-500/20 text-sky-200" : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Units
-          </button>
-          <button
-            onClick={() => onSortChange("revenue")}
-            className={`rounded-[6px] px-3 py-1 font-bold transition-colors ${
-              sort === "revenue"
-                ? "bg-sky-500/20 text-sky-200"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Revenue
-          </button>
-        </div>
-      </div>
+    <Window
+      className="sticker-sm"
+      title="Top selling stores"
+      actions={
+        <ToggleGroup
+          value={sort}
+          onChange={(v) => onSortChange(v === "revenue" ? "revenue" : "units")}
+          options={[
+            { value: "units", label: "Units" },
+            { value: "revenue", label: "Revenue" },
+          ]}
+        />
+      }
+    >
       {stores.length === 0 ? (
-        <div className="rounded-[14px] border-2 border-outline bg-surface px-4 py-10 text-center text-slate-400">
-          No sales inferred yet in this range.
-        </div>
+        <EmptyState bare>No sales inferred yet in this range.</EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-[14px] border-2 border-outline bg-surface">
+        <div className="overflow-x-auto">
           <Table className="min-w-[520px]">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -129,6 +120,6 @@ export default function StoreLeaderboard({
           </Table>
         </div>
       )}
-    </div>
+    </Window>
   );
 }

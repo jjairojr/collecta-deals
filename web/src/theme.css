@@ -1,0 +1,269 @@
+/* Collecta backoffice — dark arcade theme.
+
+   Layout language comes from the brand manual (web/manual-marca.pdf pp. 56–58):
+   retro system windows with a title bar, thick ink outlines, hard offset
+   shadows, pills, patterned fields. The manual draws those on a light field;
+   the dashboard runs them dark, which is what a tool you stare at all day
+   wants — and it matches the public storefront.
+
+   Palette is the storefront's: pink #f6559b, light pink #fdc4e5, royal #1355b3,
+   ink #0b0b0c. Type is Outfit (standing in for the manual's licensed Nohemi —
+   swap --font-display/--font-body and nothing else changes) plus Press Start 2P
+   for micro-labels only.
+
+   The storefront keeps its own theme in shared/arcade.css; the two apps share
+   the class vocabulary, not the tokens. */
+
+@theme {
+  /* ── Surfaces ─────────────────────────────────────────────────── */
+  --color-page: #17171b;
+  --color-panel: #24242a;
+  --color-raised: #2f2f36;
+  --color-outline: #000000;
+
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --color-fg: #ffffff;
+  --color-muted: #9a9aa2;
+  --color-faint: #82828b;
+  --color-on-soft: #8a3f68;
+
+  /* ── Brand ────────────────────────────────────────────────────────
+     `brand` is a fill. `brand-label` is the pink that reads as text on a dark
+     panel (#fdc4e5, 11:1) and carries every micro-label. On a light field
+     these two would swap — that is why the class is named for its job, not
+     for its lightness. */
+  --color-brand: #f6559b;
+  --color-brand-dark: #e23d85;
+  --color-brand-label: #fdc4e5;
+  --color-brand-soft: #fdc4e5;
+  --color-royal: #1355b3;
+  --color-royal-light: #2f74d8;
+
+  /* ── Data signals ─────────────────────────────────────────────── */
+  --color-gain: #34d399;
+  --color-loss: #fb7185;
+  --color-live: #fbbf24;
+
+  /* ── Type ─────────────────────────────────────────────────────── */
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-pixel: "Press Start 2P", ui-monospace, monospace;
+
+  /* ── Legacy ramps ─────────────────────────────────────────────────
+     The pages carry ~400 slate and accent utilities. Defining the ramps here
+     keeps them all on the arcade palette without touching every call site.
+     950 = page, 900 = panel, 400 = muted, 500 = faint. */
+  --color-slate-950: #17171b;
+  --color-slate-900: #24242a;
+  --color-slate-800: #2f2f36;
+  --color-slate-700: #3b3b44;
+  --color-slate-600: #55555f;
+  --color-slate-500: #82828b;
+  --color-slate-400: #9a9aa2;
+  --color-slate-300: #c8c8d0;
+  --color-slate-200: #e6e6ea;
+  --color-slate-100: #f5f5f7;
+  --color-slate-50: #ffffff;
+
+  --color-accent-200: #fdd3e9;
+  --color-accent-300: #fdc4e5;
+  --color-accent-400: #f877ac;
+  --color-accent-500: #f6559b;
+  --color-accent-600: #e23d85;
+  --color-accent-700: #c72f72;
+
+  /* The old build aliased four hues onto the accent; keep them unified. */
+  --color-sky-200: #fdd3e9;
+  --color-sky-300: #fdc4e5;
+  --color-sky-400: #f877ac;
+  --color-sky-500: #f6559b;
+  --color-sky-600: #e23d85;
+  --color-violet-200: #fdd3e9;
+  --color-violet-300: #fdc4e5;
+  --color-violet-400: #f877ac;
+  --color-violet-500: #f6559b;
+  --color-fuchsia-300: #fdc4e5;
+  --color-fuchsia-500: #f6559b;
+  --color-indigo-500: #f6559b;
+
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+}
+
+/* ── Type helpers ───────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.font-pixel {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* ── Arcade sticker surface ─────────────────────────────────────── */
+/* Thick ink border + hard offset shadow, no blur. Shadow size is set per
+   use via --sh (default 6px). */
+.sticker {
+  border: 3px solid var(--color-outline);
+  --sh: 6px;
+  box-shadow: var(--sh) var(--sh) 0 var(--color-outline);
+}
+.sticker-5 {
+  border-width: 5px;
+}
+.sticker-sm {
+  --sh: 4px;
+}
+
+/* Press-in interaction: slide toward the shadow and shrink it; flatten on
+   active. */
+.arcade-press {
+  transition:
+    transform 0.06s ease,
+    box-shadow 0.06s ease;
+}
+@media (hover: hover) {
+  .arcade-press:hover {
+    transform: translate(2px, 2px);
+    box-shadow: calc(var(--sh) - 2px) calc(var(--sh) - 2px) 0
+      var(--color-outline);
+  }
+}
+.arcade-press:active {
+  transform: translate(var(--sh), var(--sh));
+  box-shadow: 0 0 0 var(--color-outline);
+}
+
+/* ── Retro system window (manual pp. 56–58) ─────────────────────── */
+/* The dashboard's primary panel. `.win-bar` renders the three dots and the
+   minimize/close glyphs via pseudo-elements so markup stays a plain header. */
+.win {
+  border: 3px solid var(--color-outline);
+  border-radius: 12px;
+  background: var(--color-panel);
+  --sh: 6px;
+  box-shadow: var(--sh) var(--sh) 0 var(--color-outline);
+  overflow: hidden;
+}
+
+.win-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--color-raised);
+  border-bottom: 3px solid var(--color-outline);
+}
+/* Three dots, left. */
+.win-bar::before {
+  content: "";
+  flex: none;
+  width: 38px;
+  height: 10px;
+  background-image: radial-gradient(
+    circle 5px at 5px 5px,
+    var(--color-faint) 98%,
+    transparent 100%
+  );
+  background-size: 14px 10px;
+  background-repeat: repeat-x;
+}
+/* Close glyph, right: outlined box with an X. Decorative — the real controls
+   are buttons in the body, so it is not focusable and carries no label. */
+.win-bar::after {
+  content: "";
+  margin-left: auto;
+  flex: none;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--color-faint);
+  border-radius: 2px;
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 42%,
+      var(--color-faint) 42% 58%,
+      transparent 58%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 42%,
+      var(--color-faint) 42% 58%,
+      transparent 58%
+    );
+}
+/* When the bar holds its own controls, drop the decorative glyph cluster. */
+.win-bar-live::after {
+  content: none;
+}
+
+.win-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Pill (manual p. 57) ────────────────────────────────────────── */
+.pill {
+  border: 3px solid var(--color-outline);
+  border-radius: 999px;
+  --sh: 4px;
+  box-shadow: var(--sh) var(--sh) 0 var(--color-outline);
+}
+.pill-sm {
+  border-width: 2px;
+  --sh: 3px;
+}
+
+/* ── Focus is never removed ─────────────────────────────────────── */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-soft);
+  outline-offset: 2px;
+}
+
+/* ── Backgrounds ────────────────────────────────────────────────── */
+/* Faint graph paper under the page, so panels read as objects on a field. */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Placeholder card/box art. */
+.art-stripes-90 {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(11, 11, 12, 0.13) 0 12px,
+    transparent 12px 24px
+  );
+}
+.art-stripes-45 {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(11, 11, 12, 0.13) 0 12px,
+    transparent 12px 24px
+  );
+}
+
+/* ── Keyframes ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .arcade-press {
+    transition: none;
+  }
+}

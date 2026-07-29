@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import EmptyState from "./EmptyState";
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recharts";
 import { Boxes, Coins, Crown, Store } from "lucide-react";
 import { cardImageURL, getInventory, type ExpensiveCard, type InventorySummary, type StoreInventoryStat } from "../api";
@@ -45,7 +46,7 @@ function StoreTooltip({
         {
           label: "Units",
           value: d.units.toLocaleString("pt-BR"),
-          color: sort === "units" ? chartColors.sky : undefined,
+          color: sort === "units" ? chartColors.brand : undefined,
         },
       ]}
     />
@@ -69,7 +70,7 @@ function Kpi({
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="font-pixel text-[8px] uppercase text-brand-soft">{label}</div>
+        <div className="font-pixel text-[8px] uppercase text-brand-label">{label}</div>
         <div className="truncate text-lg font-semibold tabular-nums text-slate-100">{value}</div>
         {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
       </div>
@@ -83,7 +84,7 @@ function ChaseCard({ set, card }: { set: string; card: ExpensiveCard }) {
     <Card className="overflow-hidden p-0">
       <div className="relative">
         {failed ? (
-          <div className="flex aspect-[350/489] w-full items-center justify-center bg-slate-800 text-center">
+          <div className="flex art-stripes-90 aspect-[350/489] w-full items-center justify-center bg-brand-soft text-center">
             <span className="px-2 font-mono text-[11px] text-slate-500">{card.number}</span>
           </div>
         ) : (
@@ -92,7 +93,7 @@ function ChaseCard({ set, card }: { set: string; card: ExpensiveCard }) {
             alt={card.name}
             loading="lazy"
             onError={() => setFailed(true)}
-            className="aspect-[350/489] w-full bg-slate-800 object-cover"
+            className="aspect-[350/489] w-full bg-panel object-cover"
           />
         )}
         <div className="absolute right-2 top-2 rounded-[8px] border-2 border-outline bg-slate-950/85 px-2 py-1 text-sm font-bold tabular-nums text-emerald-300 backdrop-blur">
@@ -168,7 +169,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
     return null;
   }
 
-  const barColor = sort === "value" ? chartColors.emerald : chartColors.sky;
+  const barColor = sort === "value" ? chartColors.emerald : chartColors.brand;
   const chase = summary.expensive[0];
 
   return (
@@ -200,7 +201,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-display text-base font-extrabold text-white">Stores by holdings</h3>
+        <h3 className="font-display text-base font-extrabold text-fg">Stores by holdings</h3>
         <ToggleGroup
           value={sort}
           onChange={(v) => {
@@ -249,7 +250,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
         </Card>
       )}
 
-      <div className="overflow-x-auto rounded-[14px] border-2 border-outline bg-surface">
+      <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
         <Table className="min-w-[620px]">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -286,7 +287,7 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
       </div>
 
       <div>
-        <h3 className="mb-3 font-display text-base font-extrabold text-white">
+        <h3 className="mb-3 font-display text-base font-extrabold text-fg">
           Most expensive cards <span className="text-sm font-normal text-slate-500">& who holds them</span>
         </h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -301,8 +302,8 @@ export default function InventoryPanel({ set = "OP-16" }: { set?: string }) {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border-2 border-outline bg-surface px-4 py-10 text-center text-slate-400">
+    <EmptyState>
       {children}
-    </div>
+    </EmptyState>
   );
 }

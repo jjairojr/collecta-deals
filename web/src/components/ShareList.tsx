@@ -207,7 +207,7 @@ export default function ShareList({
     <Card className="space-y-4 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-sm font-bold text-white">Share list</h3>
+          <h3 className="font-display text-sm font-bold text-fg">Share list</h3>
           <p className="mt-0.5 text-xs text-slate-400">
             Pick cards, then Share to WhatsApp. Asking prices are a % of the live
             TCGplayer price, in US$ or R$ — edit any of them. Long lists split into
@@ -216,7 +216,7 @@ export default function ShareList({
         </div>
         <button
           onClick={onClose}
-          className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+          className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-raised hover:text-slate-100"
           title="Close"
         >
           <X className="h-3.5 w-3.5" />
@@ -243,7 +243,7 @@ export default function ShareList({
         )}
         {includeAsking && (
           <div className="flex items-center gap-2">
-            <span className="font-pixel text-[9px] uppercase text-brand-soft">
+            <span className="font-pixel text-[9px] uppercase text-brand-label">
               % of TCG
             </span>
             <ToggleGroup
@@ -258,10 +258,10 @@ export default function ShareList({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+      <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
-            <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+            <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
               <th className="px-3 py-2 font-bold">
                 <input
                   type="checkbox"
@@ -272,7 +272,7 @@ export default function ShareList({
                     if (el) el.indeterminate = !allSelected && someSelected;
                   }}
                   onChange={toggleAll}
-                  className="h-4 w-4 accent-accent-500"
+                  className="h-4 w-4 accent-brand"
                 />
               </th>
               <th className="px-3 py-2 font-bold">Card</th>
@@ -293,13 +293,13 @@ export default function ShareList({
               const paidUnit = t.costBRL / Math.max(t.qty, 1);
               const tcgInCurrency = marketInCurrency(t, currency, fxRate);
               return (
-                <tr key={t.id} className="border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40">
+                <tr key={t.id} className="border-b-2 border-outline/15 last:border-0 hover:bg-raised/70">
                   <td className="px-3 py-2">
                     <input
                       type="checkbox"
                       checked={row?.include ?? false}
                       onChange={(e) => setRow(t.id, { include: e.target.checked })}
-                      className="h-4 w-4 accent-accent-500"
+                      className="h-4 w-4 accent-brand"
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -377,7 +377,7 @@ export default function ShareList({
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="font-pixel text-[9px] uppercase text-brand-soft">
+          <span className="font-pixel text-[9px] uppercase text-brand-label">
             Preview
           </span>
           <ToggleGroup
@@ -387,7 +387,7 @@ export default function ShareList({
           />
         </div>
         {previewMode === "text" ? (
-          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-[14px] border-[3px] border-outline bg-ink p-3 text-xs text-slate-300">
+          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-[14px] border-[3px] border-outline bg-page p-3 text-xs text-slate-300">
             {preview || "Select at least one card to build your list."}
           </pre>
         ) : (
@@ -571,14 +571,15 @@ const SCALE = 2;
 // WhatsApp compresses into a blur.
 const PAGE_SIZE = 20;
 
-const C_BG = "#0f0f12";
-const C_TITLE = "#f4f4f7";
-const C_CELL = "#1c1c21";
+const C_BG = "#141416";
+const C_TITLE = "#ffffff";
+const C_CELL = "#1f1f22";
 const C_NAME = "#e6e6ec";
-const C_META = "#9c9ca7";
-const C_ASK = "#8c86ff";
-const C_PAID = "#7a7a85";
-const C_MUTED = "#7a7a85";
+const C_META = "#9a9aa2";
+const C_ASK = "#fdc4e5";
+const C_PAID = "#6f6f77";
+const C_MUTED = "#6f6f77";
+const C_OUTLINE = "#0b0b0c";
 
 interface Layout {
   cols: number;
@@ -715,6 +716,9 @@ function drawCell(
     ctx.fillText(t.number, x + IMG_W / 2, y + IMG_H / 2 - 6);
     ctx.textAlign = "left";
   }
+  ctx.strokeStyle = C_OUTLINE;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, IMG_W - 2, IMG_H - 2);
 
   const cy = y + IMG_H + 8;
   ctx.textAlign = "left";
@@ -898,14 +902,14 @@ function ImagePreview({
 
   if (selected.length === 0) {
     return (
-      <div className="rounded-[14px] border-[3px] border-outline bg-ink p-6 text-center text-xs text-slate-500">
+      <div className="rounded-[14px] border-[3px] border-outline bg-page p-6 text-center text-xs text-slate-500">
         Select at least one card to build your list.
       </div>
     );
   }
 
   return (
-    <div className="max-h-[36rem] space-y-4 overflow-auto rounded-[14px] border-[3px] border-outline bg-ink p-3">
+    <div className="max-h-[36rem] space-y-4 overflow-auto rounded-[14px] border-[3px] border-outline bg-page p-3">
       {pages.map((_, p) => (
         <div key={p} className="space-y-1.5">
           {pages.length > 1 && (
@@ -968,10 +972,10 @@ function SummaryStat({
         ? "text-rose-400"
         : tone === "muted"
           ? "text-slate-300"
-          : "text-accent-300";
+          : "text-brand-label";
   return (
     <div className="flex items-baseline gap-2">
-      <span className="font-pixel text-[9px] uppercase text-brand-soft">{label}</span>
+      <span className="font-pixel text-[9px] uppercase text-brand-label">{label}</span>
       <span className={`font-semibold tabular-nums ${color}`}>{value}</span>
     </div>
   );
@@ -991,8 +995,8 @@ function Toggle({
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-[8px] border-2 px-3 py-1.5 text-xs font-bold transition-colors ${
         on
-          ? "border-outline bg-brand/20 text-brand-soft"
-          : "border-outline bg-surface text-slate-400 hover:bg-slate-800"
+          ? "border-outline bg-brand/20 text-brand-label"
+          : "border-outline bg-panel text-slate-400 hover:bg-raised"
       }`}
     >
       <span

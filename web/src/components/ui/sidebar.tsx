@@ -80,7 +80,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
   return (
     <SidebarContext.Provider value={value}>
-      <div className="min-h-screen bg-slate-950">{children}</div>
+      <div className="min-h-screen bg-page">{children}</div>
     </SidebarContext.Provider>
   );
 }
@@ -93,13 +93,13 @@ export function Sidebar({ className, children }: { className?: string; children:
         onClick={() => setMobileOpen(false)}
         aria-hidden
         className={cn(
-          "fixed inset-0 z-40 bg-black/70 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
+          "fixed inset-0 z-40 bg-outline/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r-4 border-outline bg-surface",
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r-4 border-outline bg-panel",
           "transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
           collapsed ? COLLAPSED : EXPANDED,
           mobileOpen ? "translate-x-0" : "-translate-x-full",
@@ -142,7 +142,7 @@ export function SidebarContent({ className, ...props }: HTMLAttributes<HTMLDivEl
 }
 
 export function SidebarFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mt-auto flex flex-col gap-2 border-t-4 border-outline p-3", className)} {...props} />;
+  return <div className={cn("mt-auto flex flex-col gap-2 border-t-[3px] border-outline p-3", className)} {...props} />;
 }
 
 export function SidebarGroup({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -154,7 +154,7 @@ export function SidebarGroupLabel({ className, children }: { className?: string;
   return (
     <span
       className={cn(
-        "font-pixel px-3 pb-1.5 text-[9px] uppercase tracking-normal text-brand-soft transition-opacity duration-200",
+        "font-pixel px-3 pb-1.5 text-[9px] uppercase tracking-normal text-brand-label transition-opacity duration-200",
         collapsed ? "pointer-events-none h-0 select-none overflow-hidden pb-0 opacity-0 lg:h-0" : "opacity-100",
         className,
       )}
@@ -178,10 +178,10 @@ export function SidebarNavItem({ icon: IconCmp, label, active, badge, className,
       type="button"
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group/item relative flex h-10 items-center gap-3 rounded-[8px] border-2 px-3 text-sm font-medium outline-none transition-colors",
+        "group/item relative flex h-10 items-center gap-3 rounded-full border-2 px-3 text-sm font-semibold outline-none transition-colors",
         active
-          ? "border-outline bg-brand text-white"
-          : "border-transparent text-slate-400 hover:bg-slate-800/70 hover:text-white",
+          ? "border-outline bg-brand text-white shadow-[3px_3px_0_var(--color-outline)]"
+          : "border-transparent text-slate-400 hover:border-outline hover:bg-raised",
         collapsed && "lg:justify-center lg:px-0",
         className,
       )}
@@ -190,13 +190,13 @@ export function SidebarNavItem({ icon: IconCmp, label, active, badge, className,
       <IconCmp
         className={cn(
           "h-[18px] w-[18px] shrink-0 transition-colors",
-          active ? "text-white" : "text-slate-500 group-hover/item:text-slate-200",
+          active ? "text-fg" : "text-slate-500 group-hover/item:text-fg",
         )}
       />
       <span className={cn("flex-1 truncate text-left", collapsed && "lg:hidden")}>{label}</span>
       {badge !== undefined && badge !== null && <span className={cn(collapsed && "lg:hidden")}>{badge}</span>}
       {collapsed && (
-        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-medium text-white opacity-0 shadow-[3px_3px_0_#0b0b0c] transition-opacity duration-150 group-hover/item:opacity-100 lg:block lg:group-hover/item:opacity-100">
+        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-[8px] border-2 border-outline bg-raised px-2 py-1 text-xs font-medium text-white opacity-0 sticker sticker-sm transition-opacity duration-150 group-hover/item:opacity-100 lg:block lg:group-hover/item:opacity-100">
           {label}
         </span>
       )}
@@ -212,7 +212,7 @@ export function SidebarTrigger({ className }: { className?: string }) {
       onClick={toggleCollapsed}
       aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       className={cn(
-        "hidden h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-800/70 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/50 lg:flex",
+        "font-pixel hidden h-9 items-center gap-2 rounded-full border-2 border-transparent px-3 text-[9px] uppercase text-slate-400 transition-colors hover:border-outline hover:bg-raised hover:text-fg lg:flex",
         collapsed && "justify-center px-0",
         className,
       )}
@@ -231,7 +231,7 @@ export function SidebarMobileTrigger({ className }: { className?: string }) {
       onClick={() => setMobileOpen(true)}
       aria-label="Open navigation"
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-[8px] border-2 border-outline bg-surface text-slate-300 transition-colors hover:bg-slate-800 hover:text-white lg:hidden",
+        "pill pill-sm arcade-press inline-flex h-9 w-9 items-center justify-center bg-panel text-fg transition-colors hover:bg-raised lg:hidden",
         className,
       )}
     >

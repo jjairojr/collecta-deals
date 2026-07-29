@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import EmptyState from "./EmptyState";
 import { Check } from "lucide-react";
 import { cardImageURL, getCards, type TrackCard } from "../api";
 import { brl } from "../format";
@@ -60,7 +61,6 @@ export default function BrowsePage() {
   return (
     <div className="space-y-4 pb-24">
       <div>
-        <h1 className="font-display text-lg font-extrabold text-white">Browse cards</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Tap cards you want to buy, then export a flyer image and copy the message from the bar
           below to post in your WhatsApp group.
@@ -84,7 +84,7 @@ export default function BrowsePage() {
       </Card>
 
       {error && (
-        <Card className="px-4 py-10 text-center text-slate-400">Could not load: {error}</Card>
+        <EmptyState>Could not load: {error}</EmptyState>
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
@@ -95,7 +95,7 @@ export default function BrowsePage() {
               key={c.number}
               onClick={() => toggle({ set, number: c.number, name: c.name, priceBRL: c.lowBRL })}
               title={c.name}
-              className={`group relative overflow-hidden rounded-[12px] border-2 bg-surface text-left transition ${
+              className={`group relative overflow-hidden rounded-[12px] border-2 bg-panel text-left transition ${
                 picked
                   ? "border-emerald-400 ring-2 ring-emerald-400/40"
                   : "border-outline hover:border-brand"
@@ -105,13 +105,13 @@ export default function BrowsePage() {
                 src={cardImageURL(set, c.number)}
                 alt={c.name}
                 loading="lazy"
-                className="aspect-[350/489] w-full bg-slate-800 object-cover"
+                className="aspect-[350/489] w-full bg-panel object-cover"
               />
               <span
                 className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-[6px] border-2 ${
                   picked
                     ? "border-emerald-400 bg-emerald-400 text-slate-950"
-                    : "border-outline bg-ink text-transparent group-hover:text-slate-500"
+                    : "border-outline bg-page text-transparent group-hover:text-slate-500"
                 }`}
               >
                 <Check className="h-3 w-3" strokeWidth={3} />

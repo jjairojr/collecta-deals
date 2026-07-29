@@ -3,20 +3,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "arcade-press sticker bg-surface text-white",
-        primary: "arcade-press sticker bg-brand text-white",
-        accent: "arcade-press sticker bg-brand text-white",
-        ghost: "text-slate-400 hover:bg-slate-800/60 hover:text-white",
-        outline: "arcade-press sticker bg-transparent text-white",
-        link: "text-brand underline-offset-4 hover:underline",
+        default: "arcade-press pill bg-panel text-fg hover:bg-raised",
+        primary: "arcade-press pill bg-brand text-white",
+        accent: "arcade-press pill bg-brand text-white",
+        royal: "arcade-press pill bg-royal text-white",
+        ghost: "text-slate-400 hover:bg-raised hover:text-fg",
+        outline: "arcade-press pill bg-transparent text-fg hover:bg-raised",
+        link: "text-brand-label underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-[8px] px-3 text-xs",
+        sm: "h-8 px-3.5 text-xs",
         lg: "h-10 px-5",
         icon: "h-9 w-9",
       },

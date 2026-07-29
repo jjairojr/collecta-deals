@@ -47,11 +47,11 @@ function BuyoutCard({
           name={cand.name}
           className="aspect-[350/489] w-full"
         />
-        <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] border-2 border-outline bg-ink">
+        <label className="absolute left-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] border-2 border-outline bg-page">
           <Checkbox accent="emerald" checked={picked} onChange={onToggle} />
         </label>
         <div
-          className={`absolute right-2 top-2 flex items-center gap-1 rounded-[8px] border-2 border-outline bg-ink px-2 py-1 text-sm font-bold tabular-nums ${tier.text}`}
+          className={`absolute right-2 top-2 flex items-center gap-1 rounded-[8px] border-2 border-outline bg-page px-2 py-1 text-sm font-bold tabular-nums ${tier.text}`}
         >
           <TrendingUp className="h-3.5 w-3.5" />+{Math.round(cand.liftPct)}%
         </div>
@@ -89,7 +89,7 @@ function BuyoutCard({
           </div>
         </div>
 
-        <div className="rounded-[8px] border-2 border-outline bg-surface px-2.5 py-2 text-xs text-slate-400">
+        <div className="rounded-[8px] border-2 border-outline bg-panel px-2.5 py-2 text-xs text-slate-400">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <Package className="h-3.5 w-3.5" />

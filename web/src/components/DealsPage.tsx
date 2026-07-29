@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import EmptyState from "./EmptyState";
 import { LayoutGrid, List, Search, X } from "lucide-react";
 import {
   getDeals,
@@ -147,14 +148,14 @@ export default function DealsPage({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={`Search any card by name or number — e.g. ${searchHints[game] ?? searchHints.onepiece}`}
-          className="h-12 rounded-xl pl-11 pr-10 text-base [&::-webkit-search-cancel-button]:hidden"
+          className="h-12 rounded-[12px] pl-11 pr-10 text-base [&::-webkit-search-cancel-button]:hidden"
         />
         {query && (
           <button
             type="button"
             onClick={() => setQuery("")}
             aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-200"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-500 transition-colors hover:bg-raised hover:text-slate-200"
           >
             <X className="h-4 w-4" />
           </button>
@@ -250,8 +251,8 @@ function Filters({
                 onClick={() => onChange({ ...filters, minMargin: p })}
                 className={`rounded-[8px] border-2 border-outline px-2 py-1.5 text-xs font-bold transition-colors ${
                   filters.minMargin === p
-                    ? "bg-brand/20 text-brand-soft"
-                    : "bg-surface text-slate-400 hover:text-slate-200"
+                    ? "bg-brand/20 text-brand-label"
+                    : "bg-panel text-slate-400 hover:text-slate-200"
                 }`}
               >
                 {p}%
@@ -316,7 +317,7 @@ function Filters({
           type="checkbox"
           checked={filters.spOnly}
           onChange={(e) => onChange({ ...filters, spOnly: e.target.checked })}
-          className="h-4 w-4 cursor-pointer accent-accent-500"
+          className="h-4 w-4 cursor-pointer accent-brand"
         />
         SP only
         <span className="text-slate-500">(special parallel art)</span>
@@ -392,12 +393,12 @@ function Results({
         </span>
         <div className="flex items-center gap-3">
           {loading && <span className="text-xs text-slate-500">updating…</span>}
-          <div className="inline-flex rounded-[8px] border-2 border-outline bg-surface p-0.5">
+          <div className="inline-flex rounded-[8px] border-2 border-outline bg-panel p-0.5">
             <button
               onClick={() => setLayout("grid")}
               aria-label="Grid view"
               className={`rounded-[6px] p-1.5 transition-colors ${
-                layout === "grid" ? "bg-brand/20 text-brand-soft" : "text-slate-400 hover:text-slate-200"
+                layout === "grid" ? "bg-brand/20 text-brand-label" : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -406,7 +407,7 @@ function Results({
               onClick={() => setLayout("table")}
               aria-label="Table view"
               className={`rounded-[6px] p-1.5 transition-colors ${
-                layout === "table" ? "bg-brand/20 text-brand-soft" : "text-slate-400 hover:text-slate-200"
+                layout === "table" ? "bg-brand/20 text-brand-label" : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <List className="h-4 w-4" />
@@ -440,5 +441,5 @@ function FirstRun({ refreshing }: { refreshing: boolean }) {
 }
 
 function Panel({ children }: { children: ReactNode }) {
-  return <Card className="px-4 py-10 text-center text-slate-400">{children}</Card>;
+  return <EmptyState>{children}</EmptyState>;
 }

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import EmptyState from "./EmptyState";
 import { Banknote, ChevronDown, Coins, PiggyBank, TrendingUp, Wallet } from "lucide-react";
 import { getAllPortfolio, type AllPortfolioResponse, type PortfolioSummary } from "../api";
 import { brl0 } from "../format";
@@ -51,7 +52,6 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-lg font-extrabold text-white">All Portfolios</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Every game's holdings and sales combined in reais. Click a game to open its portfolio.
           Accessories belong to no game, so they are counted once in their own row.
@@ -72,10 +72,10 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
         <PnlKpi icon={<TrendingUp className="h-5 w-5" />} label="Total P&L" value={total.totalPnLBRL} strong />
       </div>
 
-      <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+      <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
-            <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+            <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
               <th className="px-3 py-2 font-bold">Game</th>
               <th className="px-3 py-2 text-right font-bold">Holding</th>
               <th className="px-3 py-2 text-right font-bold">Total invested</th>
@@ -93,7 +93,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                 <Fragment key={row.id}>
                   <tr
                     onClick={game ? () => onOpenGame(game) : undefined}
-                    className={`border-b-2 border-outline/40 transition-colors hover:bg-slate-800/40 ${game ? "cursor-pointer" : ""}`}
+                    className={`border-b-2 border-outline/15 transition-colors hover:bg-raised/70 ${game ? "cursor-pointer" : ""}`}
                   >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                     <PnlCell value={row.summary.totalPnLBRL} strong />
                   </tr>
                   {open && (
-                    <tr className="border-b-2 border-outline/40 bg-slate-950/40">
+                    <tr className="border-b-2 border-outline/15 bg-slate-950/40">
                       <td colSpan={7} className="px-3 py-4">
                         <GameDetails summary={row.summary} />
                       </td>
@@ -161,7 +161,7 @@ function GameDetails({ summary }: { summary: PortfolioSummary }) {
 
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-[10px] border-2 border-outline bg-surface px-3 py-2">
+    <div className="rounded-[10px] border-2 border-outline bg-panel px-3 py-2">
       <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-0.5 font-semibold tabular-nums text-slate-100">{value}</div>
       {hint && <div className="text-[10px] text-slate-500">{hint}</div>}
@@ -172,7 +172,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
 function PnlMetric({ label, value }: { label: string; value: number }) {
   const up = value >= 0;
   return (
-    <div className="rounded-[10px] border-2 border-outline bg-surface px-3 py-2">
+    <div className="rounded-[10px] border-2 border-outline bg-panel px-3 py-2">
       <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
       <div className={`mt-0.5 font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
         {up ? "+" : "−"}
@@ -194,8 +194,8 @@ function PnlCell({ value, strong }: { value: number; strong?: boolean }) {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
+    <EmptyState>
       {children}
-    </div>
+    </EmptyState>
   );
 }

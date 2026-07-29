@@ -36,7 +36,7 @@ function TabsList({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     <div
       role="tablist"
       className={cn(
-        "inline-flex items-center gap-1 rounded-[10px] border-[3px] border-outline bg-outline p-1",
+        "pill inline-flex items-center gap-1 bg-raised p-1",
         className,
       )}
       {...props}
@@ -57,8 +57,10 @@ function TabsTrigger({ value, className, children, ...props }: TabsTriggerProps)
       aria-selected={active}
       onClick={() => ctx.onValueChange(value)}
       className={cn(
-        "rounded-[7px] px-3.5 py-1.5 text-sm font-bold transition-colors",
-        active ? "bg-brand text-white" : "text-slate-400 hover:text-white",
+        "rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors",
+        active
+          ? "border-2 border-outline bg-brand text-white"
+          : "border-2 border-transparent text-slate-400 hover:text-fg",
         className,
       )}
       {...props}

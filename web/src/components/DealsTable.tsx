@@ -41,7 +41,7 @@ export default function DealsTable({ deals, showDepth = true }: { deals: Deal[];
     backfill(deals.map(dealSelection).filter((c): c is NonNullable<typeof c> => c !== null));
   }, [deals, backfill]);
   return (
-    <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+    <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
       <Table className="min-w-[1040px]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">

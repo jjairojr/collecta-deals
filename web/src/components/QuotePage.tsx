@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import EmptyState from "./EmptyState";
 import { ArrowLeft, Check, Copy, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
 import {
   createQuote,
@@ -131,7 +132,6 @@ export default function QuotePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-lg font-extrabold text-white">Orçamentos</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Monte orçamentos de compra de coleções: pesquise as cartas, ajuste quantidades e
             preços, aplique o deságio e copie a oferta pronta pro WhatsApp.
@@ -165,10 +165,10 @@ export default function QuotePage() {
       ) : quotes.length === 0 ? (
         <Panel>Nenhum orçamento salvo. Clique em “Novo orçamento” pra montar o primeiro.</Panel>
       ) : (
-        <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+        <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+              <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
                 <th className="w-full px-3 py-2 font-bold">Orçamento</th>
                 <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Cartas</th>
                 <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Mercado</th>
@@ -182,7 +182,7 @@ export default function QuotePage() {
                 const total = quoteTotal(q.items);
                 const units = q.items.reduce((sum, it) => sum + it.qty, 0);
                 return (
-                  <tr key={q.id} className="border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40">
+                  <tr key={q.id} className="border-b-2 border-outline/15 last:border-0 hover:bg-raised/70">
                     <td className="w-full max-w-0 px-3 py-2">
                       <button
                         onClick={() => setEditing(q)}
@@ -212,7 +212,7 @@ export default function QuotePage() {
                               deleteQuote(q.id).then(load);
                             }
                           }}
-                          className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+                          className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
                           title="Excluir"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -412,10 +412,10 @@ function QuoteEditor({
       {items.length === 0 ? (
         <Panel>Pesquise uma carta acima pra começar o orçamento.</Panel>
       ) : (
-        <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+        <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+              <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
                 <th className="w-full px-3 py-2 font-bold">Carta</th>
                 <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Qtd</th>
                 <th className="whitespace-nowrap px-3 py-2 text-right font-bold">Liga R$</th>
@@ -429,7 +429,7 @@ function QuoteEditor({
             </thead>
             <tbody>
               {items.map((it, idx) => (
-                <tr key={`${it.number}-${it.name}`} className="border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40">
+                <tr key={`${it.number}-${it.name}`} className="border-b-2 border-outline/15 last:border-0 hover:bg-raised/70">
                   <td className="w-full max-w-0 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <CardArt set={it.set} number={it.number} name={it.name} productID={it.productID} className="h-12 w-[34px] shrink-0 rounded" />
@@ -522,7 +522,7 @@ function QuoteEditor({
                       ) : null}
                       <button
                         onClick={() => removeItem(idx)}
-                        className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+                        className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
                         title="Remover"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -606,7 +606,7 @@ function CardSearch({
         />
       </Field>
       {matches.length > 0 && (
-        <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
+        <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto sticker sticker-sm rounded-[10px] bg-panel">
           {matches.map((m) => (
             <li key={`${m.number}-${m.name}`}>
               <button
@@ -616,7 +616,7 @@ function CardSearch({
                   setQuery("");
                   setMatches([]);
                 }}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-800"
+                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-raised"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <CardArt
@@ -662,8 +662,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
+    <EmptyState>
       {children}
-    </div>
+    </EmptyState>
   );
 }

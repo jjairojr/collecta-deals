@@ -86,7 +86,7 @@ export const brands: Record<string, Brand> = {
   onepiece: {
     title: (
       <>
-        OP<span className="text-accent-400">Deals</span>
+        OP<span className="text-brand-label">Deals</span>
       </>
     ),
     short: "OP",
@@ -96,7 +96,7 @@ export const brands: Record<string, Brand> = {
   pokemon: {
     title: (
       <>
-        PKM<span className="text-accent-400">Tracker</span>
+        PKM<span className="text-brand-label">Tracker</span>
       </>
     ),
     short: "PKM",
@@ -106,7 +106,7 @@ export const brands: Record<string, Brand> = {
   riftbound: {
     title: (
       <>
-        RB<span className="text-accent-400">Deals</span>
+        RB<span className="text-brand-label">Deals</span>
       </>
     ),
     short: "RB",
@@ -116,7 +116,7 @@ export const brands: Record<string, Brand> = {
   lorcana: {
     title: (
       <>
-        LOR<span className="text-accent-400">Deals</span>
+        LOR<span className="text-brand-label">Deals</span>
       </>
     ),
     short: "LOR",
@@ -126,7 +126,7 @@ export const brands: Record<string, Brand> = {
   gundam: {
     title: (
       <>
-        GND<span className="text-accent-400">Deals</span>
+        GND<span className="text-brand-label">Deals</span>
       </>
     ),
     short: "GND",

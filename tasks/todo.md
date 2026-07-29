@@ -763,3 +763,96 @@ Antes: um acessório era gravado no ledger do jogo que estivesse selecionado
 ## Pendente
 - `data/accessories.json` é **prod-owned**: sync-down/seed-prod e RAILWAY.md já cobrem,
   mas o prod só passa a ter o arquivo depois do próximo deploy do binário.
+
+---
+
+# Redesign do backoffice/dashboard — manual da marca (2026-07-28)
+
+Plano: `~/.claude/plans/snug-wobbling-orbit.md`.
+Base: `web/manual-marca.pdf` (74p; a linguagem de layout está nas p.56–58) +
+o handoff da vitrine. Supera o brief antigo em `tasks/dashboard-redesign-prompt.md`,
+que é anterior ao manual.
+
+Decisões do usuário: **Outfit** no lugar da Nohemi (que não está no Google Fonts) ·
+tema **claro** como o manual · **paleta da vitrine mantida** (#F6559B / #FDC4E5 /
+#1355B3 / #0b0b0c; a paleta nova do manual — indigo/laranja/roxo — fica de fora) ·
+janelas retrô "forte com moderação".
+
+## O que mudou
+
+- **`web/src/theme.css` (novo)** — tokens claros (`page` #e8e8e8, `panel` #fff,
+  `cream` #efe8d6, `ink` #1b1b1b), helpers `.win` / `.win-bar` / `.pill` /
+  `.bg-grid`, sticker e keyframes. O dashboard **parou de importar
+  `shared/arcade.css`**: a vitrine continua dark e Baloo, os dois apps agora
+  compartilham o vocabulário de classes, não os tokens.
+- **Rampa `slate-*` invertida** dentro do `@theme`. É a alavanca do redesign:
+  vira ~400 utilitários herdados do build escuro de uma vez, sem tocar nas 10.000
+  linhas de página. `slate-900` é creme (não branco) de propósito — quase todo uso
+  é em alpha baixo para linhas expandidas, e branco-sobre-branco sumiria.
+- **`--color-brand-deep` #a3305f** para texto. O pink da marca dá 2.9:1 no branco
+  e reprova AA abaixo de 24px, então virou exclusivamente preenchimento; os 54
+  micro-labels passaram para o pink escuro (6.4:1).
+- **Sinais escurecidos** para fundo claro: ganho #0d7a4e · perda #b81d2b ·
+  live #a15c00. A perda começou em #c2264a e foi trocada porque lia como acento
+  rosa, não como aviso.
+- **Primitivos**: `Card` virou `.win`; novo `Window` com barra de título (três
+  bolinhas + ✕ desenhados em pseudo-elemento); botões e toggles viraram pílulas;
+  cabeçalho de tabela virou faixa creme com `font-pixel`; tooltip de gráfico virou
+  mini-janela; `chartColors.sky` (que era pink) virou `.brand`.
+- **Shell**: sidebar creme com item ativo em pílula pink, topbar branca, `.bg-grid`
+  no fundo, e os **6 `<h1>` duplicados** removidos (cada página repetia o título
+  que o `PageHeader` do shell já renderiza).
+- **`EmptyState` novo** com o mascote — substituiu 11 painéis vazios repetidos.
+- **Export do ShareList**: a paleta do canvas foi para creme/branco/ink/pink e cada
+  carta ganhou contorno ink. `C_ASK` era `#8c86ff`, o último indigo fora de marca.
+
+Adoção (antes → depois): `sticker` 11 → 53 · `font-pixel` 23 → 33 · `pill` 0 → 12 ·
+`win-bar` 0 → 5 · `shadow-xl`/`bg-black`/`text-faint` → 0.
+
+## Verificação
+
+- `npm run build` (tsc + vite) limpo.
+- Captura de tela no Vite (:5174) de Deals, Browse, Tracking, Sealed, Portfolio,
+  All Games, Estoque, Orçamento e Buyout, mais o modal de imagem do Estoque.
+- `git diff shared storefront` vazio — a vitrine não foi tocada.
+- **Não verificado visualmente:** o PNG exportado do ShareList (conferir exige
+  disparar um download). É troca de constantes + um `strokeRect`; vale olhar um
+  export antes de mandar para cliente.
+
+## Pendente
+
+- **Nohemi**: hoje é Outfit. Com os arquivos licenciados, é trocar
+  `--font-display`/`--font-body` em `theme.css` e o import em `main.tsx`.
+- **Rebuild do container** `:8080` (`docker compose up -d --build opdeals`) —
+  não mexi nele; a revisão toda rodou no Vite.
+- **Mascote**: `web/src/assets/mascot.png` veio do handoff e carrega fundo
+  padronado (o README do handoff já avisava). Vale pedir o PNG transparente.
+
+## Correção: de volta pro escuro (mesma sessão)
+
+O tema claro foi testado e rejeitado — "o fundo escuro realmente é melhor". Como
+o redesign foi feito na camada de tokens, a volta custou só isso:
+
+- **Três renomes** antes de virar a chave, porque os nomes iam passar a mentir no
+  escuro: `text-ink` → `text-fg` (37) · `text-brand-deep` → `text-brand-label` (54)
+  · `bg-cream` → `bg-raised` (47). Agora as classes descrevem a **função**, não a
+  claridade — é o que torna a paleta trocável sem tocar em componente.
+- **`theme.css`** com valores escuros, `chart.tsx` e a paleta de canvas do
+  ShareList junto.
+
+**O ajuste que importa:** com a página em #141416 e o contorno em #0b0b0c (os
+valores da vitrine), a borda grossa e a sombra dura **somem** — cada painel virava
+um borrão escuro e a linguagem sticker se perdia. Então os degraus do dashboard
+ficaram um passo mais claros que os da vitrine, e o contorno virou preto puro:
+página #17171b · painel #24242a · raised #2f2f36 · outline #000. Aí os três níveis
+(painel > borda/sombra < página) voltam a ler. **Não "alinhar" isso de volta com a
+vitrine** — é proposital.
+
+`--color-faint`/`slate-500` também subiu para #82828b, para AA no texto miúdo.
+
+Tudo que era estrutura ficou: janelas com barra de título, pílulas, `EmptyState`
+com mascote, títulos dedupados, faixa de cabeçalho nas tabelas, tooltip de gráfico
+como mini-janela, Outfit.
+
+Verificado de novo: build limpo + Deals, Portfolio, All Games, Estoque e o modal
+de imagem. A vitrine continua intocada.

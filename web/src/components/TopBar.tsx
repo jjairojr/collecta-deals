@@ -8,12 +8,12 @@ import SnapshotIndicator from "./SnapshotIndicator";
 
 function StatPill({ label, value, sub, live }: { label: string; value: string; sub?: string; live?: boolean }) {
   return (
-    <div className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5">
+    <div className="pill pill-sm flex items-center gap-2 bg-panel px-3 py-1.5">
       {live !== undefined && (
-        <span className={`h-1.5 w-1.5 rounded-full ${live ? "animate-pulse bg-amber-400" : "bg-emerald-400"}`} />
+        <span className={`h-2 w-2 rounded-full border border-outline ${live ? "animate-pulse bg-amber-400" : "bg-emerald-400"}`} />
       )}
-      <span className="font-pixel text-[8px] uppercase text-brand-soft">{label}</span>
-      <span className="text-sm font-semibold tabular-nums text-white">{value}</span>
+      <span className="font-pixel text-[8px] uppercase text-brand-label">{label}</span>
+      <span className="text-sm font-bold tabular-nums text-fg">{value}</span>
       {sub && <span className="text-[10px] text-slate-500">{sub}</span>}
     </div>
   );
@@ -35,13 +35,13 @@ export default function TopBar({
   const BrandIcon = brand.icon;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b-4 border-outline bg-ink px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b-4 border-outline bg-page px-4 sm:px-6">
       <SidebarMobileTrigger />
       <div className="flex items-center gap-2 lg:hidden">
-        <div className="flex h-8 w-8 items-center justify-center rounded-[8px] border-2 border-outline bg-royal">
+        <div className="sticker sticker-sm flex h-8 w-8 items-center justify-center rounded-[8px] bg-royal">
           <BrandIcon className="h-4 w-4 text-white" />
         </div>
-        <span className="font-display text-sm font-extrabold tracking-tight text-white">{brand.title}</span>
+        <span className="font-display text-sm font-extrabold text-fg">{brand.title}</span>
       </div>
 
       <div className="ml-auto flex items-center gap-2">

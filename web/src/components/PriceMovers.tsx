@@ -72,20 +72,20 @@ export default function PriceMovers({
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-brand">
+        <span className="text-brand-label">
           <TrendingUp className="h-4 w-4" />
         </span>
-        <h2 className="font-display text-base font-extrabold text-white">Biggest price movers</h2>
+        <h2 className="font-display text-base font-extrabold text-fg">Biggest price movers</h2>
         <span className="text-xs text-slate-500">
           · {prevDate ? `floor change vs ${stampLabel(prevDate)}` : "floor-price changes"}
         </span>
       </div>
       {!loaded ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-4 py-10 text-center text-sm text-slate-500">
+        <div className="sticker sticker-sm rounded-[12px] bg-panel px-4 py-10 text-center text-sm text-slate-500">
           Loading price moves…
         </div>
       ) : movers.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/30 px-4 py-8 text-center text-sm text-slate-500">
+        <div className="sticker sticker-sm rounded-[12px] bg-panel px-4 py-8 text-center text-sm text-slate-500">
           No price moves in this range — floors were flat.
         </div>
       ) : (

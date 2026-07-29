@@ -28,10 +28,10 @@ export default function SalesSection({
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-brand">
+          <span className="text-brand-label">
             <ShoppingBag className="h-4 w-4" />
           </span>
-          <h2 className="font-display text-base font-extrabold text-white">What's selling</h2>
+          <h2 className="font-display text-base font-extrabold text-fg">What's selling</h2>
           <span className="text-xs text-slate-500">
             · {view === "totals" ? "top sellers in range, by revenue" : "cards sold per snapshot"}
           </span>
@@ -47,7 +47,7 @@ export default function SalesSection({
       </div>
 
       {!loaded ? (
-        <div className="rounded-[14px] border-2 border-outline bg-slate-900/30 px-4 py-10 text-center text-sm text-slate-500">
+        <div className="sticker sticker-sm rounded-[12px] bg-panel px-4 py-10 text-center text-sm text-slate-500">
           Loading sales…
         </div>
       ) : view === "totals" ? (
@@ -69,7 +69,7 @@ export default function SalesSection({
 
 function Empty() {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-[14px] border-2 border-dashed border-outline bg-slate-900/30 py-12 text-center">
+    <div className="flex flex-col items-center gap-2 sticker sticker-sm rounded-[12px] bg-raised py-12 text-center">
       <p className="font-medium text-slate-300">No sales in this range yet</p>
       <p className="max-w-md text-sm text-slate-500">
         Sales are inferred from day-over-day per-store stock drops — they appear once there are at

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import EmptyState from "./EmptyState";
 import {
   ArrowDown,
   ArrowUp,
@@ -395,7 +396,6 @@ export default function StockPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-lg font-extrabold text-white">Estoque</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           Defina o preço de venda (R$) e marque o que deve aparecer na vitrine pública.
           Uma carta só entra na vitrine quando está <strong className="text-slate-300">à venda</strong> e tem preço.
@@ -409,21 +409,21 @@ export default function StockPage() {
             <Store className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-soft">Na vitrine</div>
-            <div className="truncate text-xl font-bold tabular-nums text-white">{stats.onSale}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-label">Na vitrine</div>
+            <div className="truncate text-xl font-bold tabular-nums text-fg">{stats.onSale}</div>
             <div className="truncate text-[11px] text-slate-500">de {holdings.length} em estoque</div>
           </div>
         </Card>
         <Card className="flex items-center gap-3 p-4">
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-soft">Valor pedido</div>
-            <div className="truncate text-xl font-bold tabular-nums text-white">{brl0(stats.value)}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-label">Valor pedido</div>
+            <div className="truncate text-xl font-bold tabular-nums text-fg">{brl0(stats.value)}</div>
             <div className="truncate text-[11px] text-slate-500">soma dos preços × qtd</div>
           </div>
         </Card>
         <Card className="hidden items-center gap-3 p-4 sm:flex">
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-soft">Vitrine pública</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-label">Vitrine pública</div>
             <div className="truncate text-sm font-medium text-slate-300">em breve (Vercel)</div>
             <div className="truncate text-[11px] text-slate-500">link para enviar aos clientes</div>
           </div>
@@ -476,10 +476,10 @@ export default function StockPage() {
       ) : visible.length === 0 ? (
         <Panel>Nenhuma carta corresponde à busca.</Panel>
       ) : (
-        <div className="overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface">
+        <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+              <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
                 <th className="w-8 px-3 py-2">
                   <Checkbox
                     checked={allVisibleSelected}
@@ -518,11 +518,11 @@ export default function StockPage() {
         </div>
       )}
 
-      <div className="sticky bottom-0 z-30 -mx-4 border-t-[3px] border-outline bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky bottom-0 z-30 -mx-4 border-t-[3px] border-outline bg-panel/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-3">
           {selected.size > 0 ? (
             <>
-              <span className="font-pixel text-[9px] uppercase text-brand-soft">
+              <span className="font-pixel text-[9px] uppercase text-brand-label">
                 {selected.size} selecionada{selected.size > 1 ? "s" : ""}
               </span>
               {selected.size < 2 && (
@@ -558,14 +558,17 @@ export default function StockPage() {
 
       {confirmMerge && mergePreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-outline/60 p-4"
           onClick={() => !merging && setConfirmMerge(false)}
         >
-          <div className="sticker sticker-5 w-full max-w-md rounded-[16px] bg-surface p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="font-pixel text-[10px] uppercase text-brand-soft">
-              Combinar {selectedTrades.length} produtos
+          <div className="win sticker-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="win-bar">
+              <span className="win-title font-pixel !text-[9px] uppercase text-brand-label">
+                Combinar {selectedTrades.length} produtos
+              </span>
             </div>
-            <h2 className="font-display mt-2 text-lg font-extrabold text-white">
+            <div className="p-6">
+            <h2 className="font-display text-lg font-extrabold text-fg">
               {cleanName(mergePreview.primary.name) || mergePreview.primary.number}
             </h2>
             <p className="mt-1 text-xs text-slate-400">
@@ -573,17 +576,17 @@ export default function StockPage() {
               duplicadas também no Portfolio. <strong className="text-slate-300">Isto é permanente.</strong>
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-[10px] border-2 border-outline bg-ink px-2 py-3">
-                <div className="font-pixel text-[7px] uppercase text-brand-soft">Qtd</div>
-                <div className="mt-1 text-lg font-bold tabular-nums text-white">{mergePreview.qty}</div>
+              <div className="rounded-[10px] border-2 border-outline bg-page px-2 py-3">
+                <div className="font-pixel text-[7px] uppercase text-brand-label">Qtd</div>
+                <div className="mt-1 text-lg font-bold tabular-nums text-fg">{mergePreview.qty}</div>
               </div>
-              <div className="rounded-[10px] border-2 border-outline bg-ink px-2 py-3">
-                <div className="font-pixel text-[7px] uppercase text-brand-soft">Custo un.</div>
-                <div className="mt-1 text-lg font-bold tabular-nums text-white">{brl(mergePreview.unit)}</div>
+              <div className="rounded-[10px] border-2 border-outline bg-page px-2 py-3">
+                <div className="font-pixel text-[7px] uppercase text-brand-label">Custo un.</div>
+                <div className="mt-1 text-lg font-bold tabular-nums text-fg">{brl(mergePreview.unit)}</div>
               </div>
-              <div className="rounded-[10px] border-2 border-outline bg-ink px-2 py-3">
-                <div className="font-pixel text-[7px] uppercase text-brand-soft">Custo total</div>
-                <div className="mt-1 text-lg font-bold tabular-nums text-white">{brl(mergePreview.totalCost)}</div>
+              <div className="rounded-[10px] border-2 border-outline bg-page px-2 py-3">
+                <div className="font-pixel text-[7px] uppercase text-brand-label">Custo total</div>
+                <div className="mt-1 text-lg font-bold tabular-nums text-fg">{brl(mergePreview.totalCost)}</div>
               </div>
             </div>
             {mergePreview.differentCards && (
@@ -599,23 +602,27 @@ export default function StockPage() {
                 <Combine /> {merging ? "Combinando…" : "Combinar"}
               </Button>
             </div>
+            </div>
           </div>
         </div>
       )}
 
       {imgEditId && imgEditTrade && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-outline/60 p-4"
           onClick={() => setImgEditId(null)}
         >
           <div
-            className="sticker sticker-5 w-full max-w-md rounded-[16px] bg-surface p-6"
+            className="win sticker-5 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="font-pixel text-[10px] uppercase text-brand-soft">
-              Imagem do produto
+            <div className="win-bar">
+              <span className="win-title font-pixel !text-[9px] uppercase text-brand-label">
+                Imagem do produto
+              </span>
             </div>
-            <h2 className="font-display mt-2 text-lg font-extrabold text-white">
+            <div className="p-6">
+            <h2 className="font-display text-lg font-extrabold text-fg">
               {cleanName(imgEditTrade.name) || imgEditTrade.number}
             </h2>
             <p className="mt-1 text-xs text-slate-400">
@@ -634,7 +641,7 @@ export default function StockPage() {
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <label className="font-pixel text-[8px] uppercase text-brand-soft">
+                <label className="font-pixel text-[8px] uppercase text-brand-label">
                   URL da imagem
                 </label>
                 <Input
@@ -673,6 +680,7 @@ export default function StockPage() {
                   <Save /> {saving ? "Salvando…" : "Salvar"}
                 </Button>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -718,7 +726,7 @@ function StockRow({
   };
 
   return (
-    <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${selected ? "bg-brand/10" : ""}`}>
+    <tr className={`border-b-2 border-outline/15 last:border-0 hover:bg-raised/70 ${selected ? "bg-brand/10" : ""}`}>
       <td className="px-3 py-2 text-center">
         <Checkbox checked={selected} onChange={() => onToggle(t.id)} aria-label={`Selecionar ${t.name}`} />
       </td>
@@ -742,7 +750,7 @@ function StockRow({
               imageURL={row?.imageURL}
               className="h-12 w-[34px] rounded"
             />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="absolute inset-0 flex items-center justify-center bg-outline/55 opacity-0 transition-opacity group-hover:opacity-100">
               <ImagePlus className="h-3.5 w-3.5 text-white" />
             </span>
           </button>
@@ -758,7 +766,7 @@ function StockRow({
         </div>
         {preview && (
           <div
-            className="pointer-events-none fixed z-40 overflow-hidden rounded-[12px] border-[3px] border-outline bg-surface shadow-2xl shadow-black/60"
+            className="pointer-events-none fixed z-40 overflow-hidden rounded-[12px] border-[3px] border-outline bg-panel shadow-2xl shadow-black/60"
             style={{ left: preview.x, top: preview.y, width: PREVIEW_W, height: PREVIEW_H }}
           >
             <CardArt
@@ -800,7 +808,7 @@ function StockRow({
                 ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
                 : listed
                   ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                  : "bg-surface text-slate-400 hover:bg-slate-800"
+                  : "bg-panel text-slate-400 hover:bg-raised"
             }`}
           >
             {live ? <Check className="h-3 w-3" /> : <Store className="h-3 w-3" />}
@@ -813,8 +821,8 @@ function StockRow({
               aria-label={featured ? `Remover destaque de ${t.name}` : `Destacar ${t.name}`}
               className={`inline-flex items-center rounded-[8px] border-2 border-outline p-1 ${
                 featured
-                  ? "bg-brand/20 text-brand-soft hover:bg-brand/30"
-                  : "bg-surface text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                  ? "bg-brand/20 text-brand-label hover:bg-brand/30"
+                  : "bg-panel text-slate-500 hover:bg-raised hover:text-slate-300"
               }`}
             >
               <Star className={`h-3 w-3 ${featured ? "fill-current" : ""}`} />
@@ -845,7 +853,7 @@ function CopyButton({ text }: { text: string }) {
       onClick={onCopy}
       title={copied ? "Copiado" : "Copiar nome"}
       aria-label={`Copiar nome ${text}`}
-      className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+      className="shrink-0 rounded p-1 text-slate-500 hover:bg-raised hover:text-slate-200"
     >
       {copied ? (
         <Check className="h-3.5 w-3.5 text-emerald-400" />
@@ -858,8 +866,8 @@ function CopyButton({ text }: { text: string }) {
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
+    <EmptyState>
       {children}
-    </div>
+    </EmptyState>
   );
 }

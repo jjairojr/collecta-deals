@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import EmptyState from "./EmptyState";
 import { Plus, Trash2, Wallet, Coins, TrendingUp, PiggyBank, ExternalLink, Share2, Package, Pencil, Truck, Check, Search, Download, ChevronDown, ChevronsUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
 import {
   createTrade,
@@ -397,9 +398,6 @@ export default function PortfolioPage({ lockedSection }: { lockedSection?: Secti
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-lg font-extrabold text-white">
-            {lockedSection === "accessories" ? "Acessórios" : "Portfolio"}
-          </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {isSealed
               ? "Your sealed buys and sales, valued at your own current-value estimate — no TCGplayer or Liga comparison."
@@ -599,7 +597,7 @@ export default function PortfolioPage({ lockedSection }: { lockedSection?: Secti
         <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <h2 className="font-display text-base font-extrabold text-white">
+              <h2 className="font-display text-base font-extrabold text-fg">
                 Holdings <span className="font-normal text-slate-500">· {visibleHoldings.length}</span>
               </h2>
               <span className="ml-auto tabular-nums text-xs font-medium text-slate-400">
@@ -655,7 +653,7 @@ export default function PortfolioPage({ lockedSection }: { lockedSection?: Secti
                 <ChevronDown
                   className={`h-4 w-4 text-slate-500 transition-transform ${soldOpen ? "" : "-rotate-90"}`}
                 />
-                <h2 className="font-display text-base font-extrabold text-white">
+                <h2 className="font-display text-base font-extrabold text-fg">
                   Sold <span className="font-normal text-slate-500">· {soldVisible.length}</span>
                 </h2>
                 <span
@@ -699,11 +697,11 @@ export default function PortfolioPage({ lockedSection }: { lockedSection?: Secti
 
 export function Kpi({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="sticker flex items-center gap-3 rounded-[14px] bg-surface p-4">
+    <div className="sticker flex items-center gap-3 rounded-[14px] bg-panel p-4">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">{icon}</div>
       <div className="min-w-0">
-        <div className="font-pixel truncate text-[8px] uppercase text-brand-soft">{label}</div>
-        <div className="mt-1 truncate text-xl font-bold tabular-nums text-white">{value}</div>
+        <div className="font-pixel text-[8px] uppercase leading-[1.5] text-brand-label">{label}</div>
+        <div className="mt-1 truncate text-lg font-bold tabular-nums text-fg xl:text-xl">{value}</div>
         {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
       </div>
     </div>
@@ -714,11 +712,11 @@ export function PnlKpi({ icon, label, value, strong }: { icon: React.ReactNode; 
   const up = value >= 0;
   const tone = up ? "text-emerald-300" : "text-rose-300";
   return (
-    <div className={`sticker flex items-center gap-3 rounded-[14px] bg-surface p-4 ${strong ? "ring-2 ring-inset ring-brand/40" : ""}`}>
+    <div className={`sticker flex items-center gap-3 rounded-[14px] bg-panel p-4 ${strong ? "ring-2 ring-inset ring-brand/40" : ""}`}>
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">{icon}</div>
       <div className="min-w-0">
-        <div className="font-pixel truncate text-[8px] uppercase text-brand-soft">{label}</div>
-        <div className={`mt-1 truncate text-xl font-bold tabular-nums ${tone}`}>
+        <div className="font-pixel text-[8px] uppercase leading-[1.5] text-brand-label">{label}</div>
+        <div className={`mt-1 truncate text-lg font-bold tabular-nums xl:text-xl ${tone}`}>
           {up ? "+" : "−"}
           {brl0(Math.abs(value))}
         </div>
@@ -741,7 +739,7 @@ function Insight({
   const toneCls = tone === "up" ? "text-emerald-300" : tone === "down" ? "text-rose-300" : "text-slate-100";
   return (
     <Card className="p-3">
-      <div className="font-pixel truncate text-[9px] uppercase text-brand-soft">{label}</div>
+      <div className="font-pixel truncate text-[9px] uppercase text-brand-label">{label}</div>
       <div className={`mt-1 truncate text-sm font-semibold ${toneCls}`} title={primary}>
         {primary}
       </div>
@@ -757,7 +755,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       className={`rounded-[8px] border-2 border-outline px-3 py-1 text-xs font-bold transition-colors ${
         active
           ? "bg-sky-500/20 text-sky-200"
-          : "bg-surface text-slate-400 hover:text-slate-200"
+          : "bg-panel text-slate-400 hover:text-slate-200"
       }`}
     >
       {children}
@@ -785,10 +783,10 @@ function GroupBlock({
   const up = g.pnl >= 0;
   const noun = manual ? (g.count === 1 ? "item" : "items") : g.count === 1 ? "card" : "cards";
   return (
-    <div className="overflow-hidden rounded-[14px] border-[3px] border-outline bg-surface">
+    <div className="overflow-hidden rounded-[14px] border-[3px] border-outline bg-panel">
       <button
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-800/40"
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-raised/70"
       >
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "" : "-rotate-90"}`}
@@ -870,10 +868,10 @@ function TradeTable({
     return empty ? <Panel>{empty}</Panel> : null;
   }
   return (
-    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface"}>
+    <div className={bare ? "overflow-x-auto" : "sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel"}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+          <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
             <SortableTh label="Card" sortKey="name" sort={sort} onSort={onSort} align="left" />
             <SortableTh label="Cost" sortKey="cost" sort={sort} onSort={onSort} />
             <SortableTh label={isBRGame() ? "Floor" : "TCG"} sortKey="market" sort={sort} onSort={onSort} />
@@ -960,7 +958,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
   const up = t.profitBRL >= 0;
   return (
     <>
-      <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${t.realized ? "opacity-60" : ""}`}>
+      <tr className={`border-b-2 border-outline/15 last:border-0 hover:bg-raised/70 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             <CardArt set={t.set} number={t.number} name={t.name} productID={productIDFromTcgURL(t.tcgUrl)} imageURL={t.imageURL} className="h-12 w-[34px] shrink-0 rounded" />
@@ -1012,7 +1010,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                     setEditing((e) => !e);
                     setSelling(false);
                   }}
-                  className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
+                  className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
                   title="Edit what you paid and the trade details"
                 >
                   <Pencil className="h-3 w-3" /> Edit
@@ -1022,7 +1020,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                     setSelling((s) => !s);
                     setEditing(false);
                   }}
-                  className="rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
+                  className="rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
                 >
                   Sell
                 </button>
@@ -1034,7 +1032,7 @@ function TradeRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => v
                   deleteTrade(t.id).then(onChanged);
                 }
               }}
-              className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+              className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
               title="Delete"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1229,13 +1227,13 @@ function AddTradeForm({ fxRate, onAdded }: { fxRate: number; onAdded: () => void
           />
         </Field>
         {matches.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
+          <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto sticker sticker-sm rounded-[10px] bg-panel">
             {matches.map((m) => (
               <li key={`${m.number}-${m.name}`}>
                 <button
                   type="button"
                   onClick={() => pick(m)}
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-800"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-raised"
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <CardArt
@@ -1327,10 +1325,10 @@ function ManualTable({
     return empty ? <Panel>{empty}</Panel> : null;
   }
   return (
-    <div className={bare ? "overflow-x-auto" : "overflow-x-auto rounded-[14px] border-[3px] border-outline bg-surface"}>
+    <div className={bare ? "overflow-x-auto" : "sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel"}>
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b-2 border-outline text-left text-[10px] uppercase tracking-wide text-muted">
+          <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
             <SortableTh label="Product" sortKey="name" sort={sort} onSort={onSort} align="left" />
             <SortableTh label="Cost" sortKey="cost" sort={sort} onSort={onSort} />
             <SortableTh label="Current R$" sortKey="market" sort={sort} onSort={onSort} />
@@ -1357,7 +1355,7 @@ function ManualRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
   const up = t.profitBRL >= 0;
   return (
     <>
-      <tr className={`border-b-2 border-outline/40 last:border-0 hover:bg-slate-800/40 ${t.realized ? "opacity-60" : ""}`}>
+      <tr className={`border-b-2 border-outline/15 last:border-0 hover:bg-raised/70 ${t.realized ? "opacity-60" : ""}`}>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             {t.imageURL ? (
@@ -1404,7 +1402,7 @@ function ManualRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                     setEditing((e) => !e);
                     setSelling(false);
                   }}
-                  className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
+                  className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
                   title="Edit current value and what you paid"
                 >
                   <Pencil className="h-3 w-3" /> Edit
@@ -1414,7 +1412,7 @@ function ManualRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                     setSelling((s) => !s);
                     setEditing(false);
                   }}
-                  className="rounded-[8px] border-2 border-outline bg-surface px-2 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800"
+                  className="rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
                 >
                   Sell
                 </button>
@@ -1426,7 +1424,7 @@ function ManualRow({ t, onChanged, maxValue }: { t: TradeView; onChanged: () => 
                   deleteTrade(t.id).then(onChanged);
                 }
               }}
-              className="rounded-[8px] border-2 border-outline bg-surface p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
+              className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
               title="Delete"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1628,13 +1626,13 @@ function AddManualForm({ kind, onAdded }: { kind: "sealed" | "accessory"; onAdde
           />
         </Field>
         {matches.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-[10px] border-2 border-outline bg-surface shadow-xl">
+          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto sticker sticker-sm rounded-[10px] bg-panel">
             {matches.map((m) => (
               <li key={`${m.number}-${m.name}`}>
                 <button
                   type="button"
                   onClick={() => pick(m)}
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-800"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-raised"
                 >
                   <span className="truncate text-slate-100">{m.name}</span>
                   <span className="shrink-0 font-mono text-[11px] text-slate-500">{m.number}</span>
@@ -1698,8 +1696,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[14px] border-[3px] border-outline bg-surface px-4 py-10 text-center text-slate-400">
+    <EmptyState>
       {children}
-    </div>
+    </EmptyState>
   );
 }

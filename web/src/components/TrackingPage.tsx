@@ -176,9 +176,9 @@ export default function TrackingPage({ mode = "singles" }: { mode?: "singles" | 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">
+        <h2 className="font-display text-base font-extrabold text-fg">
           {isSealed ? "Sealed products" : "Market pulse"}
-        </h1>
+        </h2>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
           {isSealed
             ? "Booster boxes, packs & decks — units sold and price swings, inferred from per-store snapshots."
@@ -190,26 +190,26 @@ export default function TrackingPage({ mode = "singles" }: { mode?: "singles" | 
         <div className="flex flex-wrap items-center gap-3">
           {!isSealed && <SetSelect sets={sets} value={set} onChange={setSet} allowAll />}
           <div className="flex items-center gap-2">
-            <span className="font-pixel text-[9px] uppercase text-brand-soft">
+            <span className="font-pixel text-[9px] uppercase text-brand-label">
               Range
             </span>
             <ToggleGroup value={win} onChange={(v) => isWindow(v) && setWin(v)} options={windowOptions} />
           </div>
           {isAll && (
-            <span className="rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5 text-xs text-slate-400">
+            <span className="rounded-[8px] border-2 border-outline bg-panel px-3 py-1.5 text-xs text-slate-400">
               <span className="font-semibold text-slate-200">{sets.length}</span> collections pooled
             </span>
           )}
           {isSealed && (
-            <span className="rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5 text-xs text-slate-400">
+            <span className="rounded-[8px] border-2 border-outline bg-panel px-3 py-1.5 text-xs text-slate-400">
               Boxes · packs · decks
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-surface px-3 py-1.5">
-            <Clock className="h-3.5 w-3.5 text-brand" />
-            <span className="font-pixel text-[9px] uppercase text-brand-soft">
+          <div className="flex items-center gap-2 rounded-[8px] border-2 border-outline bg-panel px-3 py-1.5">
+            <Clock className="h-3.5 w-3.5 text-brand-label" />
+            <span className="font-pixel text-[9px] uppercase text-brand-label">
               Last snapshot
             </span>
             {snapshot ? (
@@ -255,10 +255,10 @@ export default function TrackingPage({ mode = "singles" }: { mode?: "singles" | 
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-brand">
+          <span className="text-brand-label">
             <Boxes className="h-4 w-4" />
           </span>
-          <h2 className="font-display text-base font-extrabold text-white">Collection inventory</h2>
+          <h2 className="font-display text-base font-extrabold text-fg">Collection inventory</h2>
           <span className="text-xs text-slate-500">· who holds what, and the chase cards</span>
         </div>
         <InventoryPanel key={set} set={set} />

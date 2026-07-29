@@ -45,7 +45,7 @@ export default function SelectionTray() {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t-[3px] border-outline bg-surface/95 backdrop-blur">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t-[3px] border-outline bg-panel/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
         <span className="text-sm text-slate-200">
           <span className="font-semibold text-sky-300">{count}</span> card{count === 1 ? "" : "s"}{" "}

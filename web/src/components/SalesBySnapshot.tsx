@@ -23,7 +23,7 @@ function SnapshotRow({ snap, set }: { snap: SnapshotSales; set: string }) {
     (a, b) => b.revenueBRL - a.revenueBRL || b.units - a.units || a.number.localeCompare(b.number),
   );
   return (
-    <div className="rounded-[14px] border-2 border-outline bg-surface">
+    <div className="rounded-[14px] border-2 border-outline bg-panel">
       <button
         type="button"
         disabled={!hasSales}
@@ -93,7 +93,7 @@ export default function SalesBySnapshot({
 }) {
   if (snapshots.length === 0) {
     return (
-      <div className="rounded-[14px] border-2 border-outline bg-slate-900/30 px-4 py-8 text-center text-sm text-slate-500">
+      <div className="sticker sticker-sm rounded-[12px] bg-panel px-4 py-8 text-center text-sm text-slate-500">
         No snapshot intervals in this range yet.
       </div>
     );

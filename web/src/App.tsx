@@ -149,7 +149,7 @@ export default function App() {
         />
         <SidebarInset>
           <TopBar game={game} status={status} onRefresh={onRefresh} dealsEnabled={dealsEnabled} />
-          <div key={game} className="flex flex-1 flex-col">
+          <div key={game} className="bg-grid flex flex-1 flex-col">
             <main key={activeView} className="animate-fade-in mx-auto w-full max-w-7xl flex-1 px-4 py-7 sm:px-6 lg:px-8">
               <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} />
 
@@ -239,7 +239,7 @@ function useView(): [View, (v: View) => void] {
 function Footer({ game, hasDeals }: { game: string; hasDeals: boolean }) {
   const liga = ligaLabels[game] ?? "Liga";
   return (
-    <footer className="mx-auto w-full max-w-7xl border-t-4 border-outline px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
+    <footer className="mx-auto w-full max-w-7xl border-t-[3px] border-outline px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
       {hasDeals ? (
         <>
           Margin is an FX-adjusted gross price gap (lowest current TCGPlayer listing vs cheapest {liga} price). It does

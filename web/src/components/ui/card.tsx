@@ -1,16 +1,9 @@
-import { forwardRef, type HTMLAttributes } from "react";
+import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "rounded-[14px] border-[3px] border-outline bg-surface text-white shadow-[3px_3px_0_#0b0b0c]",
-        className,
-      )}
-      {...props}
-    />
+    <div ref={ref} className={cn("win sticker-sm text-fg", className)} {...props} />
   ),
 );
 Card.displayName = "Card";
@@ -26,7 +19,7 @@ const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingEleme
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn("font-display text-sm font-bold leading-none tracking-tight text-white", className)}
+      className={cn("font-display text-sm font-bold leading-none text-fg", className)}
       {...props}
     />
   ),
@@ -47,4 +40,25 @@ const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 );
 CardContent.displayName = "CardContent";
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent };
+interface WindowProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
+  title?: ReactNode;
+  actions?: ReactNode;
+  bodyClassName?: string;
+}
+
+const Window = forwardRef<HTMLElement, WindowProps>(
+  ({ title, actions, className, bodyClassName, children, ...props }, ref) => (
+    <section ref={ref} className={cn("win", className)} {...props}>
+      {(title || actions) && (
+        <header className={cn("win-bar", actions && "win-bar-live")}>
+          {title ? <h2 className="win-title">{title}</h2> : <span className="flex-1" />}
+          {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+        </header>
+      )}
+      <div className={cn(bodyClassName)}>{children}</div>
+    </section>
+  ),
+);
+Window.displayName = "Window";
+
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, Window };

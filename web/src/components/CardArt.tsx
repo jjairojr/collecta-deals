@@ -36,10 +36,10 @@ export default function CardArt({
   if (sourceIdx >= sources.length) {
     return (
       <div
-        className={`relative flex flex-col items-center justify-center overflow-hidden bg-surface text-center ${className}`}
+        className={`relative flex flex-col items-center justify-center overflow-hidden bg-panel text-center ${className}`}
       >
         <div aria-hidden className="art-stripes-45 pointer-events-none absolute inset-0 opacity-70" />
-        <ImageOff aria-hidden className="relative h-auto w-1/3 max-w-[34px] text-brand-soft/60" />
+        <ImageOff aria-hidden className="relative h-auto w-1/3 max-w-[34px] text-brand-label/60" />
         <span className="relative mt-1 max-w-full truncate px-1 font-mono text-[10px] leading-tight text-slate-400">
           {number}
         </span>
@@ -52,7 +52,7 @@ export default function CardArt({
       alt={name ?? number}
       loading="lazy"
       onError={() => setSourceIdx((i) => i + 1)}
-      className={`bg-slate-800 object-cover ${className}`}
+      className={`bg-panel object-cover ${className}`}
     />
   );
 }

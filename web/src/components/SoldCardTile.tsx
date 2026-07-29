@@ -71,7 +71,7 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-[6px] border-2 border-outline bg-slate-800/60 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-slate-800"
+              className="flex w-full items-center justify-between rounded-[6px] border-2 border-outline bg-slate-800/60 px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-raised"
             >
               <span>
                 {storeCount} store{storeCount === 1 ? "" : "s"}
@@ -83,7 +83,7 @@ export default function SoldCardTile({ card, set }: { card: CardSale; set: strin
                 {sellers.map((s) => (
                   <li
                     key={`${s.storeId}-${s.language ?? ""}`}
-                    className="flex items-center justify-between gap-2 rounded px-1.5 py-0.5 text-[11px] hover:bg-slate-800/40"
+                    className="flex items-center justify-between gap-2 rounded px-1.5 py-0.5 text-[11px] hover:bg-raised/70"
                   >
                     <span className="truncate text-slate-400" title={s.storeName}>
                       {s.storeName}
