@@ -39,6 +39,10 @@ export const metadata: Metadata = {
   description:
     "Loja de cartas TCG do Brasil: singles avulsas e produto selado de Pokémon, One Piece e Riftbound. Cartas conferidas uma a uma, pedido pelo WhatsApp e envio para todo o Brasil.",
   applicationName: "Collecta",
+  // Merchant Center verifies by reading the served HTML, so the tag has to be
+  // rendered server-side — the GA snippet only appears after hydration and is
+  // invisible to the verifier.
+  verification: { google: "XoLIZnAr8k3IRTvhhH2xi3uSc1Rr3Z4GYa4VTPg5_2w" },
   openGraph: {
     title: "Collecta — Loja de cartas TCG",
     description:
