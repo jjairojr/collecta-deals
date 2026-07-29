@@ -68,6 +68,10 @@ export interface Sealed {
   game: GameId;
   gameLabel: string;
   name: string;
+  // Product format ("Booster Box", "Elite Trainer Box"…) and the name rewritten
+  // to lead with it. Buyers search "box", never "caixa de booster".
+  format?: string;
+  headline?: string;
   set: string;
   meta: string;
   language?: string;

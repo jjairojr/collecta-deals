@@ -107,16 +107,67 @@ function mapItem(it: RawItem): Single {
   };
 }
 
+// Language rides along inside the product name, at either end: "(PT-BR) Caixa
+// de Booster …" and "… Booster Bundle (PT-BR)".
 const SEALED_LANGS: [RegExp, string][] = [
-  [/^\((ING|EN)\)/i, "Inglês"],
-  [/^\((JAP|JPN)\)/i, "Japonês"],
-  [/^\((PORT?|PT(-BR)?|BR)\)/i, "Português"],
+  [/^\((ING|EN)\)|\((ING|EN)\)$/i, "Inglês"],
+  [/^\((JAP|JPN)\)|\((JAP|JPN)\)$/i, "Japonês"],
+  [/^\((PORT?|PT(-BR)?|BR)\)|\((PORT?|PT(-BR)?|BR)\)$/i, "Português"],
+];
+
+const LANG_ALT = "ING|EN|JAP|JPN|PORT|POR|PT-BR|PT|BR";
+const LANG_TAG = new RegExp(
+  `^\\s*\\((?:${LANG_ALT})\\)\\s*|\\s*\\((?:${LANG_ALT})\\)\\s*$`,
+  "gi",
+);
+
+// Format label first, because a title that opens with "(PT-BR)" spends the most
+// valuable characters of a search result on the Liga's internal notation — and
+// the language already travels in its own field.
+const SEALED_FORMATS: [RegExp, string][] = [
+  [/elite trainer box|\betb\b/i, "Elite Trainer Box"],
+  [/booster bundle/i, "Booster Bundle"],
+  [/caixa de booster|booster box|box display/i, "Booster Box"],
+  [/blister/i, "Blister"],
+  [/\bdeck\b/i, "Deck"],
 ];
 
 function sealedLanguage(name: string): string | undefined {
+  const n = name.trim();
   for (const [re, lang] of SEALED_LANGS) {
-    if (re.test(name.trim())) {
+    if (re.test(n)) {
       return lang;
+    }
+  }
+  return undefined;
+}
+
+function stripLangTag(name: string): string {
+  return name.replace(LANG_TAG, "").trim();
+}
+
+// "Caixa de Booster - Megaevolução 5 - Escuridão Absoluta" becomes
+// "Booster Box Megaevolução 5 - Escuridão Absoluta": the searched term leads and
+// the redundant Portuguese phrasing goes, without inventing anything.
+function sealedHeadline(name: string, format: string | undefined): string {
+  if (!format) {
+    return name;
+  }
+  const matched = SEALED_FORMATS.find(([, label]) => label === format);
+  if (!matched) {
+    return name;
+  }
+  const rest = name
+    .replace(matched[0], "")
+    .replace(/^[\s\-–—·|]+|[\s\-–—·|]+$/g, "")
+    .trim();
+  return rest ? `${format} ${rest}` : format;
+}
+
+function sealedFormat(name: string): string | undefined {
+  for (const [re, label] of SEALED_FORMATS) {
+    if (re.test(name)) {
+      return label;
     }
   }
   return undefined;
@@ -130,12 +181,18 @@ function cleanSet(set: string): string {
 function mapSealed(it: RawItem): Sealed {
   const set = cleanSet(it.set);
   const language = sealedLanguage(it.name);
+  const format = sealedFormat(it.name);
+  // The slug still hashes the raw name: it is the public URL and the Merchant
+  // Center product id, so cleaning the label must not move it.
+  const name = stripLangTag(it.name);
   return {
     kind: "sealed",
     slug: slugFor(it),
     game: it.game,
     gameLabel: it.gameLabel,
-    name: it.name,
+    name,
+    format,
+    headline: sealedHeadline(name, format),
     set,
     meta: [set || it.gameLabel, language].filter(Boolean).join(" · "),
     language,

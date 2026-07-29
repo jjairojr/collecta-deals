@@ -145,9 +145,9 @@ async function sealedRow(s: Sealed): Promise<FeedItem | null> {
   const lang = s.language ? ` em ${s.language}` : "";
   return {
     id: feedID(s.slug),
-    title: clamp(`${s.name} — ${s.gameLabel} lacrado`, 150),
+    title: clamp(`${s.headline ?? s.name} — ${s.gameLabel} lacrado`, 150),
     description: clamp(
-      `${s.name} — produto selado de ${s.gameLabel}${lang}, com lacre original. Pedido pelo WhatsApp e envio para todo o Brasil na Collecta.`,
+      `Comprar ${s.name} lacrado na Collecta: ${s.format ?? "produto selado"} de ${s.gameLabel}${lang}, com lacre original. Pedido pelo WhatsApp e envio para todo o Brasil.`,
       5000,
     ),
     link: absoluteURL(`/selado/${s.slug}`),

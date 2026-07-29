@@ -44,8 +44,8 @@ export async function generateMetadata({
   }
   const { item, live } = res;
   return {
-    title: `${item.name} · ${item.gameLabel}`,
-    description: `${item.name} — produto selado de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, lacre original, por ${brl(item.price)}. Pedido pelo WhatsApp e envio para todo o Brasil na Collecta.`,
+    title: `${item.headline ?? item.name} · ${item.gameLabel}`,
+    description: `Comprar ${item.name} lacrado na Collecta: ${item.format ?? "produto selado"} de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, com lacre original, por ${brl(item.price)}. Pedido pelo WhatsApp e envio para todo o Brasil.`,
     alternates: { canonical: `/selado/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: item.imageURL ? { images: [item.imageURL] } : undefined,
