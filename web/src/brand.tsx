@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import {
   Anchor,
+  BookOpen,
   Bot,
   Boxes,
   FileText,
@@ -26,7 +27,8 @@ export type View =
   | "acessorios"
   | "estoque"
   | "orcamento"
-  | "buyout";
+  | "buyout"
+  | "guialiga";
 
 export type Icon = ComponentType<{ className?: string }>;
 
@@ -66,6 +68,10 @@ export const navGroups: NavGroup[] = [
       { key: "orcamento", label: "Orçamento", icon: FileText },
       { key: "buyout", label: "Buyout", icon: HandCoins },
     ],
+  },
+  {
+    label: "Ajuda",
+    items: [{ key: "guialiga", label: "Guia da Liga", icon: BookOpen }],
   },
 ];
 
