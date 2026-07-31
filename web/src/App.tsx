@@ -18,6 +18,7 @@ import BuyoutPage from "./components/BuyoutPage";
 import BrowsePage from "./components/BrowsePage";
 import QuotePage from "./components/QuotePage";
 import GuiaLigaPage from "./components/GuiaLigaPage";
+import LigaExportPage from "./components/LigaExportPage";
 import SelectionTray from "./components/SelectionTray";
 import AppSidebar from "./components/AppSidebar";
 import TopBar from "./components/TopBar";
@@ -65,6 +66,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   buyout: {
     title: "Buyout",
     description: "Value a bulk buyout lot against the market.",
+  },
+  ligaexport: {
+    title: "Exportar p/ Liga",
+    description: "Gera o CSV de importação da LigaMagic a partir do que está à venda no Estoque.",
   },
   guialiga: {
     title: "Guia da Liga",
@@ -198,6 +203,10 @@ export default function App() {
               ) : activeView === "orcamento" ? (
                 <div className="mt-6">
                   <QuotePage />
+                </div>
+              ) : activeView === "ligaexport" ? (
+                <div className="mt-6">
+                  <LigaExportPage />
                 </div>
               ) : activeView === "guialiga" ? (
                 <div className="mt-6">

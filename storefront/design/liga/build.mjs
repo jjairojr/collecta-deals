@@ -18,7 +18,7 @@ async function main() {
     { name: "logo-200x85", w: 200, h: 85, body: logo(), transparent: true },
     { name: "header-bg-1920x110", w: 1920, h: 110, body: headerBG() },
     { name: "miniatura-300x300", w: 300, h: 300, body: miniatura({ mascot }), jpeg: 90 },
-    { name: "marketplace-logo-101x30", w: 101, h: 30, body: marketplaceLogo(), jpeg: 95 },
+    { name: "marketplace-logo-101x30", w: 101, h: 30, body: marketplaceLogo({ mascot }), jpeg: 95 },
     { name: "marketplace-avatar-55x55", w: 55, h: 55, body: marketplaceAvatar({ mascot }), jpeg: 88 },
     { name: "banner-superior-1170x60", w: 1170, h: 60, body: stripDesktop() },
     { name: "banner-superior-mobile-400x80", w: 400, h: 80, body: stripMobile() },

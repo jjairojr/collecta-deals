@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import EmptyState from "./EmptyState";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   Check,
@@ -12,6 +13,7 @@ import {
   Search,
   Star,
   Store,
+  Tags,
   Wand2,
   X,
 } from "lucide-react";
@@ -21,7 +23,9 @@ import {
   getPortfolio,
   mergeTrades,
   productIDFromTcgURL,
+  setLigaState,
   setListings,
+  type LigaInput,
   type ListingInput,
   type PortfolioResponse,
   type TradeView,
@@ -67,6 +71,23 @@ interface RowState {
   listed: boolean;
   imageURL: string;
   featured: boolean;
+  ligaListed: boolean;
+}
+
+// LigaSync says where a holding stands on the LigaMagic store. "stale" means it
+// is registered there but the ledger moved since — the quantity or the price no
+// longer match what was sent, so it needs a targeted reimport. Reimporting
+// everything is not an option: Liga's import sums quantities instead of setting
+// them, so a blind rerun doubles the stock.
+type LigaSync = "off" | "sync" | "stale";
+
+function ligaSync(t: TradeView): LigaSync {
+  if (!t.ligaListed) {
+    return "off";
+  }
+  const qtyDrift = t.qty !== (t.ligaQty ?? 0);
+  const priceDrift = round2(t.askBRL ?? 0) !== round2(t.ligaPriceBRL ?? 0);
+  return qtyDrift || priceDrift ? "stale" : "sync";
 }
 
 // refBRL is a card's per-unit market reference in reais: for deals games the live
@@ -86,7 +107,7 @@ function round2(n: number): number {
 const PREVIEW_W = 240;
 const PREVIEW_H = 336;
 
-type SortKey = "name" | "qty" | "ref" | "ask" | "total" | "listed";
+type SortKey = "name" | "qty" | "ref" | "ask" | "total" | "listed" | "liga";
 interface SortState {
   key: SortKey;
   dir: "asc" | "desc";
@@ -99,6 +120,19 @@ function listedRank(row: RowState | undefined): number {
     return 0;
   }
   return row.askBRL > 0 ? 2 : 1;
+}
+
+// ligaRank sorts the Liga column by how much attention a row needs: out of the
+// store first, then needs reimport, then done.
+function ligaRank(t: TradeView): number {
+  switch (ligaSync(t)) {
+    case "off":
+      return 0;
+    case "stale":
+      return 1;
+    case "sync":
+      return 2;
+  }
 }
 
 function sortValue(
@@ -120,6 +154,8 @@ function sortValue(
       return (row?.askBRL ?? 0) * Math.max(t.qty, 1);
     case "listed":
       return listedRank(row);
+    case "liga":
+      return ligaRank(t);
   }
 }
 
@@ -190,6 +226,7 @@ export default function StockPage() {
   const [merging, setMerging] = useState(false);
   const [imgEditId, setImgEditId] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>({ key: "total", dir: "desc" });
+  const [onlyMissingOnLiga, setOnlyMissingOnLiga] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,6 +243,7 @@ export default function StockPage() {
           listed: Boolean(t.listed),
           imageURL: t.imageURL ?? "",
           featured: Boolean(t.featured),
+          ligaListed: Boolean(t.ligaListed),
         };
       }
       setRows(seeded);
@@ -235,23 +273,37 @@ export default function StockPage() {
   const visible = useMemo(
     () =>
       sortStock(
-        holdings.filter((t) =>
-          `${t.name} ${t.number} ${t.store ?? ""}`.toLowerCase().includes(q),
+        holdings.filter(
+          (t) =>
+            `${t.name} ${t.number} ${t.store ?? ""}`.toLowerCase().includes(q) &&
+            (!onlyMissingOnLiga || ligaSync(t) !== "sync"),
         ),
         sort,
         fx,
         rowsRef.current,
       ),
-    [holdings, q, sort, fx],
+    [holdings, q, sort, fx, onlyMissingOnLiga],
   );
 
   const onSort = useCallback((key: SortKey) => {
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
   }, []);
 
+  // Only holdings whose Liga flag was actually toggled go in the Liga write. A
+  // row that was already marked must not be resent, or saving an unrelated price
+  // edit would refresh the recorded Liga quantity and silently clear a "needs
+  // reimport" warning without anything having been sent to the store.
+  const ligaChanged = useMemo(
+    () => holdings.filter((t) => Boolean(rows[t.id]?.ligaListed) !== Boolean(t.ligaListed)),
+    [holdings, rows],
+  );
+
   const dirty = useMemo(() => {
     if (!data) {
       return false;
+    }
+    if (ligaChanged.length > 0) {
+      return true;
     }
     return holdings.some((t) => {
       const r = rows[t.id];
@@ -263,19 +315,28 @@ export default function StockPage() {
           r.featured !== Boolean(t.featured))
       );
     });
-  }, [holdings, rows, data]);
+  }, [holdings, rows, data, ligaChanged]);
 
   const stats = useMemo(() => {
     let onSale = 0;
     let value = 0;
+    let onLiga = 0;
+    let staleOnLiga = 0;
     for (const t of holdings) {
       const r = rows[t.id];
       if (r?.listed && r.askBRL > 0) {
         onSale += 1;
         value += r.askBRL * Math.max(t.qty, 1);
       }
+      const sync = ligaSync(t);
+      if (sync !== "off") {
+        onLiga += 1;
+      }
+      if (sync === "stale") {
+        staleOnLiga += 1;
+      }
     }
-    return { onSale, value };
+    return { onSale, value, onLiga, staleOnLiga };
   }, [holdings, rows]);
 
   const patch = (id: string, next: Partial<RowState>) =>
@@ -380,6 +441,15 @@ export default function StockPage() {
         featured: Boolean(rows[t.id]?.featured),
       }));
       await setListings(items);
+      if (ligaChanged.length > 0) {
+        const ligaItems: LigaInput[] = ligaChanged.map((t) => ({
+          id: t.id,
+          ligaListed: Boolean(rows[t.id]?.ligaListed),
+          ligaQty: t.qty,
+          ligaPriceBRL: rows[t.id]?.askBRL ?? 0,
+        }));
+        await setLigaState(ligaItems);
+      }
       setSavedAt(Date.now());
       await load();
     } catch (err) {
@@ -421,11 +491,18 @@ export default function StockPage() {
             <div className="truncate text-[11px] text-slate-500">soma dos preços × qtd</div>
           </div>
         </Card>
-        <Card className="hidden items-center gap-3 p-4 sm:flex">
+        <Card className="flex items-center gap-3 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-raised text-slate-300">
+            <Tags className="h-5 w-5" />
+          </div>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-label">Vitrine pública</div>
-            <div className="truncate text-sm font-medium text-slate-300">em breve (Vercel)</div>
-            <div className="truncate text-[11px] text-slate-500">link para enviar aos clientes</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-label">Na LigaMagic</div>
+            <div className="truncate text-xl font-bold tabular-nums text-fg">{stats.onLiga}</div>
+            <div className="truncate text-[11px] text-slate-500">
+              {stats.staleOnLiga > 0
+                ? `${stats.staleOnLiga} precisa${stats.staleOnLiga > 1 ? "m" : ""} reimportar`
+                : `de ${holdings.length} em estoque`}
+            </div>
           </div>
         </Card>
       </div>
@@ -460,6 +537,13 @@ export default function StockPage() {
             </span>
             <ToggleGroup value="" onChange={(v) => suggestAll(Number(v))} options={suggestOptions} />
           </div>
+          <Button
+            variant={onlyMissingOnLiga ? "accent" : "outline"}
+            onClick={() => setOnlyMissingOnLiga((v) => !v)}
+            title="Mostrar só o que ainda não está na LigaMagic ou precisa ser reimportado"
+          >
+            <Tags /> Faltam na Liga
+          </Button>
           <Button variant="outline" onClick={() => listAll(true)} disabled={visible.length === 0}>
             Listar todas
           </Button>
@@ -498,6 +582,7 @@ export default function StockPage() {
                 <SortableTh label="Preço R$ (un.)" sortKey="ask" sort={sort} onSort={onSort} />
                 <SortableTh label="Total" sortKey="total" sort={sort} onSort={onSort} />
                 <SortableTh label="Na vitrine" sortKey="listed" sort={sort} onSort={onSort} align="center" />
+                <SortableTh label="Liga" sortKey="liga" sort={sort} onSort={onSort} align="center" />
               </tr>
             </thead>
             <tbody>
@@ -711,6 +796,11 @@ function StockRow({
   const featured = Boolean(row?.featured);
   const ref = refBRL(t, fx);
   const live = listed && ask > 0;
+  // The Liga chip follows the draft flag so a click reacts immediately, but the
+  // "needs reimport" state can only come from saved data — it compares the ledger
+  // against what was actually sent to the store.
+  const ligaFlag = Boolean(row?.ligaListed);
+  const sync: LigaSync = !ligaFlag ? "off" : t.ligaListed ? ligaSync(t) : "sync";
   const total = ask * Math.max(t.qty, 1);
   const askUSD = fx > 0 ? ask * fx : 0;
   const [preview, setPreview] = useState<{ x: number; y: number } | null>(null);
@@ -829,6 +919,34 @@ function StockRow({
             </button>
           )}
         </div>
+      </td>
+      <td className="px-3 py-2 text-center">
+        <button
+          onClick={() => onPatch(t.id, { ligaListed: !ligaFlag })}
+          title={
+            sync === "stale"
+              ? `Cadastrada na Liga com ${t.ligaQty} un. a ${brl(t.ligaPriceBRL ?? 0)} — o estoque mudou desde então, precisa reimportar`
+              : sync === "sync"
+                ? "Cadastrada na LigaMagic — clique para desmarcar"
+                : "Fora da LigaMagic — clique para marcar como cadastrada"
+          }
+          className={`inline-flex items-center gap-1 rounded-[8px] border-2 border-outline px-2 py-1 text-xs font-bold ${
+            sync === "sync"
+              ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              : sync === "stale"
+                ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                : "bg-panel text-slate-400 hover:bg-raised"
+          }`}
+        >
+          {sync === "sync" ? (
+            <Check className="h-3 w-3" />
+          ) : sync === "stale" ? (
+            <AlertTriangle className="h-3 w-3" />
+          ) : (
+            <Tags className="h-3 w-3" />
+          )}
+          {sync === "sync" ? "Na Liga" : sync === "stale" ? "Reimportar" : "Fora"}
+        </button>
       </td>
     </tr>
   );

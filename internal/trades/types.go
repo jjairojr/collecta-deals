@@ -30,6 +30,15 @@ type Trade struct {
 	ImageURL string  `json:"imageURL,omitempty"` // custom image URL for products without TCG art (e.g. sealed)
 	Featured bool    `json:"featured,omitempty"`
 
+	// LigaListed records that this holding was registered on the LigaMagic store.
+	// LigaQty and LigaPriceBRL keep what was actually sent there, so the Estoque
+	// tab can tell "registered and in sync" from "registered but the ledger moved
+	// since" — reimporting blindly is unsafe because Liga's import sums quantities.
+	LigaListed   bool      `json:"ligaListed,omitempty"`
+	LigaQty      int       `json:"ligaQty,omitempty"`
+	LigaPriceBRL float64   `json:"ligaPriceBRL,omitempty"`
+	LigaAt       time.Time `json:"ligaAt,omitempty"`
+
 	Status string `json:"status"` // "holding" | "sold"
 
 	SellPrice    float64 `json:"sellPrice,omitempty"`

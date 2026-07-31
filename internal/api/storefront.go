@@ -191,6 +191,58 @@ func (s *Server) handleTradesListings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]int{"updated": updated})
 }
 
+type ligaInput struct {
+	ID       string  `json:"id"`
+	Listed   bool    `json:"ligaListed"`
+	Qty      int     `json:"ligaQty"`
+	PriceBRL float64 `json:"ligaPriceBRL"`
+}
+
+// handleTradesLiga records which holdings are registered on the LigaMagic store.
+// Kept apart from handleTradesListings so marking the flag can never overwrite an
+// asking price: the two screens write different columns of the same ledger.
+func (s *Server) handleTradesLiga(w http.ResponseWriter, r *http.Request) {
+	gs := s.stackFor(r.URL.Query())
+	if gs.Trades == nil {
+		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var in struct {
+		Items []ligaInput `json:"items"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	updates := make(map[string]trades.LigaState, len(in.Items))
+	for _, it := range in.Items {
+		if it.ID == "" {
+			continue
+		}
+		qty := it.Qty
+		if qty < 0 {
+			qty = 0
+		}
+		price := it.PriceBRL
+		if price < 0 {
+			price = 0
+		}
+		updates[it.ID] = trades.LigaState{Listed: it.Listed, Qty: qty, PriceBRL: price}
+	}
+	// Same batching as the listings write: cards and the shared accessories ledger
+	// are saved together, and each store ignores the ids it doesn't own.
+	updated := 0
+	for _, st := range s.ledgersFor(gs) {
+		n, err := st.SetLigaState(updates)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		updated += n
+	}
+	writeJSON(w, map[string]int{"updated": updated})
+}
+
 var productIDRe = regexp.MustCompile(`/product/(\d+)`)
 
 // productIDFromURL pulls the TCGplayer product id out of a tcgUrl

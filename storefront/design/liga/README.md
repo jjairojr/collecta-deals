@@ -48,6 +48,18 @@ mas não publicado — o slot está com a faixa de confiança.
 - **A Liga não tem variante mobile para o slot Banner 100%** — a faixa inteira é
   escalada para ~37% no celular. Por isso os títulos são grandes e cada linha de
   apoio cabe em uma linha só (`white-space: nowrap`).
+- **O logo do marketplace (101×30) é um mini-cabeçalho com o mascote.** A
+  primeira versão era uma placa rosa chapada e ficou feia nas linhas de seller
+  do marketplace; a segunda, wordmark em fundo branco, ficou genérica. A que
+  valeu: royal + grid + ticks rosa, disco do mascote e wordmark a 13.5px.
+- **A Liga corta ~3px da base do logo do marketplace ao exibir.** Por isso a
+  peça não tem barra de rodapé e nada crítico fica a menos de 4px da borda
+  inferior (disco de 24px puxado 1px pra cima).
+- **O rosto do mascote só lê em disco pequeno com crop na cabeça.** O
+  enquadramento da arte inteira vira mancha de cabelo, e fechar demais na cara
+  (190%) ficou "cheio" demais — o aprovado é `width:155%;left:-26%;top:-42%` +
+  `contrast(1.55) saturate(1.25)`: cabeça com o afro de moldura e olhos
+  legíveis.
 - **A cor "principal do site" da Liga é o acento** (botões, títulos, badges,
   breadcrumb) → rosa `#F6559B`. A "secundária" é a fonte/ícone do cabeçalho →
   branco.

@@ -54,10 +54,23 @@ export const artCSS = `
 
 /* ── marketplace lockups ──────────────────────────────────────── */
 .mkt{
-  width:101px;height:30px;background:${BRAND};border:2px solid ${INK};
-  display:flex;align-items:center;justify-content:center;
+  width:101px;height:30px;background:${ROYAL};
+  display:flex;align-items:center;justify-content:center;gap:3px;
 }
-.mkt .wm{font-size:19px;text-shadow:1px 1px 0 ${INK}}
+.mkt .mgrid{background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.075) 0 1px,transparent 1px 12px)}
+.mkt .ticks{
+  top:0;bottom:auto;height:2px;opacity:.95;
+  background-image:repeating-linear-gradient(90deg,${BRAND} 0 4px,transparent 4px 12px);
+}
+.mkt .mdisc{
+  width:24px;height:24px;border-radius:999px;overflow:hidden;flex:none;
+  background:#fff;border:2px solid ${INK};margin-top:-1px;position:relative;
+}
+.mkt .mdisc img{
+  position:absolute;display:block;width:155%;left:-26%;top:-42%;
+  filter:contrast(1.55) saturate(1.25);
+}
+.mkt .wm{font-size:13.5px;text-shadow:1px 1px 0 ${BRAND},2px 2px 0 ${INK}}
 
 .avatar{width:55px;height:55px;background:${BRAND};border:3px solid ${INK};overflow:hidden}
 .avatar img{width:100%;height:100%;object-fit:cover;object-position:50% 38%;display:block}
@@ -225,8 +238,14 @@ export function favicon({ mascot, size }) {
 </div>`;
 }
 
-export function marketplaceLogo() {
-  return `<div class="mkt"><span class="wordmark wm">COLLECTA</span></div>`;
+export function marketplaceLogo({ mascot }) {
+  return `<div class="mkt">
+  <div class="fill mgrid"></div>
+  <div class="fill scan"></div>
+  <div class="fill ticks"></div>
+  <div class="mdisc z"><img src="${mascot}"></div>
+  <span class="wordmark wm z">COLLECTA</span>
+</div>`;
 }
 
 export function marketplaceAvatar({ mascot }) {

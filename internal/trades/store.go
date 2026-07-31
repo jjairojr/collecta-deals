@@ -202,6 +202,56 @@ func (s *Store) SetListings(updates map[string]Listing) (int, error) {
 	return n, nil
 }
 
+// LigaState is what a holding looks like on the LigaMagic store: whether it is
+// registered there and, if so, the quantity and unit price actually sent.
+type LigaState struct {
+	Listed   bool
+	Qty      int
+	PriceBRL float64
+}
+
+// SetLigaState records LigaMagic registration state for many trades in a single
+// load/persist cycle. Unknown ids are ignored; returns the count updated.
+//
+// Deliberately separate from SetListings: that one owns the public storefront
+// fields and would overwrite price and visibility, so folding the Liga flag into
+// it would let a flag toggle clobber a price.
+func (s *Store) SetLigaState(updates map[string]LigaState) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now()
+	n := 0
+	for i := range all {
+		u, ok := updates[all[i].ID]
+		if !ok {
+			continue
+		}
+		all[i].LigaListed = u.Listed
+		if u.Listed {
+			all[i].LigaQty = u.Qty
+			all[i].LigaPriceBRL = u.PriceBRL
+			all[i].LigaAt = now
+		} else {
+			all[i].LigaQty = 0
+			all[i].LigaPriceBRL = 0
+			all[i].LigaAt = time.Time{}
+		}
+		all[i].UpdatedAt = now
+		n++
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	if err := s.persist(all); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 type Sale struct {
 	Qty          int
 	SellPrice    float64

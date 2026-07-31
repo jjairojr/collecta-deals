@@ -563,6 +563,10 @@ export interface Trade {
   listed?: boolean;
   imageURL?: string;
   featured?: boolean;
+  ligaListed?: boolean;
+  ligaQty?: number;
+  ligaPriceBRL?: number;
+  ligaAt?: string;
   status: "holding" | "sold";
   sellPrice?: number;
   sellCurrency?: "BRL" | "USD";
@@ -727,6 +731,24 @@ export interface ListingInput {
 export function setListings(items: ListingInput[]): Promise<{ updated: number }> {
   return sendJSON<{ updated: number }>(
     `${base}/trades/listings?${gp(new URLSearchParams()).toString()}`,
+    "POST",
+    { items },
+  );
+}
+
+export interface LigaInput {
+  id: string;
+  ligaListed: boolean;
+  ligaQty: number;
+  ligaPriceBRL: number;
+}
+
+// setLigaState records which holdings are registered on the LigaMagic store. It
+// writes different columns than setListings, so a flag toggle never touches the
+// asking price.
+export function setLigaState(items: LigaInput[]): Promise<{ updated: number }> {
+  return sendJSON<{ updated: number }>(
+    `${base}/trades/liga?${gp(new URLSearchParams()).toString()}`,
     "POST",
     { items },
   );

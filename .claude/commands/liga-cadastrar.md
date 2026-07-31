@@ -158,13 +158,75 @@ termo de busca.
 Confirme o casamento com o usuário na primeira execução (mostre
 `ledger → sid → categoria`) antes de gravar.
 
-## Fase 1b — Singles ⚠️ fluxo ainda não validado
+## Fase 1b — Singles ✅ validado em 2026-07-30
 
-Tela: `?view=ecom/admin/cartas/all&tcg=<id>` (busca por card, exige ao menos um
-campo preenchido). Os três jogos do escopo já estão públicos e em "Somente com
-Estoque". **Antes de cadastrar em lote, valide o fluxo com 1 card** e documente
-os nomes de campo aqui, do mesmo jeito que a Fase 1 documenta os selados.
-Não presuma que os campos são iguais aos de produto.
+> **Singles têm skill por jogo — use a do jogo em vez desta seção.**
+> `liga-singles-pokemon` (casamento na tela do admin), `liga-singles-riftbound`
+> e `liga-singles-onepiece` (importação por CSV). As três foram validadas ponta
+> a ponta em 2026-07-30. Lorcana e Gundam ainda não têm skill.
+
+### ⚠️ Confira o NOME da carta, não só o número
+
+Número + total **não identificam a edição**. `253` (Celebrações) e `254` (Coleção
+Clássica de Celebrações) têm ambas 25 cards — escolher pela contagem publicou
+Kyogre no lugar de Venusaur, Cosmog no lugar de Mew ex e Solgaleo no lugar de
+Zekrom (2026-07-30). O nome da carta fica na **célula 6 da linha**; aborte a
+linha quando ele não casar com o do ledger, e nunca afrouxe o casamento para
+"resolver" um abort.
+
+Tela: `?view=ecom/admin/cartas/all&tcg=<id>`. Busca simples por `txt_carta` +
+`procurar`; a avançada aceita `txt_edicao` (785 edições), raridade, cor e extras.
+Salvar com o botão **Salvar** (`form.requestSubmit`) → *"Cards de sua lista
+alterados com sucesso"*.
+
+Campos por linha `[n]`:
+
+| campo | uso |
+| --- | --- |
+| `h_ide_edicao[n]` | id da edição na Liga |
+| `h_ide_carta[n]` | id do card (mesmo card em várias edições repete) |
+| `h_numero_carta[n]` | número impresso, ex. `101` |
+| `h_id[n]` | **id do seu cadastro** — vazio = não cadastrado |
+| `txt_qty_typed[n]` + `txt_qty[n]` | quantidade (escreva nos dois) |
+| `txt_preco[n]` | preço unitário |
+| `txt_idioma[n]` | idioma |
+| `txt_qualidade[n]` | condição |
+| `txt_extras_<n>[]` | **multi-select**: Foil, Reverse Foil, Master Ball… |
+
+**Qualidade (difere da de produto!):** `1` M · **`2` NM** · `3` SP · **`4` MP** ·
+`5` HP · `6` D. Nosso ledger usa NM/MP, que mapeiam direto para `2` e `4`.
+
+**Extras** (só singles): `2` Foil · `3` Reverse Foil · `7` Promo · `13` Pre
+Release · `43` Master Ball · `47` Pokeball Foil · `11` Assinada · `37` Misprint.
+Deixar vazio = card normal.
+
+### Como casar o card certo
+
+O nome no ledger traz `(NNN/DDD)` — ex. `Mega Darkrai ex (101/084)`. O
+**denominador identifica a edição**: buscar "Mega Darkrai ex" devolve 8 linhas em
+2 edições, e `/084` é a `792` enquanto `/081` é a `777`. Case por
+`h_ide_edicao` + `h_numero_carta`, nunca por posição.
+
+Mapa de edição (o código entre parênteses no set do ledger é a chave):
+
+| set no ledger | edição na Liga |
+| --- | --- |
+| `Escuridão Absoluta (PBL)` | `792` Escuridão Absoluta / Pitch Black |
+| `WHT` | `722` Fogo Branco / White Flare |
+| `BLK` | `721` Raio Preto / Black Bolt |
+
+⚠️ Alguns sets vêm sem código (`151`, `Celebrações 25 Anos (2021)`,
+`Black & White (2011)`) e outros com **espaço no início** — normalize com
+`.strip()` antes de comparar.
+
+**Estratégia de lote:** buscar por **edição** (não card a card) traz todos os
+cards daquele set numa página; preencha todas as linhas que você tem e dê um
+Salvar só. ~6 buscas cobrem as 70 singles de Pokémon, contra 70 buscas
+individuais.
+
+⚠️ **O ledger não guarda idioma nem variante em singles** (`variant` vazio nas 70).
+Ambos precisam ser decididos com o dono antes do lote — errar o idioma ou marcar
+Foil onde não é gera anúncio errado.
 
 ---
 
@@ -217,6 +279,24 @@ Com `--dry-run`: só monte e mostre a tabela `item → sid → qty → preço �
    de insistir.
 8. **`tipo_abertura` é invertido entre telas:** em Banners `1` = mesma janela;
    em Notícias `0` = mesma janela. Confira os `option.value` antes de setar.
+9. **Páginas públicas via `fetch` NÃO mostram qty/preço** — `N un.` e `R$` são
+   injetados por JS no navegador. Um `fetch` da categoria sempre devolve
+   `"un. R$"` vazio, mesmo com estoque; isso NÃO é evidência de cadastro
+   faltando. Verifique navegando de verdade (screenshot/zoom).
+10. **`txt_estoque` do `prod/edit` não é o estoque** — produto vivo com 4 un. na
+    loja mostra `0` ali, e salvar esse campo não persiste. Estoque de produto se
+    grava só pela linha do `prod/all`.
+11. **Quantidade no `prod/all` (custou 90 un. fantasma na Vendetta):** preencha
+    SÓ `txt_qty_typed[n]` disparando `input`+`change` (o handler sincroniza o
+    hidden `txt_qty[n]`); escrever no hidden na mão fez o estoque SOMAR
+    (30→60→90) em vez de setar. `typed=0` zera de forma absoluta — é o reset
+    seguro: zere e regrave o valor certo. Depois de salvar, confira a
+    quantidade na página pública renderizada, nunca no formulário (o
+    `markFavorite(eid, qty)` da listagem também vem defasado).
+12. **A home demora a refletir estoque novo** (cache da Liga): a página da
+    categoria atualiza na hora, o bloco de destaque da home pode levar mais
+    tempo para passar a renderizar. Categoria certa + estoque público = config
+    ok; recheque a home depois.
 
 ---
 
@@ -266,6 +346,24 @@ então um regex procurando só `ocultar=` devolve `undefined`.
 
 Só categorias **não-card-game** têm esse ícone. Categorias com Regra = Card Game
 (Cartas de One Piece etc.) só têm Editar/Deletar — não há como ocultá-las.
+
+### ⚠️ Categoria de card game precisa de "Link fixo"
+
+A página `?view=ecom/itens&id=866280&cat=<id>` de uma categoria **card game** vem
+**sempre vazia** — ela lista *produtos* atribuídos à categoria, e cartas não moram
+em categoria, moram em `tcg=`. Resultado: clicar no menu não mostra nada.
+
+A Liga transforma a entrada em dropdown (com "Todos cards" + edições) só para
+alguns jogos — One Piece ganhou, Pokémon e Riftbound não, e re-salvar a categoria
+não muda isso.
+
+**Solução:** preencha o campo **Link fixo** na categoria com a lista de cards:
+
+| categoria | Link fixo |
+| --- | --- |
+| Cartas de One Piece (`255616`) | tem dropdown, não precisa |
+| Cartas de Pokémon (`254664`) | `…/?view=ecom/itens&id=866280&tcg=2` |
+| Cartas de Riftbound (`256180`) | `…/?view=ecom/itens&id=866280&tcg=19` |
 
 ### Regra da categoria decide o que ela lista
 

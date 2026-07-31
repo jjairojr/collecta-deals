@@ -13,6 +13,7 @@ import {
   Sparkles,
   Store,
   Swords,
+  Upload,
   Wallet,
   Wand2,
 } from "lucide-react";
@@ -28,7 +29,8 @@ export type View =
   | "estoque"
   | "orcamento"
   | "buyout"
-  | "guialiga";
+  | "guialiga"
+  | "ligaexport";
 
 export type Icon = ComponentType<{ className?: string }>;
 
@@ -71,7 +73,10 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "Ajuda",
-    items: [{ key: "guialiga", label: "Guia da Liga", icon: BookOpen }],
+    items: [
+      { key: "ligaexport", label: "Exportar p/ Liga", icon: Upload },
+      { key: "guialiga", label: "Guia da Liga", icon: BookOpen },
+    ],
   },
 ];
 
