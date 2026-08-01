@@ -11,6 +11,7 @@ import {
   ImagePlus,
   Save,
   Search,
+  Share2,
   Star,
   Store,
   Tags,
@@ -32,6 +33,7 @@ import {
 } from "../api";
 import { brl, brl0, usd } from "../format";
 import CardArt from "./CardArt";
+import ShareList from "./ShareList";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
@@ -227,6 +229,7 @@ export default function StockPage() {
   const [imgEditId, setImgEditId] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>({ key: "total", dir: "desc" });
   const [onlyMissingOnLiga, setOnlyMissingOnLiga] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -283,6 +286,21 @@ export default function StockPage() {
         rowsRef.current,
       ),
     [holdings, q, sort, fx, onlyMissingOnLiga],
+  );
+
+  // The share panel posts exactly what is on screen, priced with the draft
+  // edits: you can tweak a price for the post and send it before deciding
+  // whether to save it to the ledger.
+  const shareItems = useMemo(
+    () =>
+      visible.map((t) => ({
+        ...t,
+        name: cleanName(t.name) || t.number,
+        askBRL: rows[t.id]?.askBRL ?? t.askBRL ?? 0,
+        listed: rows[t.id]?.listed ?? Boolean(t.listed),
+        imageURL: rows[t.id]?.imageURL || t.imageURL,
+      })),
+    [visible, rows],
   );
 
   const onSort = useCallback((key: SortKey) => {
@@ -550,8 +568,25 @@ export default function StockPage() {
           <Button variant="outline" onClick={() => listAll(false)} disabled={visible.length === 0}>
             Ocultar todas
           </Button>
+          <Button
+            variant={sharing ? "accent" : "outline"}
+            onClick={() => setSharing((v) => !v)}
+            disabled={visible.length === 0}
+            title="Montar a lista do que está à venda para postar nos grupos"
+          >
+            <Share2 /> Compartilhar
+          </Button>
         </div>
       </div>
+
+      {sharing && shareItems.length > 0 && (
+        <ShareList
+          variant="stock"
+          holdings={shareItems}
+          fxRate={fx}
+          onClose={() => setSharing(false)}
+        />
+      )}
 
       {loading ? (
         <Panel>Carregando estoque…</Panel>

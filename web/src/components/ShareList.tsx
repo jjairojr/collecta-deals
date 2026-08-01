@@ -7,30 +7,45 @@ import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { ToggleGroup } from "./ui/toggle-group";
 
-// ShareList turns held cards into something you can hand to a buyer: a copyable
-// text block and a downloadable image grid. Asking prices are seeded as a
-// percentage of the live TCGplayer price (80/90/100%) and editable per card.
-// Prices show in US$ (international buyers) or R$ (local sales); the currency
-// also picks the language of the exported text. You choose whether to reveal
-// what you paid (kept in BRL, the real cost basis).
+// ShareList turns held products into something you can hand to a buyer: a
+// copyable text block and a downloadable image grid.
+//
+// The "portfolio" variant seeds asking prices as a percentage of the live
+// TCGplayer price (80/90/100%) and shows them in US$ or R$ — the currency also
+// picks the language of the exported text. The "stock" variant is the seller's
+// post for BR groups: prices come from what was already set on the Estoque page
+// (R$), and only what is on sale starts marked. Either way, editing here never
+// touches the ledger, and you choose whether to reveal what you paid.
 type Currency = "USD" | "BRL";
+type Variant = "portfolio" | "stock";
 
 export default function ShareList({
   holdings,
   fxRate,
   onClose,
+  variant = "portfolio",
 }: {
   holdings: TradeView[];
   fxRate: number;
   onClose: () => void;
+  variant?: Variant;
 }) {
-  const [currency, setCurrency] = useState<Currency>("USD");
+  const L = variant === "stock" ? PT_LABELS : EN_LABELS;
+  const [currency, setCurrency] = useState<Currency>(
+    variant === "stock" ? "BRL" : "USD",
+  );
   const [includePaid, setIncludePaid] = useState(false);
   const [includeAsking, setIncludeAsking] = useState(true);
   const [showProfit, setShowProfit] = useState(true);
   const [askPct, setAskPct] = useState(90);
   const [rows, setRows] = useState<Record<string, RowState>>(() =>
-    seedRows(holdings, 90, "USD", fxRate),
+    seedRows(holdings, {
+      pct: 90,
+      currency: variant === "stock" ? "BRL" : "USD",
+      fxRate,
+      variant,
+      onlyListed: preferListed(holdings, variant),
+    }),
   );
   const [previewMode, setPreviewMode] = useState<PreviewMode>("image");
   const [copied, setCopied] = useState(false);
@@ -38,12 +53,36 @@ export default function ShareList({
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
 
+  // The stock panel is fed by the page's current search, so the list can grow
+  // while the panel is open: anything not seeded yet gets its own row instead of
+  // showing up unpriced and unselectable.
+  useEffect(() => {
+    setRows((prev) => {
+      const missing = holdings.filter((t) => !prev[t.id]);
+      if (missing.length === 0) {
+        return prev;
+      }
+      const ctx: SeedCtx = {
+        pct: askPct,
+        currency,
+        fxRate,
+        variant,
+        onlyListed: preferListed(holdings, variant),
+      };
+      const next = { ...prev };
+      for (const t of missing) {
+        next[t.id] = seedRow(t, ctx);
+      }
+      return next;
+    });
+  }, [holdings, askPct, currency, fxRate, variant]);
+
   const selected = useMemo(
     () => holdings.filter((t) => rows[t.id]?.include),
     [holdings, rows],
   );
 
-  const opts: ShareOpts = { includePaid, includeAsking };
+  const opts: ShareOpts = { includePaid, includeAsking, variant };
   const totals = useMemo(() => {
     let asking = 0;
     let cost = 0;
@@ -207,44 +246,44 @@ export default function ShareList({
     <Card className="space-y-4 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-sm font-bold text-fg">Share list</h3>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Pick cards, then Share to WhatsApp. Asking prices are a % of the live
-            TCGplayer price, in US$ or R$ — edit any of them. Long lists split into
-            pages of {PAGE_SIZE} so each image stays sharp.
-          </p>
+          <h3 className="font-display text-sm font-bold text-fg">{L.title}</h3>
+          <p className="mt-0.5 text-xs text-slate-400">{L.hint(PAGE_SIZE)}</p>
         </div>
         <button
           onClick={onClose}
           className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-raised hover:text-slate-100"
-          title="Close"
+          title={L.close}
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup
-          value={currency}
-          onChange={(v) => applyCurrency(v as Currency)}
-          options={currencyOptions}
-        />
-        <span className="mx-1 h-5 w-px bg-slate-800" />
+        {variant === "portfolio" && (
+          <>
+            <ToggleGroup
+              value={currency}
+              onChange={(v) => applyCurrency(v as Currency)}
+              options={currencyOptions}
+            />
+            <span className="mx-1 h-5 w-px bg-slate-800" />
+          </>
+        )}
         <Toggle on={includeAsking} onClick={() => setIncludeAsking((v) => !v)}>
-          Asking price
+          {L.asking}
         </Toggle>
         <Toggle on={includePaid} onClick={() => setIncludePaid((v) => !v)}>
-          Price paid
+          {L.paid}
         </Toggle>
         {includeAsking && (
           <Toggle on={showProfit} onClick={() => setShowProfit((v) => !v)}>
-            My profit
+            {L.profit}
           </Toggle>
         )}
         {includeAsking && (
           <div className="flex items-center gap-2">
             <span className="font-pixel text-[9px] uppercase text-brand-label">
-              % of TCG
+              {L.pctOf}
             </span>
             <ToggleGroup
               value={String(askPct)}
@@ -254,19 +293,23 @@ export default function ShareList({
           </div>
         )}
         <span className="ml-auto text-xs text-slate-500">
-          {selected.length} of {holdings.length} selected
+          {L.selected(selected.length, holdings.length)}
         </span>
       </div>
 
-      <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
+      <div
+        className={`sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel ${
+          holdings.length > LONG_LIST ? "max-h-[26rem] overflow-y-auto" : ""
+        }`}
+      >
         <table className="w-full min-w-[560px] text-sm">
           <thead>
-            <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
+            <tr className="font-pixel sticky top-0 z-10 border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label [&>th]:bg-raised">
               <th className="px-3 py-2 font-bold">
                 <input
                   type="checkbox"
-                  aria-label={allSelected ? "Unmark all" : "Mark all"}
-                  title={allSelected ? "Unmark all" : "Mark all"}
+                  aria-label={allSelected ? L.unmarkAll : L.markAll}
+                  title={allSelected ? L.unmarkAll : L.markAll}
                   checked={allSelected}
                   ref={(el) => {
                     if (el) el.indeterminate = !allSelected && someSelected;
@@ -275,16 +318,14 @@ export default function ShareList({
                   className="h-4 w-4 accent-brand"
                 />
               </th>
-              <th className="px-3 py-2 font-bold">Card</th>
-              <th className="px-3 py-2 text-right font-bold">TCG</th>
-              {includePaid && <th className="px-3 py-2 text-right font-bold">Paid /ea</th>}
+              <th className="px-3 py-2 font-bold">{L.colCard}</th>
+              <th className="px-3 py-2 text-right font-bold">{L.colRef}</th>
+              {includePaid && <th className="px-3 py-2 text-right font-bold">{L.colPaid}</th>}
               {includeAsking && <th className="px-3 py-2 text-right font-bold">%</th>}
               {includeAsking && (
-                <th className="px-3 py-2 text-right font-bold">
-                  Asking {currency === "USD" ? "US$" : "R$"} /ea
-                </th>
+                <th className="px-3 py-2 text-right font-bold">{L.colAsk(currency)}</th>
               )}
-              {showProfitCol && <th className="px-3 py-2 text-right font-bold">My profit</th>}
+              {showProfitCol && <th className="px-3 py-2 text-right font-bold">{L.profit}</th>}
             </tr>
           </thead>
           <tbody>
@@ -315,7 +356,7 @@ export default function ShareList({
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-400">
-                    {t.marketKnown ? money(tcgInCurrency, currency) : "—"}
+                    {tcgInCurrency > 0 ? money(tcgInCurrency, currency) : "—"}
                   </td>
                   {includePaid && (
                     <td className="px-3 py-2 text-right tabular-nums text-slate-400">
@@ -329,7 +370,7 @@ export default function ShareList({
                           type="number"
                           value={String(row?.pct ?? 0)}
                           onChange={(e) => setRowPct(t, Number(e.target.value) || 0)}
-                          disabled={!t.marketKnown || t.marketUSD <= 0}
+                          disabled={tcgInCurrency <= 0}
                           className="w-16 text-right"
                         />
                         <span className="text-xs text-slate-500">%</span>
@@ -361,13 +402,13 @@ export default function ShareList({
 
       {includeAsking && selected.length > 0 && (
         <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2 text-sm">
-          <SummaryStat label="Asking total" value={money(totals.asking, currency)} tone="accent" />
+          <SummaryStat label={L.totalAsk} value={money(totals.asking, currency)} tone="accent" />
           {showProfit && (
-            <SummaryStat label="Your cost" value={money(totals.cost, currency)} tone="muted" />
+            <SummaryStat label={L.yourCost} value={money(totals.cost, currency)} tone="muted" />
           )}
           {showProfit && (
             <SummaryStat
-              label="Your profit"
+              label={L.yourProfit}
               value={`${money(totals.profit, currency)} · ${pctFmt(totals.margin)}`}
               tone={totals.profit >= 0 ? "gain" : "loss"}
             />
@@ -378,35 +419,46 @@ export default function ShareList({
       <div>
         <div className="mb-1.5 flex items-center justify-between">
           <span className="font-pixel text-[9px] uppercase text-brand-label">
-            Preview
+            {L.preview}
           </span>
           <ToggleGroup
             value={previewMode}
             onChange={(v) => setPreviewMode(v as PreviewMode)}
-            options={previewOptions}
+            options={[
+              { value: "image", label: L.tabImage },
+              { value: "text", label: L.tabText },
+            ]}
           />
         </div>
         {previewMode === "text" ? (
           <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-[14px] border-[3px] border-outline bg-page p-3 text-xs text-slate-300">
-            {preview || "Select at least one card to build your list."}
+            {preview || L.empty}
           </pre>
         ) : (
-          <ImagePreview selected={selected} rows={rows} opts={opts} currency={currency} total={total} />
+          <ImagePreview
+            selected={selected}
+            rows={rows}
+            opts={opts}
+            currency={currency}
+            total={total}
+            empty={L.empty}
+            pageLabel={L.page}
+          />
         )}
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" onClick={copyText} disabled={selected.length === 0}>
-          {copied ? <Check /> : <Copy />} {copied ? "Copied!" : "Copy text"}
+          {copied ? <Check /> : <Copy />} {copied ? L.copied : L.copyText}
         </Button>
         <Button variant="outline" onClick={copyImage} disabled={selected.length === 0 || busy}>
-          {copiedImg ? <Check /> : <Images />} {copiedImg ? "Copied!" : "Copy image"}
+          {copiedImg ? <Check /> : <Images />} {copiedImg ? L.copied : L.copyImage}
         </Button>
         <Button variant="outline" onClick={downloadImage} disabled={selected.length === 0 || busy}>
-          {busy ? <ImageDown /> : <Download />} {busy ? "Building…" : "Download"}
+          {busy ? <ImageDown /> : <Download />} {busy ? L.building : L.download}
         </Button>
         <Button variant="accent" onClick={shareList} disabled={selected.length === 0 || sharing}>
-          <Send /> {sharing ? "Sharing…" : "Share"}
+          <Send /> {sharing ? L.sharingNow : L.share}
         </Button>
       </div>
     </Card>
@@ -425,10 +477,9 @@ const askPctOptions = [
   { value: "100", label: "100%" },
 ];
 
-const previewOptions = [
-  { value: "image", label: "Image" },
-  { value: "text", label: "Text" },
-];
+// Past LONG_LIST products the picker gets its own scroll area, so the preview
+// and the share buttons stay reachable instead of sitting below a wall of rows.
+const LONG_LIST = 25;
 
 type PreviewMode = "image" | "text";
 
@@ -441,7 +492,109 @@ interface RowState {
 interface ShareOpts {
   includePaid: boolean;
   includeAsking: boolean;
+  variant: Variant;
 }
+
+// The portfolio panel talks to an international buyer in English; the stock
+// panel is the seller's own post for BR groups, so it speaks Portuguese and
+// never mentions TCGplayer — its reference is whatever the Estoque page shows.
+interface Labels {
+  title: string;
+  hint: (pageSize: number) => string;
+  asking: string;
+  paid: string;
+  profit: string;
+  pctOf: string;
+  selected: (n: number, total: number) => string;
+  colCard: string;
+  colRef: string;
+  colPaid: string;
+  colAsk: (currency: Currency) => string;
+  totalAsk: string;
+  yourCost: string;
+  yourProfit: string;
+  preview: string;
+  tabImage: string;
+  tabText: string;
+  page: (index: number, count: number) => string;
+  empty: string;
+  copyText: string;
+  copied: string;
+  copyImage: string;
+  download: string;
+  building: string;
+  share: string;
+  sharingNow: string;
+  close: string;
+  markAll: string;
+  unmarkAll: string;
+}
+
+const EN_LABELS: Labels = {
+  title: "Share list",
+  hint: (pageSize) =>
+    `Pick cards, then Share to WhatsApp. Asking prices are a % of the live TCGplayer price, in US$ or R$ — edit any of them. Long lists split into pages of ${pageSize} so each image stays sharp.`,
+  asking: "Asking price",
+  paid: "Price paid",
+  profit: "My profit",
+  pctOf: "% of TCG",
+  selected: (n, total) => `${n} of ${total} selected`,
+  colCard: "Card",
+  colRef: "TCG",
+  colPaid: "Paid /ea",
+  colAsk: (currency) => `Asking ${currency === "USD" ? "US$" : "R$"} /ea`,
+  totalAsk: "Asking total",
+  yourCost: "Your cost",
+  yourProfit: "Your profit",
+  preview: "Preview",
+  tabImage: "Image",
+  tabText: "Text",
+  page: (index, count) => `Page ${index} / ${count}`,
+  empty: "Select at least one card to build your list.",
+  copyText: "Copy text",
+  copied: "Copied!",
+  copyImage: "Copy image",
+  download: "Download",
+  building: "Building…",
+  share: "Share",
+  sharingNow: "Sharing…",
+  close: "Close",
+  markAll: "Mark all",
+  unmarkAll: "Unmark all",
+};
+
+const PT_LABELS: Labels = {
+  title: "Lista para grupos",
+  hint: (pageSize) =>
+    `Marque o que entra no post e mande para o WhatsApp. Os preços já vêm do estoque — pode editar aqui que nada disso altera o que está salvo. Listas longas viram várias imagens de ${pageSize} produtos.`,
+  asking: "Preço",
+  paid: "Preço pago",
+  profit: "Meu lucro",
+  pctOf: "% da ref.",
+  selected: (n, total) => `${n} de ${total} marcados`,
+  colCard: "Produto",
+  colRef: "Ref.",
+  colPaid: "Pago /un",
+  colAsk: () => "Preço R$ /un",
+  totalAsk: "Total pedido",
+  yourCost: "Meu custo",
+  yourProfit: "Meu lucro",
+  preview: "Prévia",
+  tabImage: "Imagem",
+  tabText: "Texto",
+  page: (index, count) => `Imagem ${index} / ${count}`,
+  empty: "Marque pelo menos um produto para montar a lista.",
+  copyText: "Copiar texto",
+  copied: "Copiado!",
+  copyImage: "Copiar imagem",
+  download: "Baixar",
+  building: "Gerando…",
+  share: "Compartilhar",
+  sharingNow: "Enviando…",
+  close: "Fechar",
+  markAll: "Marcar todos",
+  unmarkAll: "Desmarcar todos",
+};
 
 // money formats an amount in the chosen currency: USD with cents, BRL rounded
 // (pt-BR grouping) — matching how the Quotes feature shows reais.
@@ -449,16 +602,22 @@ function money(value: number, currency: Currency): string {
   return currency === "USD" ? usd(value) : brl0(value);
 }
 
-// marketInCurrency converts a card's live TCG price into the display currency.
-// fxRate is USD per BRL (e.g. 0.195), so BRL = USD / fxRate.
+// marketInCurrency converts a product's market reference into the display
+// currency: the live TCG price when there is one, else the manual estimate that
+// sealed products and accessories carry (already in BRL). fxRate is USD per BRL
+// (e.g. 0.195), so BRL = USD / fxRate and USD = BRL * fxRate.
 function marketInCurrency(t: TradeView, currency: Currency, fxRate: number): number {
-  if (!t.marketKnown || t.marketUSD <= 0) {
+  if (t.marketKnown && t.marketUSD > 0) {
+    if (currency === "USD") {
+      return t.marketUSD;
+    }
+    return fxRate > 0 ? t.marketUSD / fxRate : t.marketUSD;
+  }
+  const manual = t.manualBRL ?? 0;
+  if (manual <= 0) {
     return 0;
   }
-  if (currency === "USD") {
-    return t.marketUSD;
-  }
-  return fxRate > 0 ? t.marketUSD / fxRate : t.marketUSD;
+  return currency === "BRL" ? manual : manual * fxRate;
 }
 
 // costInCurrency converts a card's total cost basis (kept in BRL) into the
@@ -490,21 +649,67 @@ function pctFromMarket(t: TradeView, ask: number, currency: Currency, fxRate: nu
   return Math.round((ask / base) * 100);
 }
 
-function seedRows(
-  holdings: TradeView[],
-  pct: number,
-  currency: Currency,
-  fxRate: number,
-): Record<string, RowState> {
+interface SeedCtx {
+  pct: number;
+  currency: Currency;
+  fxRate: number;
+  variant: Variant;
+  onlyListed: boolean;
+}
+
+// preferListed decides how the stock panel opens: if anything is already on
+// sale, only those start marked — that is the post you meant to write. With
+// nothing on sale yet, marking everything beats opening an empty panel.
+function preferListed(holdings: TradeView[], variant: Variant): boolean {
+  return (
+    variant === "stock" &&
+    holdings.some((t) => t.listed && (t.askBRL ?? 0) > 0)
+  );
+}
+
+// seedRow gives a product its starting state in the panel. The stock variant
+// takes the price already set on the Estoque page; the portfolio variant prices
+// off the live market at the chosen %.
+function seedRow(t: TradeView, ctx: SeedCtx): RowState {
+  if (ctx.variant === "stock") {
+    const ask = t.askBRL ?? 0;
+    return {
+      include: ctx.onlyListed ? Boolean(t.listed) && ask > 0 : true,
+      ask,
+      pct: pctFromMarket(t, ask, ctx.currency, ctx.fxRate),
+    };
+  }
+  return {
+    include: true,
+    ask: askFromMarket(t, ctx.pct, ctx.currency, ctx.fxRate),
+    pct: ctx.pct,
+  };
+}
+
+function seedRows(holdings: TradeView[], ctx: SeedCtx): Record<string, RowState> {
   const out: Record<string, RowState> = {};
   for (const t of holdings) {
-    out[t.id] = { include: true, ask: askFromMarket(t, pct, currency, fxRate), pct };
+    out[t.id] = seedRow(t, ctx);
   }
   return out;
 }
 
-function eaSuffix(qty: number): string {
-  return qty > 1 ? " ea" : "";
+// eaSuffix marks a price as per-unit, and only where it matters: a single copy
+// has no "each" to spell out.
+function eaSuffix(qty: number, currency: Currency): string {
+  if (qty <= 1) {
+    return "";
+  }
+  return currency === "BRL" ? " cada" : " ea";
+}
+
+// condLabel is the condition shown next to a product. Sealed boxes and
+// accessories have none — printing "NM" on a booster box would be nonsense.
+function condLabel(t: TradeView): string {
+  if (t.kind) {
+    return "";
+  }
+  return t.condition || "NM";
 }
 
 function buildText(
@@ -517,7 +722,7 @@ function buildText(
     return "";
   }
   const pt = currency === "BRL";
-  const noun = selected.length === 1 ? (pt ? "carta" : "card") : pt ? "cartas" : "cards";
+  const noun = itemNoun(selected.length, opts.variant, pt);
   const lines: string[] = [
     `${gameLabel()} — ${pt ? "à venda" : "for sale"} (${selected.length} ${noun})`,
     "",
@@ -525,13 +730,15 @@ function buildText(
   let total = 0;
   for (const t of selected) {
     const row = rows[t.id];
-    lines.push(`${t.name} (${t.number})`);
-    const meta = [t.condition || "NM", `${t.qty}x`];
+    lines.push(t.number ? `${t.name} (${t.number})` : t.name);
+    const meta = [condLabel(t), `${t.qty}x`].filter(Boolean);
     if (opts.includeAsking) {
       const lineTotal = row.ask * Math.max(t.qty, 1);
       total += lineTotal;
       if (t.qty > 1) {
-        meta.push(`${money(row.ask, currency)}${eaSuffix(t.qty)} = ${money(lineTotal, currency)}`);
+        meta.push(
+          `${money(row.ask, currency)}${eaSuffix(t.qty, currency)} = ${money(lineTotal, currency)}`,
+        );
       } else {
         meta.push(money(row.ask, currency));
       }
@@ -539,7 +746,7 @@ function buildText(
     lines.push(meta.join(" · "));
     if (opts.includePaid) {
       const paid = brl0(t.costBRL / Math.max(t.qty, 1));
-      lines.push(`${pt ? "pago" : "paid"}: ${paid}${eaSuffix(t.qty)}`);
+      lines.push(`${pt ? "pago" : "paid"}: ${paid}${eaSuffix(t.qty, currency)}`);
     }
     lines.push("");
   }
@@ -547,6 +754,21 @@ function buildText(
     lines.push(`💰 Total: ${money(total, currency)}`);
   }
   return lines.join("\n").trimEnd();
+}
+
+// itemNoun counts the list: the stock panel mixes singles, sealed and
+// accessories, so it says "items" where the portfolio panel says "cards".
+function itemNoun(count: number, variant: Variant, pt: boolean): string {
+  if (variant === "stock") {
+    if (pt) {
+      return count === 1 ? "item" : "itens";
+    }
+    return count === 1 ? "item" : "items";
+  }
+  if (pt) {
+    return count === 1 ? "carta" : "cartas";
+  }
+  return count === 1 ? "card" : "cards";
 }
 
 function gameLabel(): string {
@@ -624,10 +846,16 @@ interface PageInfo {
   cols: number;
 }
 
-// imgSrc resolves a card's art, preferring its exact TCGplayer product image
-// (routed through the same-origin proxy so the canvas isn't tainted) over the
-// number-keyed Liga lookup — the latter can't tell variant prints apart.
+// imgSrc resolves a product's art. A hand-picked image URL (the only art sealed
+// products and accessories have) wins; otherwise the exact TCGplayer product
+// image, routed through the same-origin proxy so the canvas isn't tainted,
+// beats the number-keyed Liga lookup — the latter can't tell variant prints
+// apart. A remote URL without CORS simply fails to load and the cell falls back
+// to text, so it can never taint the canvas either.
 function imgSrc(t: TradeView): string | null {
+  if (t.imageURL) {
+    return t.imageURL;
+  }
   const pid = productIDFromTcgURL(t.tcgUrl);
   if (pid) {
     return cardImageURL(t.set, t.number, pid);
@@ -636,7 +864,7 @@ function imgSrc(t: TradeView): string | null {
 }
 
 function imgKey(t: TradeView): string {
-  return `${t.set}|${t.number}|${productIDFromTcgURL(t.tcgUrl) ?? ""}`;
+  return `${t.imageURL ?? ""}|${t.set}|${t.number}|${productIDFromTcgURL(t.tcgUrl) ?? ""}`;
 }
 
 // paint draws one page: its cards, a header with a page indicator, and the
@@ -666,10 +894,11 @@ function paint(
   ctx.fillStyle = C_MUTED;
   ctx.font = "500 13px ui-sans-serif, system-ui, sans-serif";
   ctx.textAlign = "right";
+  const noun = itemNoun(page.totalCards, opts.variant, currency === "BRL");
   const header =
     page.count > 1
-      ? `${page.totalCards} cards · ${page.index + 1}/${page.count}`
-      : `${page.totalCards} cards`;
+      ? `${page.totalCards} ${noun} · ${page.index + 1}/${page.count}`
+      : `${page.totalCards} ${noun}`;
   ctx.fillText(header, lay.width - PAD, PAD + 8);
   ctx.textAlign = "left";
 
@@ -713,7 +942,7 @@ function drawCell(
     ctx.fillStyle = C_MUTED;
     ctx.font = "12px ui-monospace, monospace";
     ctx.textAlign = "center";
-    ctx.fillText(t.number, x + IMG_W / 2, y + IMG_H / 2 - 6);
+    ctx.fillText(truncate(ctx, t.number || t.name, IMG_W - 16), x + IMG_W / 2, y + IMG_H / 2 - 6);
     ctx.textAlign = "left";
   }
   ctx.strokeStyle = C_OUTLINE;
@@ -728,13 +957,13 @@ function drawCell(
 
   ctx.fillStyle = C_META;
   ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
-  const meta = [t.condition || "NM", `${t.qty}x`].join(" · ");
+  const meta = [condLabel(t), `${t.qty}x`].filter(Boolean).join(" · ");
   ctx.fillText(meta, x, cy + 20);
 
   if (opts.includeAsking && row) {
     ctx.fillStyle = C_ASK;
     ctx.font = "700 16px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillText(`${money(row.ask, currency)}${eaSuffix(t.qty)}`, x, cy + 38);
+    ctx.fillText(`${money(row.ask, currency)}${eaSuffix(t.qty, currency)}`, x, cy + 38);
   }
   if (opts.includePaid) {
     ctx.fillStyle = C_PAID;
@@ -852,12 +1081,16 @@ function ImagePreview({
   opts,
   currency,
   total,
+  empty,
+  pageLabel,
 }: {
   selected: TradeView[];
   rows: Record<string, RowState>;
   opts: ShareOpts;
   currency: Currency;
   total: number;
+  empty: string;
+  pageLabel: (index: number, count: number) => string;
 }) {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const cacheRef = useRef<Map<string, HTMLImageElement | null>>(new Map());
@@ -903,7 +1136,7 @@ function ImagePreview({
   if (selected.length === 0) {
     return (
       <div className="rounded-[14px] border-[3px] border-outline bg-page p-6 text-center text-xs text-slate-500">
-        Select at least one card to build your list.
+        {empty}
       </div>
     );
   }
@@ -914,7 +1147,7 @@ function ImagePreview({
         <div key={p} className="space-y-1.5">
           {pages.length > 1 && (
             <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-              Page {p + 1} / {pages.length}
+              {pageLabel(p + 1, pages.length)}
             </div>
           )}
           <canvas
