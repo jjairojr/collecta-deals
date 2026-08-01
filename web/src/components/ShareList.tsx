@@ -596,10 +596,18 @@ const PT_LABELS: Labels = {
   unmarkAll: "Desmarcar todos",
 };
 
-// money formats an amount in the chosen currency: USD with cents, BRL rounded
-// (pt-BR grouping) — matching how the Quotes feature shows reais.
+// money formats an amount in the chosen currency: USD always with cents, BRL
+// with cents only when the price has them. A list is a price tag — rounding
+// R$ 219,89 to R$ 220 would advertise a price that is not the registered one.
 function money(value: number, currency: Currency): string {
-  return currency === "USD" ? usd(value) : brl0(value);
+  if (currency === "USD") {
+    return usd(value);
+  }
+  const cents = Math.round(value * 100);
+  return `R$ ${(cents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 // marketInCurrency converts a product's market reference into the display
