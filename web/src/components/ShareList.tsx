@@ -93,7 +93,6 @@ export default function ShareList({
     const profit = asking - cost;
     return { asking, cost, profit, margin: cost > 0 ? (profit / cost) * 100 : 0 };
   }, [selected, rows, currency, fxRate]);
-  const total = totals.asking;
   const showProfitCol = includeAsking && showProfit;
 
   const setRow = (id: string, patch: Partial<RowState>) =>
@@ -438,7 +437,6 @@ export default function ShareList({
             rows={rows}
             opts={opts}
             currency={currency}
-            total={total}
             empty={L.empty}
             pageLabel={L.page}
           />
@@ -742,14 +740,12 @@ function buildText(
     `${gameLabel()} — ${pt ? "à venda" : "for sale"} (${selected.length} ${noun})`,
     "",
   ];
-  let total = 0;
   for (const t of selected) {
     const row = rows[t.id];
     lines.push(t.number ? `${t.name} (${t.number})` : t.name);
     const meta = [condLabel(t), `${t.qty}x`].filter(Boolean);
     if (opts.includeAsking) {
       const lineTotal = row.ask * Math.max(t.qty, 1);
-      total += lineTotal;
       if (t.qty > 1) {
         meta.push(
           `${money(row.ask, currency)}${eaSuffix(t.qty, currency)} = ${money(lineTotal, currency)}`,
@@ -764,9 +760,6 @@ function buildText(
       lines.push(`${pt ? "pago" : "paid"}: ${paid}${eaSuffix(t.qty, currency)}`);
     }
     lines.push("");
-  }
-  if (opts.includeAsking) {
-    lines.push(`💰 Total: ${money(total, currency)}`);
   }
   return lines.join("\n").trimEnd();
 }
@@ -801,7 +794,6 @@ const GAP = 18;
 const PAD = 28;
 const CAPTION_H = 66;
 const TITLE_H = 54;
-const FOOTER_H = 52;
 const SCALE = 2;
 // Cap each exported image at PAGE_SIZE cards (4 cols × 5 rows) so a long list
 // splits into several short, sharp PNGs instead of one very tall image that
@@ -820,23 +812,19 @@ const C_OUTLINE = "#0b0b0c";
 
 interface Layout {
   cols: number;
-  rowsN: number;
   width: number;
   height: number;
   gridTop: number;
-  gridH: number;
 }
 
 // layout sizes one page. cols is fixed across pages (from the full list) so
-// every page shares a width; showFooter reserves the total row only where it's
-// drawn (the last page).
-function layout(count: number, opts: ShareOpts, cols: number, showFooter: boolean): Layout {
+// every page shares a width.
+function layout(count: number, cols: number): Layout {
   const rowsN = Math.max(1, Math.ceil(count / cols));
   const width = PAD * 2 + cols * IMG_W + (cols - 1) * GAP;
   const gridH = rowsN * (IMG_H + CAPTION_H) + Math.max(rowsN - 1, 0) * GAP;
-  const footerH = opts.includeAsking && showFooter ? FOOTER_H : 0;
-  const height = PAD * 2 + TITLE_H + gridH + footerH;
-  return { cols, rowsN, width, height, gridTop: PAD + TITLE_H, gridH };
+  const height = PAD * 2 + TITLE_H + gridH;
+  return { cols, width, height, gridTop: PAD + TITLE_H };
 }
 
 // gridCols is the shared column count for a list of `count` cards.
@@ -882,20 +870,19 @@ function imgKey(t: TradeView): string {
   return `${t.imageURL ?? ""}|${t.set}|${t.number}|${productIDFromTcgURL(t.tcgUrl) ?? ""}`;
 }
 
-// paint draws one page: its cards, a header with a page indicator, and the
-// grand total only on the last page. grandTotal is the sum across every page.
+// paint draws one page: its cards and a header with a page indicator. There is
+// deliberately no grand total — a post to a group is a price list, not a bill,
+// and the sum of everything on offer is nobody's business but the seller's.
 function paint(
   ctx: CanvasRenderingContext2D,
   cards: TradeView[],
   rows: Record<string, RowState>,
   opts: ShareOpts,
   currency: Currency,
-  grandTotal: number,
   cache: Map<string, HTMLImageElement | null>,
   page: PageInfo,
 ) {
-  const showFooter = opts.includeAsking && page.index === page.count - 1;
-  const lay = layout(cards.length, opts, page.cols, showFooter);
+  const lay = layout(cards.length, page.cols);
 
   ctx.fillStyle = C_BG;
   ctx.fillRect(0, 0, lay.width, lay.height);
@@ -924,19 +911,6 @@ function paint(
     const y = lay.gridTop + r * (IMG_H + CAPTION_H + GAP);
     drawCell(ctx, t, rows[t.id], opts, currency, cache.get(imgKey(t)) ?? null, x, y);
   });
-
-  if (showFooter) {
-    const fy = lay.gridTop + lay.gridH + 16;
-    ctx.fillStyle = C_META;
-    ctx.font = "500 14px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("Total", PAD, fy);
-    ctx.fillStyle = C_ASK;
-    ctx.font = "700 20px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(money(grandTotal, currency), lay.width - PAD, fy - 3);
-    ctx.textAlign = "left";
-  }
 }
 
 function drawCell(
@@ -1014,8 +988,20 @@ function loadImage(t: TradeView): Promise<HTMLImageElement | null> {
   });
 }
 
+// Card art comes through our own proxy, which pulls each image from TCGplayer
+// the first time it is asked for. Firing a hundred of those at once makes some
+// of them fail, and a failed image is a hole in the grid — so a small pool
+// keeps the requests flowing without flooding the proxy.
+const IMG_CONCURRENCY = 6;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 // ensureImages loads any card art not yet in the shared cache, so both the live
-// preview and the PNG download draw from the same set of decoded images.
+// preview and the PNG download draw from the same set of decoded images. A
+// failed load is retried once — a single hiccup upstream shouldn't cost a card
+// its picture for the rest of the session, since the cache keeps the null.
 async function ensureImages(
   selected: TradeView[],
   cache: Map<string, HTMLImageElement | null>,
@@ -1024,23 +1010,26 @@ async function ensureImages(
   if (missing.length === 0) {
     return;
   }
+  let next = 0;
+  const worker = async () => {
+    for (let i = next++; i < missing.length; i = next++) {
+      const t = missing[i];
+      let img = await loadImage(t);
+      if (!img) {
+        await delay(300);
+        img = await loadImage(t);
+      }
+      cache.set(imgKey(t), img);
+    }
+  };
   await Promise.all(
-    missing.map(async (t) => {
-      cache.set(imgKey(t), await loadImage(t));
-    }),
+    Array.from({ length: Math.min(IMG_CONCURRENCY, missing.length) }, worker),
   );
-}
-
-function grandTotalOf(
-  selected: TradeView[],
-  rows: Record<string, RowState>,
-): number {
-  return selected.reduce((sum, t) => sum + (rows[t.id]?.ask ?? 0) * Math.max(t.qty, 1), 0);
 }
 
 // buildImages renders the list into one PNG per PAGE_SIZE-card page, so a long
 // list ships as several short, sharp images. All card art is loaded once and
-// shared across pages; the grand total prints on the final page only.
+// shared across pages.
 async function buildImages(
   selected: TradeView[],
   rows: Record<string, RowState>,
@@ -1054,13 +1043,11 @@ async function buildImages(
   await ensureImages(selected, cache);
   const cols = gridCols(selected.length);
   const pages = paginate(selected, PAGE_SIZE);
-  const grand = grandTotalOf(selected, rows);
   const blobs: Blob[] = [];
   for (let p = 0; p < pages.length; p++) {
     const cards = pages[p];
     const page: PageInfo = { index: p, count: pages.length, totalCards: selected.length, cols };
-    const showFooter = opts.includeAsking && p === pages.length - 1;
-    const lay = layout(cards.length, opts, cols, showFooter);
+    const lay = layout(cards.length, cols);
     const canvas = document.createElement("canvas");
     canvas.width = lay.width * SCALE;
     canvas.height = lay.height * SCALE;
@@ -1069,7 +1056,7 @@ async function buildImages(
       continue;
     }
     ctx.scale(SCALE, SCALE);
-    paint(ctx, cards, rows, opts, currency, grand, cache, page);
+    paint(ctx, cards, rows, opts, currency, cache, page);
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/png"),
     );
@@ -1118,7 +1105,6 @@ function ImagePreview({
   rows,
   opts,
   currency,
-  total,
   empty,
   pageLabel,
 }: {
@@ -1126,7 +1112,6 @@ function ImagePreview({
   rows: Record<string, RowState>;
   opts: ShareOpts;
   currency: Currency;
-  total: number;
   empty: string;
   pageLabel: (index: number, count: number) => string;
 }) {
@@ -1157,8 +1142,7 @@ function ImagePreview({
         return;
       }
       const page: PageInfo = { index: p, count: pages.length, totalCards: selected.length, cols };
-      const showFooter = opts.includeAsking && p === pages.length - 1;
-      const lay = layout(cards.length, opts, cols, showFooter);
+      const lay = layout(cards.length, cols);
       canvas.width = lay.width * SCALE;
       canvas.height = lay.height * SCALE;
       const ctx = canvas.getContext("2d");
@@ -1166,10 +1150,10 @@ function ImagePreview({
         return;
       }
       ctx.scale(SCALE, SCALE);
-      paint(ctx, cards, rows, opts, currency, total, cacheRef.current, page);
+      paint(ctx, cards, rows, opts, currency, cacheRef.current, page);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids, rows, opts, currency, total, imgVersion, cols]);
+  }, [ids, rows, opts, currency, imgVersion, cols]);
 
   if (selected.length === 0) {
     return (
