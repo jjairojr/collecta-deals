@@ -170,18 +170,15 @@ export default function ShareList({
     }
   };
 
+  // A long list is several PNGs and every one of them has to land on disk, so
+  // they are saved one at a time and the button stays busy until the last one.
   const downloadImage = async () => {
     setBusy(true);
     try {
       const blobs = await buildImages(selected, rows, opts, currency);
-      blobs.forEach((blob, i) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = pageFilename(i, blobs.length);
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+      for (let i = 0; i < blobs.length; i++) {
+        await saveBlob(blobs[i], pageFilename(i, blobs.length));
+      }
     } finally {
       setBusy(false);
     }
@@ -241,6 +238,7 @@ export default function ShareList({
   };
 
   const preview = buildText(selected, rows, opts, currency);
+  const pageCount = Math.max(1, Math.ceil(selected.length / PAGE_SIZE));
 
   return (
     <Card className="space-y-4 p-4">
@@ -447,7 +445,10 @@ export default function ShareList({
         )}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {selected.length > 0 && pageCount > 1 && (
+          <span className="mr-auto text-xs text-slate-500">{L.multiPage(pageCount)}</span>
+        )}
         <Button variant="outline" onClick={copyText} disabled={selected.length === 0}>
           {copied ? <Check /> : <Copy />} {copied ? L.copied : L.copyText}
         </Button>
@@ -455,7 +456,8 @@ export default function ShareList({
           {copiedImg ? <Check /> : <Images />} {copiedImg ? L.copied : L.copyImage}
         </Button>
         <Button variant="outline" onClick={downloadImage} disabled={selected.length === 0 || busy}>
-          {busy ? <ImageDown /> : <Download />} {busy ? L.building : L.download}
+          {busy ? <ImageDown /> : <Download />}{" "}
+          {busy ? L.building : pageCount > 1 ? `${L.download} (${pageCount})` : L.download}
         </Button>
         <Button variant="accent" onClick={shareList} disabled={selected.length === 0 || sharing}>
           <Send /> {sharing ? L.sharingNow : L.share}
@@ -517,6 +519,7 @@ interface Labels {
   tabImage: string;
   tabText: string;
   page: (index: number, count: number) => string;
+  multiPage: (count: number) => string;
   empty: string;
   copyText: string;
   copied: string;
@@ -550,6 +553,8 @@ const EN_LABELS: Labels = {
   tabImage: "Image",
   tabText: "Text",
   page: (index, count) => `Page ${index} / ${count}`,
+  multiPage: (count) =>
+    `${count} images — Download saves all of them (allow multiple downloads), Copy image takes the first.`,
   empty: "Select at least one card to build your list.",
   copyText: "Copy text",
   copied: "Copied!",
@@ -583,6 +588,8 @@ const PT_LABELS: Labels = {
   tabImage: "Imagem",
   tabText: "Texto",
   page: (index, count) => `Imagem ${index} / ${count}`,
+  multiPage: (count) =>
+    `${count} imagens — Baixar salva todas (permita vários downloads), Copiar imagem leva só a primeira.`,
   empty: "Marque pelo menos um produto para montar a lista.",
   copyText: "Copiar texto",
   copied: "Copiado!",
@@ -1071,6 +1078,29 @@ async function buildImages(
     }
   }
   return blobs;
+}
+
+// saveBlob writes one PNG to the user's downloads. The anchor has to be in the
+// document to be clickable, and the object URL can only be revoked a beat later
+// — revoking it right after the click cancels the download that just started.
+// The same pause spaces the files out: a burst of clicks in one task makes the
+// browser keep the first file and silently drop the rest.
+function saveBlob(blob: Blob, filename: string): Promise<void> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    window.setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+      resolve();
+    }, 400);
+  });
 }
 
 // pageFilename names page i of n: bare when there's a single page, numbered when
