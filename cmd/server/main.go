@@ -13,6 +13,7 @@ import (
 	"opdeals/internal/api"
 	"opdeals/internal/cardimg"
 	"opdeals/internal/compare"
+	"opdeals/internal/expenses"
 	"opdeals/internal/flaresolverr"
 	"opdeals/internal/game"
 	"opdeals/internal/httpx"
@@ -39,6 +40,7 @@ func run() error {
 	tradesPath := flag.String("trades", "data/trades.json", "path to the trade ledger (portfolio)")
 	accessoriesPath := flag.String("accessories", "data/accessories.json", "path to the shared accessories ledger (sleeves, deckboxes… — not tied to a game)")
 	quotesPath := flag.String("quotes", "data/quotes.json", "path to the saved buy quotes (orçamentos)")
+	expensesPath := flag.String("expenses", "data/expenses.json", "path to the business expense ledger (despesas — not tied to a game)")
 	setsFlag := flag.String("sets", "", "comma-separated Liga set codes to limit (default all)")
 	fxOverride := flag.Float64("fx", 0, "BRL->USD rate override (0 = fetch live)")
 	concurrency := flag.Int("concurrency", 8, "max concurrent requests per source")
@@ -332,6 +334,7 @@ func run() error {
 	if err := migrateAccessories(games, accessoryStore, logger); err != nil {
 		return fmt.Errorf("accessories migration: %w", err)
 	}
+	expenseStore := expenses.NewStore(*expensesPath, logger)
 
 	if *backfillImages {
 		gs, ok := games[*backfillImagesGame]
@@ -418,7 +421,7 @@ func run() error {
 		trackLog.Printf("scheduler off; trigger via POST /api/tracking/capture(?game=) or -capture-once (enable with -schedule)")
 	}
 
-	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, *serveOnly, *adminToken)
+	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, expenseStore, *serveOnly, *adminToken)
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
 }

@@ -784,3 +784,39 @@ export async function deleteTrade(id: string): Promise<void> {
 export function mergeTrades(ids: string[]): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades/merge?${gp(new URLSearchParams()).toString()}`, "POST", { ids });
 }
+
+// Expenses are business-wide (frete, embalagens, aluguel…), not tied to a game,
+// so the endpoints take no ?game= param. Recurring entries count every month
+// from date's month until endDate's month (empty endDate = still active).
+export interface Expense {
+  id: string;
+  date: string;
+  recurring?: boolean;
+  endDate?: string;
+  description: string;
+  category?: string;
+  amountBRL: number;
+  store?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listExpenses(): Promise<{ expenses: Expense[] }> {
+  return getJSON<{ expenses: Expense[] }>(`${base}/expenses`);
+}
+
+export function createExpense(e: Partial<Expense>): Promise<Expense> {
+  return sendJSON<Expense>(`${base}/expenses`, "POST", e);
+}
+
+export function updateExpense(id: string, e: Partial<Expense>): Promise<Expense> {
+  return sendJSON<Expense>(`${base}/expenses/${id}`, "PUT", e);
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  const res = await fetch(`${base}/expenses/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`delete failed: ${res.status}`);
+  }
+}

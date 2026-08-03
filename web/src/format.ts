@@ -6,6 +6,10 @@ export function brl0(value: number): string {
   return `R$ ${Math.round(value).toLocaleString("pt-BR")}`;
 }
 
+export function brl2(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export function usd(value: number): string {
   return `$${value.toFixed(2)}`;
 }

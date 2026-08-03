@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useState } from "react";
 import EmptyState from "./EmptyState";
-import { Banknote, ChevronDown, Coins, PiggyBank, TrendingUp, Wallet } from "lucide-react";
+import { Banknote, ChevronDown, Coins, Wallet } from "lucide-react";
 import { getAllPortfolio, type AllPortfolioResponse, type PortfolioSummary } from "../api";
 import { brl0 } from "../format";
-import { Kpi, PnlKpi } from "./PortfolioPage";
+import { Kpi } from "./PortfolioPage";
 
 const totalInvested = (s: PortfolioSummary) => s.investedBRL + s.costOfSoldBRL;
 
@@ -53,12 +53,12 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
     <div className="space-y-6">
       <div>
         <p className="mt-1 max-w-2xl text-sm text-slate-400">
-          Every game's holdings and sales combined in reais. Click a game to open its portfolio.
+          Every game's investment and sales combined in reais. Click a game to open its portfolio.
           Accessories belong to no game, so they are counted once in their own row.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Kpi
           icon={<Banknote className="h-5 w-5" />}
           label="Total invested"
@@ -66,23 +66,17 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
           sub="holding + sold, all time"
         />
         <Kpi icon={<Wallet className="h-5 w-5" />} label="Invested (holding)" value={brl0(total.investedBRL)} sub={`${total.holdings} items`} />
-        <Kpi icon={<Coins className="h-5 w-5" />} label="Current value" value={brl0(total.marketBRL)} sub="all games" />
-        <PnlKpi icon={<TrendingUp className="h-5 w-5" />} label="Unrealized P&L" value={total.unrealizedBRL} />
-        <PnlKpi icon={<PiggyBank className="h-5 w-5" />} label={`Realized (${total.sold} sold)`} value={total.realizedBRL} />
-        <PnlKpi icon={<TrendingUp className="h-5 w-5" />} label="Total P&L" value={total.totalPnLBRL} strong />
+        <Kpi icon={<Coins className="h-5 w-5" />} label="Sold" value={brl0(total.proceedsBRL)} sub={`${total.sold} sold`} />
       </div>
 
       <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
               <th className="px-3 py-2 font-bold">Game</th>
               <th className="px-3 py-2 text-right font-bold">Holding</th>
               <th className="px-3 py-2 text-right font-bold">Total invested</th>
-              <th className="px-3 py-2 text-right font-bold">Current value</th>
-              <th className="px-3 py-2 text-right font-bold">Unrealized</th>
-              <th className="px-3 py-2 text-right font-bold">Realized</th>
-              <th className="px-3 py-2 text-right font-bold">Total P&L</th>
+              <th className="px-3 py-2 text-right font-bold">Sold</th>
             </tr>
           </thead>
           <tbody>
@@ -122,14 +116,11 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-slate-300">{row.summary.holdings}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-slate-200">{brl0(totalInvested(row.summary))}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-200">{brl0(row.summary.marketBRL)}</td>
-                    <PnlCell value={row.summary.unrealizedBRL} />
-                    <PnlCell value={row.summary.realizedBRL} />
-                    <PnlCell value={row.summary.totalPnLBRL} strong />
+                    <td className="px-3 py-2 text-right tabular-nums text-emerald-300">{brl0(row.summary.proceedsBRL)}</td>
                   </tr>
                   {open && (
                     <tr className="border-b-2 border-outline/15 bg-slate-950/40">
-                      <td colSpan={7} className="px-3 py-4">
+                      <td colSpan={4} className="px-3 py-4">
                         <GameDetails summary={row.summary} />
                       </td>
                     </tr>
@@ -146,15 +137,11 @@ export default function AllPortfolioPage({ onOpenGame }: { onOpenGame: (id: stri
 
 function GameDetails({ summary }: { summary: PortfolioSummary }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Metric label="Total invested" value={brl0(totalInvested(summary))} hint="holding + sold" />
       <Metric label="Invested (holding)" value={brl0(summary.investedBRL)} hint={`${summary.holdings} items`} />
       <Metric label="Cost of sold" value={brl0(summary.costOfSoldBRL)} hint={`${summary.sold} sold`} />
-      <Metric label="Current value" value={brl0(summary.marketBRL)} />
       <Metric label="Sale proceeds" value={brl0(summary.proceedsBRL)} />
-      <PnlMetric label="Unrealized P&L" value={summary.unrealizedBRL} />
-      <PnlMetric label="Realized P&L" value={summary.realizedBRL} />
-      <PnlMetric label="Total P&L" value={summary.totalPnLBRL} />
     </div>
   );
 }
@@ -166,29 +153,6 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
       <div className="mt-0.5 font-semibold tabular-nums text-slate-100">{value}</div>
       {hint && <div className="text-[10px] text-slate-500">{hint}</div>}
     </div>
-  );
-}
-
-function PnlMetric({ label, value }: { label: string; value: number }) {
-  const up = value >= 0;
-  return (
-    <div className="rounded-[10px] border-2 border-outline bg-panel px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
-      <div className={`mt-0.5 font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}>
-        {up ? "+" : "−"}
-        {brl0(Math.abs(value))}
-      </div>
-    </div>
-  );
-}
-
-function PnlCell({ value, strong }: { value: number; strong?: boolean }) {
-  const up = value >= 0;
-  return (
-    <td className={`px-3 py-2 text-right tabular-nums ${strong ? "font-semibold" : ""} ${up ? "text-emerald-300" : "text-rose-300"}`}>
-      {up ? "+" : "−"}
-      {brl0(Math.abs(value))}
-    </td>
   );
 }
 

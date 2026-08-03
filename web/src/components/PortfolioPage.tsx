@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import EmptyState from "./EmptyState";
 import {
   Plus,
   Trash2,
   Wallet,
   Coins,
-  TrendingUp,
-  PiggyBank,
+  Banknote,
   ExternalLink,
   Share2,
   Package,
@@ -48,6 +47,23 @@ const isBRGame = () => !gameHasDeals(getGame());
 function marketMoney(v: number): string {
   return isBRGame() ? brl0(v) : usd(v);
 }
+
+const VARIANT_SUGGESTIONS: Record<string, string[]> = {
+  pokemon: ["Normal", "Reverse Holo", "Holo", "Promo"],
+  onepiece: ["Normal", "Alternate Art", "Parallel", "SP", "Manga", "Promo"],
+  riftbound: ["Normal", "Alternate Art", "Overnumbered", "Signature", "Promo"],
+};
+
+const DEFAULT_VARIANTS = [
+  "Normal",
+  "Foil",
+  "Reverse Holo",
+  "Holo",
+  "Alternate Art",
+  "Parallel",
+  "SP",
+  "Promo",
+];
 import CardArt from "./CardArt";
 import ShareList from "./ShareList";
 import { Button } from "./ui/button";
@@ -55,13 +71,6 @@ import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { ToggleGroup } from "./ui/toggle-group";
-
-const pctOptions = [
-  { value: "85", label: "85%" },
-  { value: "90", label: "90%" },
-  { value: "95", label: "95%" },
-  { value: "100", label: "100%" },
-];
 
 function cleanName(n: string): string {
   return n.replace(/\s*\([^)]*\)\s*$/, "");
@@ -78,50 +87,33 @@ const SECTION_KIND: Record<Section, "sealed" | "accessory" | undefined> = {
 interface SectionSummary {
   holdings: number;
   investedBRL: number;
-  marketBRL: number;
-  unrealizedBRL: number;
   sold: number;
-  realizedBRL: number;
-  totalPnLBRL: number;
+  costOfSoldBRL: number;
+  proceedsBRL: number;
 }
 
 function sectionSummary(list: TradeView[]): SectionSummary {
   const s: SectionSummary = {
     holdings: 0,
     investedBRL: 0,
-    marketBRL: 0,
-    unrealizedBRL: 0,
     sold: 0,
-    realizedBRL: 0,
-    totalPnLBRL: 0,
+    costOfSoldBRL: 0,
+    proceedsBRL: 0,
   };
-  let costOfSold = 0;
-  let proceeds = 0;
   for (const t of list) {
     if (t.realized) {
       s.sold += 1;
-      costOfSold += t.costBRL;
-      proceeds += t.valueBRL;
+      s.costOfSoldBRL += t.costBRL;
+      s.proceedsBRL += t.valueBRL;
     } else {
       s.holdings += 1;
       s.investedBRL += t.costBRL;
-      s.marketBRL += t.valueBRL;
     }
   }
-  s.unrealizedBRL = s.marketBRL - s.investedBRL;
-  s.realizedBRL = proceeds - costOfSold;
-  s.totalPnLBRL = s.unrealizedBRL + s.realizedBRL;
   return s;
 }
 
-type SortKey =
-  | "name"
-  | "cost"
-  | "market"
-  | "value"
-  | "pnl"
-  | "margin"
-  | "added";
+type SortKey = "name" | "cost" | "value" | "added";
 interface SortState {
   key: SortKey;
   dir: "asc" | "desc";
@@ -140,14 +132,8 @@ function sortValue(t: TradeView, key: SortKey): number | string {
       return cleanName(t.name).toLowerCase();
     case "cost":
       return t.costBRL;
-    case "market":
-      return t.marketKnown ? t.marketUSD : (t.manualBRL ?? 0);
     case "value":
       return t.valueBRL;
-    case "pnl":
-      return t.profitBRL;
-    case "margin":
-      return t.marginPct;
     case "added":
       return Date.parse(t.createdAt) || 0;
   }
@@ -179,10 +165,7 @@ const CSV_HEADERS = [
   "buyDate",
   "delivered",
   "costBRL",
-  "marketUnit",
-  "valueBRL",
-  "pnlBRL",
-  "marginPct",
+  "soldBRL",
   "sellDate",
   "sellPrice",
   "sellCurrency",
@@ -194,54 +177,36 @@ function round2(n: number): number {
 }
 
 function csvRows(list: TradeView[]): (string | number)[][] {
-  return list.map((t) => {
-    const marketUnit = t.kind
-      ? t.manualBRL
-        ? round2(t.manualBRL)
-        : ""
-      : t.marketKnown
-        ? round2(t.marketUSD)
-        : "";
-    return [
-      t.realized ? "sold" : "held",
-      t.number,
-      t.name,
-      t.set,
-      t.condition ?? "",
-      t.qty,
-      t.store ?? "",
-      t.buyDate ?? "",
-      t.realized ? "" : t.delivered ? "yes" : "no",
-      round2(t.costBRL),
-      marketUnit,
-      round2(t.valueBRL),
-      round2(t.profitBRL),
-      Math.round(t.marginPct),
-      t.sellDate ?? "",
-      t.sellPrice != null ? round2(t.sellPrice) : "",
-      t.sellCurrency ?? "",
-      t.buyer ?? "",
-    ];
-  });
+  return list.map((t) => [
+    t.realized ? "sold" : "held",
+    t.number,
+    t.name,
+    t.set,
+    t.condition ?? "",
+    t.qty,
+    t.store ?? "",
+    t.buyDate ?? "",
+    t.realized ? "" : t.delivered ? "yes" : "no",
+    round2(t.costBRL),
+    t.realized ? round2(t.valueBRL) : "",
+    t.sellDate ?? "",
+    t.sellPrice != null ? round2(t.sellPrice) : "",
+    t.sellCurrency ?? "",
+    t.buyer ?? "",
+  ]);
 }
 
-type QuickFilter = "all" | "gainers" | "losers" | "transit" | "delivered";
+type QuickFilter = "all" | "transit" | "delivered";
 type GroupBy = "set" | "store" | "none";
 
 const QUICK: { v: QuickFilter; label: string }[] = [
   { v: "all", label: "All" },
-  { v: "gainers", label: "Gainers" },
-  { v: "losers", label: "Losers" },
   { v: "transit", label: "In transit" },
   { v: "delivered", label: "Delivered" },
 ];
 
 function passesQuick(t: TradeView, f: QuickFilter): boolean {
   switch (f) {
-    case "gainers":
-      return t.profitBRL > 0;
-    case "losers":
-      return t.profitBRL < 0;
     case "transit":
       return !t.delivered;
     case "delivered":
@@ -256,9 +221,7 @@ interface Group {
   trades: TradeView[];
   count: number;
   invested: number;
-  value: number;
-  pnl: number;
-  marginPct: number;
+  soldBRL: number;
 }
 
 function groupKeyOf(t: TradeView, by: GroupBy): string {
@@ -283,60 +246,18 @@ function groupTrades(list: TradeView[], by: GroupBy): Group[] {
   for (const [key, trades] of map) {
     let count = 0;
     let invested = 0;
-    let value = 0;
-    let pnl = 0;
+    let soldBRL = 0;
     for (const t of trades) {
       count += t.qty;
       invested += t.costBRL;
-      value += t.valueBRL;
-      pnl += t.profitBRL;
+      if (t.realized) {
+        soldBRL += t.valueBRL;
+      }
     }
-    groups.push({
-      key,
-      trades,
-      count,
-      invested,
-      value,
-      pnl,
-      marginPct: invested > 0 ? (pnl / invested) * 100 : 0,
-    });
+    groups.push({ key, trades, count, invested, soldBRL });
   }
-  groups.sort((a, b) => b.value - a.value);
+  groups.sort((a, b) => b.invested - a.invested);
   return groups;
-}
-
-interface Insights {
-  topGainer?: TradeView;
-  topLoser?: TradeView;
-  biggest?: TradeView;
-  transitCount: number;
-  transitValue: number;
-}
-
-function computeInsights(list: TradeView[]): Insights {
-  const r: Insights = { transitCount: 0, transitValue: 0 };
-  for (const t of list) {
-    if (
-      t.profitBRL > 0 &&
-      (!r.topGainer || t.profitBRL > r.topGainer.profitBRL)
-    ) {
-      r.topGainer = t;
-    }
-    if (
-      t.profitBRL < 0 &&
-      (!r.topLoser || t.profitBRL < r.topLoser.profitBRL)
-    ) {
-      r.topLoser = t;
-    }
-    if (!r.biggest || t.valueBRL > r.biggest.valueBRL) {
-      r.biggest = t;
-    }
-    if (!t.delivered) {
-      r.transitCount += t.qty;
-      r.transitValue += t.valueBRL;
-    }
-  }
-  return r;
 }
 
 // lockedSection pins the page to one section and drops the section switcher — how
@@ -346,7 +267,6 @@ export default function PortfolioPage({
 }: {
   lockedSection?: Section;
 }) {
-  const [pct, setPct] = useState(90);
   const [section, setSection] = useState<Section>(lockedSection ?? "singles");
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -354,15 +274,15 @@ export default function PortfolioPage({
   const [adding, setAdding] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortState>({ key: "value", dir: "desc" });
+  const [sort, setSort] = useState<SortState>({ key: "added", dir: "desc" });
   const [soldOpen, setSoldOpen] = useState(true);
   const [quick, setQuick] = useState<QuickFilter>("all");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async (p: number) => {
+  const load = useCallback(async () => {
     try {
-      const r = await getPortfolio(p);
+      const r = await getPortfolio(90);
       setData(r);
       setError(null);
     } catch (err) {
@@ -373,10 +293,10 @@ export default function PortfolioPage({
   }, []);
 
   useEffect(() => {
-    load(pct);
-  }, [load, pct]);
+    load();
+  }, [load]);
 
-  const refresh = useCallback(() => load(pct), [load, pct]);
+  const refresh = load;
 
   const trades = data?.trades ?? [];
   const active = useMemo(
@@ -413,21 +333,13 @@ export default function PortfolioPage({
         : sold.filter((t) => passesQuick(t, quick)),
     [sold, quick],
   );
-  const maxValue = useMemo(
-    () => visibleHoldings.reduce((m, t) => Math.max(m, t.valueBRL), 0),
+  const holdingsInvested = useMemo(
+    () => visibleHoldings.reduce((s, t) => s + t.costBRL, 0),
     [visibleHoldings],
   );
-  const holdingsValue = useMemo(
-    () => visibleHoldings.reduce((s, t) => s + t.valueBRL, 0),
-    [visibleHoldings],
-  );
-  const soldRealized = useMemo(
-    () => soldVisible.reduce((s, t) => s + t.profitBRL, 0),
+  const soldReceived = useMemo(
+    () => soldVisible.reduce((s, t) => s + t.valueBRL, 0),
     [soldVisible],
-  );
-  const insights = useMemo(
-    () => computeInsights(visibleHoldings),
-    [visibleHoldings],
   );
   const holdingsGroups = useMemo(
     () => (groupBy === "none" ? [] : groupTrades(visibleHoldings, groupBy)),
@@ -440,8 +352,6 @@ export default function PortfolioPage({
   const quickCounts = useMemo(
     () => ({
       all: holdings.length,
-      gainers: holdings.filter((t) => t.profitBRL > 0).length,
-      losers: holdings.filter((t) => t.profitBRL < 0).length,
       transit: holdings.filter((t) => !t.delivered).length,
       delivered: holdings.filter((t) => Boolean(t.delivered)).length,
     }),
@@ -497,12 +407,10 @@ export default function PortfolioPage({
         <div>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {isSealed
-              ? "Your sealed buys and sales, valued at your own current-value estimate — no TCGplayer or Liga comparison."
+              ? "Your sealed buys and sales — what you invested and what you sold."
               : section === "accessories"
-                ? "Your accessories (sleeves, deckboxes, playmats…), valued at your own current-value estimate. They belong to no game — the same list shows up whichever game is selected."
-                : isBRGame()
-                  ? "Your buys and sales, valued against the current Liga Brazil floor. Track what you're up — and down — across the whole collection."
-                  : "Your buys and sales, valued against live TCGplayer prices. Track what you're up — and down — across the whole collection."}
+                ? "Your accessories (sleeves, deckboxes, playmats…). They belong to no game — the same list shows up whichever game is selected."
+                : "Your buys and sales — what you invested and what you sold."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -527,23 +435,11 @@ export default function PortfolioPage({
               ]}
             />
           )}
-          {!isManual && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                Value holdings at
-              </span>
-              <ToggleGroup
-                value={String(pct)}
-                onChange={(v) => setPct(Number(v))}
-                options={pctOptions}
-              />
-            </div>
-          )}
         </div>
       </div>
 
       {data && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Kpi
             icon={<Wallet className="h-5 w-5" />}
             label="Invested (holding)"
@@ -551,77 +447,16 @@ export default function PortfolioPage({
             sub={`${summary.holdings} ${isManual ? "products" : "cards"}`}
           />
           <Kpi
+            icon={<Banknote className="h-5 w-5" />}
+            label="Total invested"
+            value={brl0(summary.investedBRL + summary.costOfSoldBRL)}
+            sub="holding + sold, all time"
+          />
+          <Kpi
             icon={<Coins className="h-5 w-5" />}
-            label="Current value"
-            value={brl0(summary.marketBRL)}
-            sub={
-              isManual
-                ? "your estimate"
-                : `@ ${pct}% of ${isBRGame() ? "floor" : "TCG"}`
-            }
-          />
-          <PnlKpi
-            icon={<TrendingUp className="h-5 w-5" />}
-            label="Unrealized P&L"
-            value={summary.unrealizedBRL}
-          />
-          <PnlKpi
-            icon={<PiggyBank className="h-5 w-5" />}
-            label={`Realized (${summary.sold} sold)`}
-            value={summary.realizedBRL}
-          />
-          <PnlKpi
-            icon={<TrendingUp className="h-5 w-5" />}
-            label="Total P&L"
-            value={summary.totalPnLBRL}
-            strong
-          />
-        </div>
-      )}
-
-      {!loading && visibleHoldings.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Insight
-            label="Top gainer"
-            primary={
-              insights.topGainer ? cleanName(insights.topGainer.name) : "—"
-            }
-            secondary={
-              insights.topGainer
-                ? `+${brl0(insights.topGainer.profitBRL)}`
-                : undefined
-            }
-            tone="up"
-          />
-          <Insight
-            label="Top loser"
-            primary={
-              insights.topLoser ? cleanName(insights.topLoser.name) : "—"
-            }
-            secondary={
-              insights.topLoser
-                ? `−${brl0(Math.abs(insights.topLoser.profitBRL))}`
-                : undefined
-            }
-            tone="down"
-          />
-          <Insight
-            label="Biggest position"
-            primary={insights.biggest ? cleanName(insights.biggest.name) : "—"}
-            secondary={
-              insights.biggest ? brl0(insights.biggest.valueBRL) : undefined
-            }
-          />
-          <Insight
-            label="In transit"
-            primary={
-              insights.transitCount
-                ? `${insights.transitCount} ${isManual ? "items" : "cards"}`
-                : "None"
-            }
-            secondary={
-              insights.transitCount ? brl0(insights.transitValue) : undefined
-            }
+            label="Sold"
+            value={brl0(summary.proceedsBRL)}
+            sub={`${summary.sold} sold`}
           />
         </div>
       )}
@@ -781,7 +616,7 @@ export default function PortfolioPage({
                 </span>
               </h2>
               <span className="ml-auto tabular-nums text-xs font-medium text-slate-400">
-                {brl0(holdingsValue)} value
+                {brl0(holdingsInvested)} invested
               </span>
             </div>
             {groupBy === "none" ? (
@@ -796,7 +631,6 @@ export default function PortfolioPage({
                   }
                   sort={sort}
                   onSort={onSort}
-                  maxValue={maxValue}
                 />
               ) : (
                 <TradeTable
@@ -809,7 +643,6 @@ export default function PortfolioPage({
                   }
                   sort={sort}
                   onSort={onSort}
-                  maxValue={maxValue}
                 />
               )
             ) : holdingsGroups.length === 0 ? (
@@ -829,7 +662,6 @@ export default function PortfolioPage({
                     onToggle={() => toggleGroup(g.key)}
                     sort={sort}
                     onSort={onSort}
-                    maxValue={maxValue}
                     onChanged={refresh}
                   />
                 ))}
@@ -851,11 +683,8 @@ export default function PortfolioPage({
                     · {soldVisible.length}
                   </span>
                 </h2>
-                <span
-                  className={`ml-auto tabular-nums text-xs font-medium ${soldRealized >= 0 ? "text-emerald-300" : "text-rose-300"}`}
-                >
-                  {soldRealized >= 0 ? "+" : "−"}
-                  {brl0(Math.abs(soldRealized))} realized
+                <span className="ml-auto tabular-nums text-xs font-medium text-emerald-300">
+                  {brl0(soldReceived)} received
                 </span>
               </button>
               {soldOpen &&
@@ -867,7 +696,6 @@ export default function PortfolioPage({
                       empty=""
                       sort={sort}
                       onSort={onSort}
-                      maxValue={0}
                     />
                   ) : (
                     <TradeTable
@@ -876,7 +704,6 @@ export default function PortfolioPage({
                       empty=""
                       sort={sort}
                       onSort={onSort}
-                      maxValue={0}
                     />
                   )
                 ) : (
@@ -890,7 +717,6 @@ export default function PortfolioPage({
                         onToggle={() => toggleGroup(g.key)}
                         sort={sort}
                         onSort={onSort}
-                        maxValue={0}
                         onChanged={refresh}
                       />
                     ))}
@@ -935,78 +761,6 @@ export function Kpi({
   );
 }
 
-export function PnlKpi({
-  icon,
-  label,
-  value,
-  strong,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  strong?: boolean;
-}) {
-  const up = value >= 0;
-  const tone = up ? "text-emerald-300" : "text-rose-300";
-  return (
-    <div
-      className={`sticker flex items-center gap-3 rounded-[14px] bg-panel p-4 ${strong ? "ring-2 ring-inset ring-brand/40" : ""}`}
-    >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border-2 border-outline bg-brand text-white">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <div className="font-pixel text-[8px] uppercase leading-[1.5] text-brand-label">
-          {label}
-        </div>
-        <div
-          className={`mt-1 truncate text-lg font-bold tabular-nums xl:text-xl ${tone}`}
-        >
-          {up ? "+" : "−"}
-          {brl0(Math.abs(value))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Insight({
-  label,
-  primary,
-  secondary,
-  tone,
-}: {
-  label: string;
-  primary: string;
-  secondary?: string;
-  tone?: "up" | "down";
-}) {
-  const toneCls =
-    tone === "up"
-      ? "text-emerald-300"
-      : tone === "down"
-        ? "text-rose-300"
-        : "text-slate-100";
-  return (
-    <Card className="p-3">
-      <div className="font-pixel truncate text-[9px] uppercase text-brand-label">
-        {label}
-      </div>
-      <div
-        className={`mt-1 truncate text-sm font-semibold ${toneCls}`}
-        title={primary}
-      >
-        {primary}
-      </div>
-      {secondary && (
-        <div className="truncate text-[11px] tabular-nums text-slate-500">
-          {secondary}
-        </div>
-      )}
-    </Card>
-  );
-}
-
 function Chip({
   active,
   onClick,
@@ -1037,17 +791,14 @@ function GroupBlock({
   onToggle,
   sort,
   onSort,
-  maxValue,
   onChanged,
 }: SortableProps & {
   g: Group;
   manual: boolean;
   open: boolean;
   onToggle: () => void;
-  maxValue: number;
   onChanged: () => void;
 }) {
-  const up = g.pnl >= 0;
   const noun = manual
     ? g.count === 1
       ? "item"
@@ -1069,19 +820,14 @@ function GroupBlock({
           {g.count} {noun}
         </span>
         <div className="ml-auto flex shrink-0 items-center gap-3 tabular-nums text-xs sm:gap-5">
-          <span className="hidden text-slate-500 sm:inline">
+          <span className="text-slate-500">
             inv <span className="text-slate-300">{brl0(g.invested)}</span>
           </span>
-          <span className="text-slate-500">
-            val <span className="text-slate-200">{brl0(g.value)}</span>
-          </span>
-          <span
-            className={`font-semibold ${up ? "text-emerald-300" : "text-rose-300"}`}
-          >
-            {up ? "+" : "−"}
-            {brl0(Math.abs(g.pnl))}
-          </span>
-          <MarginPill pct={g.marginPct} up={up} />
+          {g.soldBRL > 0 && (
+            <span className="text-slate-500">
+              sold <span className="text-emerald-300">{brl0(g.soldBRL)}</span>
+            </span>
+          )}
         </div>
       </button>
       {open && (
@@ -1093,7 +839,6 @@ function GroupBlock({
               empty=""
               sort={sort}
               onSort={onSort}
-              maxValue={maxValue}
               bare
             />
           ) : (
@@ -1103,7 +848,6 @@ function GroupBlock({
               empty=""
               sort={sort}
               onSort={onSort}
-              maxValue={maxValue}
               bare
             />
           )}
@@ -1160,13 +904,11 @@ function TradeTable({
   empty,
   sort,
   onSort,
-  maxValue,
   bare,
 }: SortableProps & {
   trades: TradeView[];
   onChanged: () => void;
   empty: string;
-  maxValue: number;
   bare?: boolean;
 }) {
   if (trades.length === 0) {
@@ -1180,7 +922,7 @@ function TradeTable({
           : "sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel"
       }
     >
-      <table className="w-full min-w-[760px] text-sm">
+      <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
             <SortableTh
@@ -1197,21 +939,8 @@ function TradeTable({
               onSort={onSort}
             />
             <SortableTh
-              label={isBRGame() ? "Floor" : "TCG"}
-              sortKey="market"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortableTh
-              label="Value / Sold"
+              label="Sold"
               sortKey="value"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortableTh label="P&L" sortKey="pnl" sort={sort} onSort={onSort} />
-            <SortableTh
-              label="Margin"
-              sortKey="margin"
               sort={sort}
               onSort={onSort}
             />
@@ -1226,12 +955,7 @@ function TradeTable({
         </thead>
         <tbody>
           {trades.map((t) => (
-            <TradeRow
-              key={t.id}
-              t={t}
-              onChanged={onChanged}
-              maxValue={maxValue}
-            />
+            <TradeRow key={t.id} t={t} onChanged={onChanged} />
           ))}
         </tbody>
       </table>
@@ -1281,54 +1005,28 @@ function DeliveryToggle({
   );
 }
 
-function ValueCell({ t, maxValue }: { t: TradeView; maxValue: number }) {
-  const showBar = !t.realized && maxValue > 0 && t.valueBRL > 0;
-  const width = showBar ? Math.max(3, (t.valueBRL / maxValue) * 100) : 0;
+// SoldCell shows what a sale brought in; holdings have nothing to show here.
+function SoldCell({ t }: { t: TradeView }) {
+  if (!t.realized) {
+    return <td className="px-3 py-2 text-right text-slate-600">—</td>;
+  }
   return (
-    <td className="relative px-3 py-2 text-right tabular-nums text-slate-200">
-      {showBar && (
-        <div
-          className="pointer-events-none absolute inset-y-1 right-0 rounded-l bg-sky-500/10"
-          style={{ width: `${width}%` }}
-        />
-      )}
-      <span className="relative z-10">{brl0(t.valueBRL)}</span>
-      {t.realized && (
-        <div className="relative z-10 text-[10px] text-slate-500">
-          {t.sellDate || "sold"}
-        </div>
-      )}
+    <td className="px-3 py-2 text-right tabular-nums text-emerald-300">
+      {brl0(t.valueBRL)}
+      <div className="text-[10px] text-slate-500">{t.sellDate || "sold"}</div>
     </td>
-  );
-}
-
-function MarginPill({ pct, up }: { pct: number; up: boolean }) {
-  return (
-    <span
-      className={`inline-flex rounded-[6px] border-2 border-outline px-1.5 py-0.5 text-xs font-bold tabular-nums ${
-        up
-          ? "bg-emerald-500/10 text-emerald-300"
-          : "bg-rose-500/10 text-rose-300"
-      }`}
-    >
-      {up ? "+" : ""}
-      {Math.round(pct)}%
-    </span>
   );
 }
 
 function TradeRow({
   t,
   onChanged,
-  maxValue,
 }: {
   t: TradeView;
   onChanged: () => void;
-  maxValue: number;
 }) {
   const [selling, setSelling] = useState(false);
   const [editing, setEditing] = useState(false);
-  const up = t.profitBRL >= 0;
   return (
     <>
       <tr
@@ -1353,6 +1051,7 @@ function TradeRow({
               </div>
               <div className="font-mono text-[10px] text-slate-500">
                 {t.number}
+                {t.variant ? ` · ${t.variant}` : ""}
                 {t.qty > 1 ? ` ·×${t.qty}` : ""}
                 {t.store ? ` · ${t.store}` : ""}
               </div>
@@ -1362,19 +1061,7 @@ function TradeRow({
         <td className="px-3 py-2 text-right tabular-nums text-slate-300">
           {brl0(t.costBRL)}
         </td>
-        <td className="px-3 py-2 text-right tabular-nums text-slate-400">
-          {t.marketKnown ? marketMoney(t.marketUSD) : "—"}
-        </td>
-        <ValueCell t={t} maxValue={maxValue} />
-        <td
-          className={`px-3 py-2 text-right font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}
-        >
-          {up ? "+" : "−"}
-          {brl0(Math.abs(t.profitBRL))}
-        </td>
-        <td className="px-3 py-2 text-right">
-          <MarginPill pct={t.marginPct} up={up} />
-        </td>
+        <SoldCell t={t} />
         <AddedCell t={t} />
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
@@ -1431,7 +1118,7 @@ function TradeRow({
       </tr>
       {editing && (
         <tr className="bg-slate-900/60">
-          <td colSpan={8} className="px-3 py-3">
+          <td colSpan={5} className="px-3 py-3">
             <EditTradeForm
               t={t}
               onDone={() => {
@@ -1444,7 +1131,7 @@ function TradeRow({
       )}
       {selling && (
         <tr className="bg-slate-900/60">
-          <td colSpan={8} className="px-3 py-3">
+          <td colSpan={5} className="px-3 py-3">
             <SellForm
               t={t}
               onDone={() => {
@@ -1580,6 +1267,7 @@ function AddTradeForm({
   const [buyBRL, setBuyBRL] = useState("");
   const [shippingBRL, setShippingBRL] = useState("");
   const [qty, setQty] = useState("1");
+  const [variant, setVariant] = useState("");
   const [condition, setCondition] = useState("NM");
   const [store, setStore] = useState("");
   const [buyDate, setBuyDate] = useState("");
@@ -1607,6 +1295,7 @@ function AddTradeForm({
     setNumber(m.number);
     setName(m.name);
     setSet(m.set);
+    setVariant(m.variant ?? "");
     setRefUSD(String(Math.round(m.marketUSD * 100) / 100));
     setQuery(`${m.number} · ${cleanName(m.name)}`);
     setMatches([]);
@@ -1619,6 +1308,7 @@ function AddTradeForm({
         number,
         name,
         set,
+        variant,
         condition,
         qty: Number(qty) || 1,
         buyBRL: Number(buyBRL) || 0,
@@ -1743,6 +1433,9 @@ function AddTradeForm({
             onChange={(e) => setQty(e.target.value)}
           />
         </Field>
+        <Field label="Variant">
+          <VariantInput value={variant} onChange={setVariant} />
+        </Field>
         <Field label="Condition">
           <Input
             value={condition}
@@ -1799,13 +1492,11 @@ function ManualTable({
   empty,
   sort,
   onSort,
-  maxValue,
   bare,
 }: SortableProps & {
   trades: TradeView[];
   onChanged: () => void;
   empty: string;
-  maxValue: number;
   bare?: boolean;
 }) {
   if (trades.length === 0) {
@@ -1819,7 +1510,7 @@ function ManualTable({
           : "sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel"
       }
     >
-      <table className="w-full min-w-[760px] text-sm">
+      <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
             <SortableTh
@@ -1836,21 +1527,8 @@ function ManualTable({
               onSort={onSort}
             />
             <SortableTh
-              label="Current R$"
-              sortKey="market"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortableTh
-              label="Value / Sold"
+              label="Sold"
               sortKey="value"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortableTh label="P&L" sortKey="pnl" sort={sort} onSort={onSort} />
-            <SortableTh
-              label="Margin"
-              sortKey="margin"
               sort={sort}
               onSort={onSort}
             />
@@ -1865,12 +1543,7 @@ function ManualTable({
         </thead>
         <tbody>
           {trades.map((t) => (
-            <ManualRow
-              key={t.id}
-              t={t}
-              onChanged={onChanged}
-              maxValue={maxValue}
-            />
+            <ManualRow key={t.id} t={t} onChanged={onChanged} />
           ))}
         </tbody>
       </table>
@@ -1881,15 +1554,12 @@ function ManualTable({
 function ManualRow({
   t,
   onChanged,
-  maxValue,
 }: {
   t: TradeView;
   onChanged: () => void;
-  maxValue: number;
 }) {
   const [selling, setSelling] = useState(false);
   const [editing, setEditing] = useState(false);
-  const up = t.profitBRL >= 0;
   return (
     <>
       <tr
@@ -1928,19 +1598,7 @@ function ManualRow({
         <td className="px-3 py-2 text-right tabular-nums text-slate-300">
           {brl0(t.costBRL)}
         </td>
-        <td className="px-3 py-2 text-right tabular-nums text-slate-400">
-          {t.manualBRL ? brl0(t.manualBRL) : "—"}
-        </td>
-        <ValueCell t={t} maxValue={maxValue} />
-        <td
-          className={`px-3 py-2 text-right font-semibold tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}
-        >
-          {up ? "+" : "−"}
-          {brl0(Math.abs(t.profitBRL))}
-        </td>
-        <td className="px-3 py-2 text-right">
-          <MarginPill pct={t.marginPct} up={up} />
-        </td>
+        <SoldCell t={t} />
         <AddedCell t={t} />
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
@@ -1986,7 +1644,7 @@ function ManualRow({
       </tr>
       {editing && (
         <tr className="bg-slate-900/60">
-          <td colSpan={8} className="px-3 py-3">
+          <td colSpan={5} className="px-3 py-3">
             <EditTradeForm
               t={t}
               manual
@@ -2000,7 +1658,7 @@ function ManualRow({
       )}
       {selling && (
         <tr className="bg-slate-900/60">
-          <td colSpan={8} className="px-3 py-3">
+          <td colSpan={5} className="px-3 py-3">
             <SellForm
               t={t}
               onDone={() => {
@@ -2036,6 +1694,7 @@ function EditTradeForm({
     t.shippingBRL ? String(t.shippingBRL) : "",
   );
   const [qty, setQty] = useState(String(t.qty));
+  const [variant, setVariant] = useState(t.variant ?? "");
   const [condition, setCondition] = useState(t.condition ?? "");
   const [store, setStore] = useState(t.store ?? "");
   const [buyDate, setBuyDate] = useState(t.buyDate ?? "");
@@ -2055,6 +1714,7 @@ function EditTradeForm({
         buyBRL: nextBuy,
         shippingBRL: nextShip,
         qty: nextQty,
+        variant,
         condition,
         store,
         buyDate,
@@ -2107,6 +1767,11 @@ function EditTradeForm({
           className="w-20"
         />
       </Field>
+      {!manual && (
+        <Field label="Variant">
+          <VariantInput value={variant} onChange={setVariant} className="w-32" />
+        </Field>
+      )}
       {!manual && (
         <Field label="Condition">
           <Input
@@ -2352,6 +2017,35 @@ function AddManualForm({
         </Button>
       </div>
     </Card>
+  );
+}
+
+function VariantInput({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
+  const id = useId();
+  const options = VARIANT_SUGGESTIONS[getGame()] ?? DEFAULT_VARIANTS;
+  return (
+    <>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        list={id}
+        placeholder="Foil"
+        className={className}
+      />
+      <datalist id={id}>
+        {options.map((v) => (
+          <option key={v} value={v} />
+        ))}
+      </datalist>
+    </>
   );
 }
 

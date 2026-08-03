@@ -14,6 +14,7 @@ import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
 import AllPortfolioPage from "./components/AllPortfolioPage";
 import StockPage from "./components/StockPage";
+import ExpensesPage from "./components/ExpensesPage";
 import BuyoutPage from "./components/BuyoutPage";
 import BrowsePage from "./components/BrowsePage";
 import QuotePage from "./components/QuotePage";
@@ -45,7 +46,7 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   },
   portfolio: {
     title: "Portfolio",
-    description: "Your holdings, valuation, and realized P&L.",
+    description: "Your holdings and sales — what you invested and what you sold.",
   },
   allportfolio: {
     title: "All Games",
@@ -54,6 +55,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   acessorios: {
     title: "Acessórios",
     description: "Sleeves, deckboxes, playmats — estoque único, o mesmo em todos os jogos.",
+  },
+  despesas: {
+    title: "Despesas",
+    description: "Gastos do negócio — lançamentos do mês e despesas fixas recorrentes.",
   },
   estoque: {
     title: "Estoque",
@@ -195,6 +200,10 @@ export default function App() {
               ) : activeView === "acessorios" ? (
                 <div className="mt-6">
                   <PortfolioPage lockedSection="accessories" />
+                </div>
+              ) : activeView === "despesas" ? (
+                <div className="mt-6">
+                  <ExpensesPage />
                 </div>
               ) : activeView === "estoque" ? (
                 <div className="mt-6">
