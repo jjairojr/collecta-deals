@@ -1040,7 +1040,9 @@ func (s *Server) handleCardImage(w http.ResponseWriter, r *http.Request) {
 			pageURL = u
 		}
 	}
-	if pageURL == "" {
+	// A cached URL needs no page: Fetch resolves from the cache before ever
+	// touching pageURL, so seeded art (e.g. TCGplayer) serves without tracking.
+	if pageURL == "" && !gs.Cardimg.Cached(set, number) {
 		http.Error(w, "unknown card", http.StatusNotFound)
 		return
 	}

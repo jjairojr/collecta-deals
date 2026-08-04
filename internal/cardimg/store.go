@@ -149,6 +149,13 @@ func (s *Store) cached(set, number string) (string, bool) {
 	return u, ok && u != ""
 }
 
+// Cached reports whether a card's image URL is already in the cache, letting
+// the API serve art for cards the tracking snapshots don't know (no page URL).
+func (s *Store) Cached(set, number string) bool {
+	_, ok := s.cached(set, number)
+	return ok
+}
+
 func (s *Store) store(set, number, url string) {
 	s.mu.Lock()
 	s.urls[key(set, number)] = url
