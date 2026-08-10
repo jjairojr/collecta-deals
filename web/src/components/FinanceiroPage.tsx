@@ -11,6 +11,7 @@ import {
   expensesInRange,
   filterSales,
   groupTotals,
+  isUSD,
   kindLabels,
   kindOf,
   kinds,
@@ -24,6 +25,7 @@ import {
   sideOf,
   sides,
   totalsOf,
+  undatedSales,
   type FinanceFilters,
   type Kind,
   type MonthRow,
@@ -105,6 +107,7 @@ export default function FinanceiroPage() {
   const [selectedSides, setSelectedSides] = useState<Side[]>([]);
   const [unmarkedIsLiga, setUnmarkedIsLiga] = useState(true);
   const [hideSymbolic, setHideSymbolic] = useState(true);
+  const [includeUSD, setIncludeUSD] = useState(true);
 
   useEffect(() => {
     Promise.all([listSales(), listExpenses()])
@@ -145,8 +148,9 @@ export default function FinanceiroPage() {
       sides: selectedSides,
       unmarkedIsLiga,
       hideSymbolic,
+      includeUSD,
     }),
-    [from, to, games, selectedKinds, selectedSides, unmarkedIsLiga, hideSymbolic],
+    [from, to, games, selectedKinds, selectedSides, unmarkedIsLiga, hideSymbolic, includeUSD],
   );
 
   const months = useMemo(() => monthRange(from, to), [from, to]);
@@ -162,15 +166,21 @@ export default function FinanceiroPage() {
   const expenseTotal = useMemo(() => expensesInRange(expenses, months), [expenses, months]);
   const categories = useMemo(() => expensesByCategory(expenses, months), [expenses, months]);
 
+  const undated = useMemo(() => undatedSales(sales, filters), [sales, filters]);
+  const usdTotal = useMemo(
+    () => visible.filter(isUSD).reduce((sum, s) => sum + s.valueBRL, 0),
+    [visible],
+  );
+
   const gameOptions = useMemo(() => {
     const found = new Map<string, string>();
-    for (const s of eligibleSales(sales, hideSymbolic)) {
+    for (const s of eligibleSales(sales, hideSymbolic, includeUSD)) {
       if (kindOf(s) !== "accessory") {
         found.set(s.game, s.gameName);
       }
     }
     return [...found.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [sales, hideSymbolic]);
+  }, [sales, hideSymbolic, includeUSD]);
 
   const net = totals.grossBRL - expenseTotal;
   const liga = bySide.get("liga");
@@ -262,10 +272,23 @@ export default function FinanceiroPage() {
             <Checkbox checked={hideSymbolic} onChange={(e) => setHideSymbolic(e.target.checked)} />
             Ocultar baixas simbólicas (R$ 1/un.)
           </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <Checkbox checked={includeUSD} onChange={(e) => setIncludeUSD(e.target.checked)} />
+            Incluir vendas em US$ (TCGplayer), convertidas
+          </label>
           <span className="text-[11px] text-slate-500">
-            Vendas em US$ ficam fora. Despesa recorrente conta uma vez por mês do período.
+            Venda em US$ entra sempre como fora da Liga. Despesa recorrente conta uma vez por mês do período.
           </span>
         </div>
+
+        {undated.length > 0 && (
+          <p className="text-[11px] text-amber-300">
+            {undated.length} venda{undated.length > 1 ? "s" : ""} sem data (
+            {brl2(undated.reduce((sum, s) => sum + s.valueBRL, 0))}) fica
+            {undated.length > 1 ? "m" : ""} fora de qualquer período — preencha a data na aba Vendas para
+            entrar na conta.
+          </p>
+        )}
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -291,7 +314,7 @@ export default function FinanceiroPage() {
           value={brl2(fora?.revenueBRL ?? 0)}
           sub={
             totals.revenueBRL > 0
-              ? `${Math.round(((fora?.revenueBRL ?? 0) / totals.revenueBRL) * 100)}% do total · lucro ${brl2(fora?.grossBRL ?? 0)}`
+              ? `${Math.round(((fora?.revenueBRL ?? 0) / totals.revenueBRL) * 100)}% do total · lucro ${brl2(fora?.grossBRL ?? 0)}${usdTotal > 0 ? ` · US$ ${brl2(usdTotal)}` : ""}`
               : "sem vendas no período"
           }
         />

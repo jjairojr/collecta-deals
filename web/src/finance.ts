@@ -22,7 +22,14 @@ export function kindOf(sale: SaleRow): Kind {
   return sale.kind ?? "single";
 }
 
+export function isUSD(sale: SaleRow): boolean {
+  return !isBRL(sale);
+}
+
 export function sideOf(sale: SaleRow, unmarkedIsLiga: boolean): Side {
+  if (isUSD(sale)) {
+    return "fora";
+  }
   const channel = channelOf(sale.buyer);
   if (channel === "liga") {
     return "liga";
@@ -79,6 +86,7 @@ export interface FinanceFilters {
   sides: Side[];
   unmarkedIsLiga: boolean;
   hideSymbolic: boolean;
+  includeUSD: boolean;
 }
 
 export function saleMonths(sales: SaleRow[]): string[] {
@@ -103,25 +111,35 @@ export function expenseMonths(expenses: Expense[]): string[] {
   return [...found].sort();
 }
 
-export function eligibleSales(sales: SaleRow[], hideSymbolic: boolean): SaleRow[] {
-  const brl = sales.filter(isBRL);
-  return hideSymbolic ? brl.filter((s) => !isSymbolic(s)) : brl;
+export function eligibleSales(sales: SaleRow[], hideSymbolic: boolean, includeUSD = true): SaleRow[] {
+  const kept = includeUSD ? sales : sales.filter(isBRL);
+  return hideSymbolic ? kept.filter((s) => !isSymbolic(s)) : kept;
+}
+
+export function matchesScope(s: SaleRow, f: FinanceFilters): boolean {
+  if (f.games.length > 0 && !f.games.includes(s.game)) {
+    return false;
+  }
+  if (f.kinds.length > 0 && !f.kinds.includes(kindOf(s))) {
+    return false;
+  }
+  return f.sides.length === 0 || f.sides.includes(sideOf(s, f.unmarkedIsLiga));
 }
 
 export function filterSales(sales: SaleRow[], f: FinanceFilters): SaleRow[] {
-  return eligibleSales(sales, f.hideSymbolic).filter((s) => {
+  return eligibleSales(sales, f.hideSymbolic, f.includeUSD).filter((s) => {
     const month = monthOf(s.sellDate ?? "");
     if (!month || monthIndex(month) < monthIndex(f.from) || monthIndex(month) > monthIndex(f.to)) {
       return false;
     }
-    if (f.games.length > 0 && !f.games.includes(s.game)) {
-      return false;
-    }
-    if (f.kinds.length > 0 && !f.kinds.includes(kindOf(s))) {
-      return false;
-    }
-    return f.sides.length === 0 || f.sides.includes(sideOf(s, f.unmarkedIsLiga));
+    return matchesScope(s, f);
   });
+}
+
+export function undatedSales(sales: SaleRow[], f: FinanceFilters): SaleRow[] {
+  return eligibleSales(sales, f.hideSymbolic, f.includeUSD).filter(
+    (s) => !monthOf(s.sellDate ?? "") && matchesScope(s, f),
+  );
 }
 
 export function expenseInMonth(e: Expense, month: string): boolean {
