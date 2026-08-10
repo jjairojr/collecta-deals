@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"opdeals/internal/game"
 	"opdeals/internal/model"
@@ -29,14 +30,16 @@ type rawCard struct {
 }
 
 type rawStock struct {
-	LjID       int    `json:"lj_id"`
-	Num        string `json:"num"`
-	Qualid     string `json:"qualid"`
-	Idioma     string `json:"idioma"`
-	QuantCss   string `json:"quantCss"`
-	Preco      string `json:"preco"`
-	PrecoFinal string `json:"precoFinal"`
-	PrecoCss   string `json:"precoCss"`
+	LjID       int             `json:"lj_id"`
+	Num        string          `json:"num"`
+	Qualid     string          `json:"qualid"`
+	Idioma     string          `json:"idioma"`
+	Extras     json.RawMessage `json:"extras"`
+	SellType   json.RawMessage `json:"sellType"`
+	QuantCss   string          `json:"quantCss"`
+	Preco      string          `json:"preco"`
+	PrecoFinal string          `json:"precoFinal"`
+	PrecoCss   string          `json:"precoCss"`
 }
 
 type rawStore struct {
@@ -53,6 +56,8 @@ type StoreListing struct {
 	Number     string
 	Condition  string
 	Language   string
+	Extras     *int
+	SellType   *int
 	Quantity   int
 	QtyKnown   bool
 	PriceBRL   float64
@@ -175,6 +180,8 @@ func parseCardStock(html []byte, qtyAtlas, priceAtlas image.Image) ([]StoreListi
 			Number:     model.NormalizeNumber(s.Num),
 			Condition:  s.Qualid,
 			Language:   s.Idioma,
+			Extras:     numOrStringInt(s.Extras),
+			SellType:   numOrStringInt(s.SellType),
 			Quantity:   qty,
 			QtyKnown:   known,
 			PriceBRL:   price,
@@ -197,4 +204,16 @@ func parsePrice(s string) float64 {
 		return 0
 	}
 	return v
+}
+
+func numOrStringInt(m json.RawMessage) *int {
+	s := strings.Trim(string(m), `"`)
+	if s == "" || s == "null" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return &v
 }

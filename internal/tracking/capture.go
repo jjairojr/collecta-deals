@@ -261,6 +261,8 @@ func toStoreQty(listings []liga.StoreListing) []StoreQty {
 			StoreName:  l.StoreName,
 			Condition:  l.Condition,
 			Language:   l.Language,
+			Extras:     l.Extras,
+			SellType:   l.SellType,
 			Quantity:   l.Quantity,
 			Known:      l.QtyKnown,
 			PriceBRL:   l.PriceBRL,

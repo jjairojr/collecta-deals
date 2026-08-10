@@ -235,6 +235,8 @@ func parseProductStock(body []byte, pcode string, qtyAtlas, priceAtlas image.Ima
 			Number:     pcode,
 			Condition:  s.Qualid,
 			Language:   s.Idioma,
+			Extras:     numOrStringInt(s.Extras),
+			SellType:   numOrStringInt(s.SellType),
 			Quantity:   qty,
 			QtyKnown:   known,
 			PriceBRL:   price,

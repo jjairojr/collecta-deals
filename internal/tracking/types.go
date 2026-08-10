@@ -24,6 +24,8 @@ type StoreQty struct {
 	StoreName  string  `json:"storeName"`
 	Condition  string  `json:"condition"`
 	Language   string  `json:"language"`
+	Extras     *int    `json:"extras,omitempty"`
+	SellType   *int    `json:"sellType,omitempty"`
 	Quantity   int     `json:"quantity"`
 	Known      bool    `json:"known"`
 	PriceBRL   float64 `json:"priceBRL"`

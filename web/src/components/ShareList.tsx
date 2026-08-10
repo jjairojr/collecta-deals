@@ -347,6 +347,7 @@ export default function ShareList({
                       </div>
                       <div className="font-mono text-[10px] text-slate-500">
                         {t.number}
+                        {t.variant ? ` · ${t.variant}` : ""}
                         {t.condition ? ` · ${t.condition}` : ""}
                         {t.qty > 1 ? ` · ×${t.qty}` : ""}
                       </div>
@@ -743,7 +744,7 @@ function buildText(
   for (const t of selected) {
     const row = rows[t.id];
     lines.push(t.number ? `${t.name} (${t.number})` : t.name);
-    const meta = [condLabel(t), `${t.qty}x`].filter(Boolean);
+    const meta = [t.variant, condLabel(t), `${t.qty}x`].filter(Boolean);
     if (opts.includeAsking) {
       const lineTotal = row.ask * Math.max(t.qty, 1);
       if (t.qty > 1) {
@@ -946,7 +947,7 @@ function drawCell(
 
   ctx.fillStyle = C_META;
   ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
-  const meta = [condLabel(t), `${t.qty}x`].filter(Boolean).join(" · ");
+  const meta = [t.variant, condLabel(t), `${t.qty}x`].filter(Boolean).join(" · ");
   ctx.fillText(meta, x, cy + 20);
 
   if (opts.includeAsking && row) {

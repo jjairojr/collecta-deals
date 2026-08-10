@@ -10,6 +10,14 @@ type saleKey struct {
 	StoreID   int
 	Condition string
 	Language  string
+	Extras    string
+}
+
+func extrasKey(s StoreQty) string {
+	if s.Extras == nil {
+		return ""
+	}
+	return strconv.Itoa(*s.Extras)
 }
 
 // sellerKey groups a card's sales per store AND language, so each row reports the
@@ -544,7 +552,7 @@ func indexQuantities(d DaySnapshot) map[saleKey]StoreQty {
 	out := make(map[saleKey]StoreQty)
 	for _, c := range d.Cards {
 		for _, s := range c.Stores {
-			key := saleKey{Number: c.Number, StoreID: s.StoreID, Condition: s.Condition, Language: s.Language}
+			key := saleKey{Number: c.Number, StoreID: s.StoreID, Condition: s.Condition, Language: s.Language, Extras: extrasKey(s)}
 			existing, ok := out[key]
 			if !ok {
 				out[key] = s

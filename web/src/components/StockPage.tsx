@@ -54,6 +54,7 @@ function cleanName(n: string): string {
 function rowMeta(t: TradeView): string {
   return [
     t.kind === "accessory" ? "Acessório · todos os jogos" : t.number,
+    t.variant,
     t.condition,
     t.store,
   ]
