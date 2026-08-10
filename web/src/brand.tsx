@@ -10,7 +10,9 @@ import {
   LayoutGrid,
   LineChart,
   Package,
+  PiggyBank,
   Receipt,
+  ShoppingBag,
   Sparkles,
   Store,
   Swords,
@@ -26,6 +28,8 @@ export type View =
   | "sealed"
   | "portfolio"
   | "allportfolio"
+  | "vendas"
+  | "financeiro"
   | "acessorios"
   | "despesas"
   | "estoque"
@@ -67,6 +71,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { key: "portfolio", label: "Portfolio", icon: Wallet },
       { key: "allportfolio", label: "All Games", icon: Layers },
+      { key: "vendas", label: "Vendas", icon: ShoppingBag },
+      { key: "financeiro", label: "Financeiro", icon: PiggyBank },
       { key: "acessorios", label: "Acessórios", icon: Package },
       { key: "despesas", label: "Despesas", icon: Receipt },
       { key: "estoque", label: "Estoque", icon: Store },

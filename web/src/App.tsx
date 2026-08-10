@@ -13,6 +13,8 @@ import DealsPage from "./components/DealsPage";
 import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
 import AllPortfolioPage from "./components/AllPortfolioPage";
+import LigaSalesPage from "./components/LigaSalesPage";
+import FinanceiroPage from "./components/FinanceiroPage";
 import StockPage from "./components/StockPage";
 import ExpensesPage from "./components/ExpensesPage";
 import BuyoutPage from "./components/BuyoutPage";
@@ -51,6 +53,14 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   allportfolio: {
     title: "All Games",
     description: "Combined portfolio across every game.",
+  },
+  vendas: {
+    title: "Vendas da Liga",
+    description: "Pedidos já vendidos — receita, custo e lucro de cada pacote, em todos os jogos.",
+  },
+  financeiro: {
+    title: "Financeiro",
+    description: "Quanto entrou, quanto veio da Liga e o que sobrou depois das despesas.",
   },
   acessorios: {
     title: "Acessórios",
@@ -196,6 +206,14 @@ export default function App() {
                       setView("portfolio");
                     }}
                   />
+                </div>
+              ) : activeView === "vendas" ? (
+                <div className="mt-6">
+                  <LigaSalesPage />
+                </div>
+              ) : activeView === "financeiro" ? (
+                <div className="mt-6">
+                  <FinanceiroPage />
                 </div>
               ) : activeView === "acessorios" ? (
                 <div className="mt-6">
