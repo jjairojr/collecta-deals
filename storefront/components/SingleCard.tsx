@@ -13,7 +13,9 @@ export function singleToCartLine(item: Single) {
     slug: item.slug,
     kind: "single" as const,
     name: item.name,
-    meta: `${item.set} · ${item.number} · ${item.condition}`,
+    meta: [item.set, item.number, item.variant, item.condition]
+      .filter(Boolean)
+      .join(" · "),
     seller: "Collecta Oficial",
     price: item.price,
     stock: item.qty,
@@ -74,7 +76,7 @@ export default function SingleCard({
             {item.name}
           </h3>
           <p className="truncate text-xs text-muted">
-            {item.set} · {item.number}
+            {[item.set, item.number, item.variant].filter(Boolean).join(" · ")}
           </p>
         </div>
 

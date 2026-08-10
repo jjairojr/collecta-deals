@@ -28,8 +28,8 @@ export async function generateMetadata({
   }
   const { item, live } = res;
   return {
-    title: `${item.name} ${item.number} · ${item.set}`,
-    description: `Carta ${item.name} (${item.number}) do set ${item.set}, ${item.condition}, por ${brl(item.price)}. Conferida uma a uma na Collecta — pedido pelo WhatsApp, envio para todo o Brasil.`,
+    title: `${item.name} ${item.number}${item.variant ? ` ${item.variant}` : ""} · ${item.set}`,
+    description: `Carta ${item.name} (${item.number}) do set ${item.set}${item.variant ? `, versão ${item.variant}` : ""}, ${item.condition}, por ${brl(item.price)}. Conferida uma a uma na Collecta — pedido pelo WhatsApp, envio para todo o Brasil.`,
     alternates: { canonical: `/carta/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: item.imageURL ? { images: [item.imageURL] } : undefined,

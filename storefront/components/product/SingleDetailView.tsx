@@ -23,7 +23,9 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
   const [qty, setQty] = useState(1);
   const [wished, setWished] = useState(false);
 
-  const meta = [item.set, item.number, item.rarity].filter(Boolean).join(" · ");
+  const meta = [item.set, item.number, item.variant, item.rarity]
+    .filter(Boolean)
+    .join(" · ");
 
   useEffect(() => {
     trackViewItem(singleItem(item));
@@ -35,7 +37,9 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
         slug: item.slug,
         kind: "single",
         name: item.name,
-        meta: `${item.set} · ${item.number} · ${item.condition}`,
+        meta: [item.set, item.number, item.variant, item.condition]
+          .filter(Boolean)
+          .join(" · "),
         seller: item.seller.name,
         price: item.price,
         stock: item.qty,
@@ -177,9 +181,10 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
 
           <p className="mt-6 text-[14px] leading-relaxed text-muted">
             {item.name} ({item.number}) é uma carta de {item.gameLabel} do set{" "}
-            {item.set}, em condição {item.condition}, conferida uma a uma antes
-            do envio. Adicione ao carrinho, finalize o pedido pelo WhatsApp e
-            receba em todo o Brasil.
+            {item.set},{item.variant ? ` versão ${item.variant},` : ""} em
+            condição {item.condition}, conferida uma a uma antes do envio.
+            Adicione ao carrinho, finalize o pedido pelo WhatsApp e receba em
+            todo o Brasil.
           </p>
         </div>
       </div>

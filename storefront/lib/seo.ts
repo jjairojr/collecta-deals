@@ -39,7 +39,7 @@ export function singleProductJsonLd(item: Single) {
     "@type": "Product",
     name: `${item.name} ${item.number}`,
     sku: item.number,
-    description: `Carta ${item.name} (${item.number}) do set ${item.set}, condição ${item.condition}.`,
+    description: `Carta ${item.name} (${item.number}) do set ${item.set}${item.variant ? `, versão ${item.variant}` : ""}, condição ${item.condition}.`,
     image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
     brand: { "@type": "Brand", name: item.gameLabel },
     category: "Trading Card Game",

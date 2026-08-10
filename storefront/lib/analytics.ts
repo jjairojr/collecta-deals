@@ -52,7 +52,9 @@ export function singleItem(item: Single, quantity = 1): GAItem {
     item_category: item.game,
     item_category2: "single",
     item_category3: item.set,
-    item_variant: [item.condition, item.language].filter(Boolean).join(" · "),
+    item_variant: [item.variant, item.condition, item.language]
+      .filter(Boolean)
+      .join(" · "),
     price: reais(item.price),
     quantity,
   };

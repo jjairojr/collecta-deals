@@ -39,6 +39,7 @@ export interface Single {
   name: string;
   set: string;
   number: string;
+  variant?: string;
   condition: string;
   language: string;
   price: number;

@@ -98,6 +98,7 @@ function mapItem(it: RawItem): Single {
     name: it.name,
     set: it.set,
     number: it.number,
+    variant: it.variant?.trim() || undefined,
     condition,
     language: "", // backend has no language field yet
     price: Math.round(it.askBRL * 100),

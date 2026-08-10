@@ -111,14 +111,15 @@ function singleRow(s: Single): FeedItem | null {
   const number = s.number ? ` ${s.number}` : "";
   const numberNote = s.number ? ` (${s.number})` : "";
   const setNote = s.set ? `, set ${s.set}` : "";
+  const variantNote = s.variant ? `, versão ${s.variant}` : "";
   return {
     id: feedID(s.slug),
     title: clamp(
-      `${s.name}${number} — Carta ${s.gameLabel}${s.set ? ` ${s.set}` : ""} ${s.condition}`,
+      `${s.name}${number} — Carta ${s.gameLabel}${s.set ? ` ${s.set}` : ""}${s.variant ? ` ${s.variant}` : ""} ${s.condition}`,
       150,
     ),
     description: clamp(
-      `Carta ${s.name}${numberNote} de ${s.gameLabel}${setNote}, condição ${s.condition}. Conferida uma a uma na Collecta, com pedido pelo WhatsApp e envio para todo o Brasil.`,
+      `Carta ${s.name}${numberNote} de ${s.gameLabel}${setNote}${variantNote}, condição ${s.condition}. Conferida uma a uma na Collecta, com pedido pelo WhatsApp e envio para todo o Brasil.`,
       5000,
     ),
     link: absoluteURL(`/carta/${s.slug}`),
@@ -133,7 +134,13 @@ function singleRow(s: Single): FeedItem | null {
     brand: maker(s.game, s.gameLabel),
     productType: ["Singles", s.gameLabel, s.set].filter(Boolean).join(" > "),
     googleCategory: CAT_CARDS,
-    labels: [s.gameLabel, s.set, s.condition, priceBand(s.price)].filter(Boolean),
+    labels: [
+      s.gameLabel,
+      s.set,
+      s.variant ?? "",
+      s.condition,
+      priceBand(s.price),
+    ].filter(Boolean),
   };
 }
 
