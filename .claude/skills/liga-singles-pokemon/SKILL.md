@@ -329,3 +329,40 @@ POST $B/api/trades/liga?game=pokemon
 ```
 
 Conferência posterior: skill `liga-conferir`.
+
+---
+
+## CSV ponta a ponta SEM downloads — validado em 2026-08-03 (75 cartas, 31 edições)
+
+Para lote grande espalhado em muitas edições, o caminho form-por-edição explode
+(a busca por edição pagina em **50 linhas, ordem alfabética** — "uma edição por
+página" só vale para set pequeno). O que funcionou, tudo via `fetch` in-page no
+próprio admin (zero arquivos baixados/subidos):
+
+1. **Export por edição via POST direto**: `fetch('/?view=ecom/admin/export&tcg=2')`
+   com FormData `txt_tipo_export=2, txt_edicao_2=<ID>, txt_agrupar_cartas_2=0,
+   txt_orderby_2=, btExport=Exportar`. **Sem `btExport` o servidor devolve a
+   página HTML em vez do CSV.** Resposta = CSV da edição inteira (catálogo com
+   colunas de estoque vazias). O select de edição do export é `txt_edicao_2`
+   (o sufixo é o id do TCG), single — uma edição por POST; ~800ms entre POSTs.
+2. Filtrar as linhas desejadas por `numero` (col 4) **com trava de nome**
+   (cols 8/9, normalizar hífen/apóstrofo: `Lumineon-V`, `N's`), preencher
+   col10=EN/PT, col11=NM, col13=qtd, col14=preço com vírgula, e guardar.
+   ⚠️ **`window.*` morre ao navegar** — montar as linhas na MESMA página de onde
+   sai o import, ou refazer (os fetches funcionam de qualquer página do admin).
+3. **Import via POST direto** (dispensa o clique real no rádio): FormData com
+   `VALID_SEC_UNIQUE_TOKEN` (hidden do form da página de import),
+   `inpt-stock-action=1` (Acrescentar), `file` = `new Blob([csv])` com nome
+   `.csv`, `btImport=Importar`, para o `action` do form. CSV = 2 linhas de
+   cabeçalho do export + linhas (todos os campos requoted). A resposta **não
+   traz mensagem de resultado** — verificar SEMPRE pelo `h_eid` na busca.
+4. **"Acrescentar" SOMA.** Se alguma linha já foi salva pelo formulário antes do
+   import, a quantidade duplica (Articuno ficou q10 = 5 do form + 5 do CSV;
+   corrigido re-salvando q5). Não misture os dois caminhos para o mesmo lote.
+
+Edições confirmadas nesta rodada (além das já listadas): JTG 654, CRI 773,
+SSP 639, MEP 733, DRI 706, PAL 391, SUM 100, HIF 159 (Shiny Vault junto,
+números SVnn), MEG 730, VIV 175, OBF 406, POR 769, TEF 529, CZGG 339, PGO 274,
+SIT 286, SITTG 287, ASR 267, ARTG 271, MEW/151 411, XYPR 9, SVI 343, SFA 557,
+PFL 738, ASC 754 (padrões têm edições próprias 761/762/763), SVP 342
+(carimbada Journey Together = número `167b`), TWM 538, BRS 259, PAR 439.

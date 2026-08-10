@@ -136,7 +136,7 @@ da referência, costuma ser carta trocada ou referência de mercado quebrada —
 "promoção". Em One Piece isso publicou uma carta de R$330 a R$3,00, e ela vendeu.
 Segure a linha e pergunte.
 
-Preenche só quatro colunas na linha do catálogo:
+Preenche cinco colunas na linha do catálogo:
 
 | coluna | valor |
 | --- | --- |
@@ -144,6 +144,29 @@ Preenche só quatro colunas na linha do catálogo:
 | `11` Qualidade | `condition` do ledger, default `NM` |
 | `13` QtdSomar | `qty` |
 | `14` Preço | `askBRL` com **vírgula** decimal (`12,10`) |
+| `15` Foil | `1` quando a carta é foil — **não deixe em branco** |
+
+> ### ⚠️ Coluna 15 em branco cadastra tudo como "Normal"
+>
+> Foi o que aconteceu com as 143 singles de Riftbound: entraram como Normal
+> enquanto o mercado dessas cartas é ~95% Foil. Consequência: quem filtra "Foil"
+> na Liga **nunca vê a loja**, o comparador põe você num balde sem compradores,
+> e toda análise de posição compara produto diferente. A Liga nem tinha histórico
+> de venda de Normal nessas cartas — o "Preço Médio de Venda / Normal" mostrava
+> o nosso próprio preço nas três colunas, que é a assinatura do problema.
+>
+> **Como saber se é foil:** o produto casado no TCGplayer traz `Variant`
+> (`Foil`/`Normal`) em `data/snapshot-<jogo>.json` → `prices[]`, e o `ProductID`
+> está no `tcgUrl` do ledger. Cruze por aí; o campo `variant` do ledger registra
+> variação de **arte** (Alternate Art, Overnumbered), não acabamento. Em Riftbound
+> as raridades `Epic` e `Showcase` são foil.
+>
+> **Reimportar não conserta**, porque o import soma: criaria anúncios Foil novos e
+> deixaria os Normal errados de pé. A correção é na tela
+> `?view=ecom/admin/cartas/all&tcg=19`, filtrando `txt_filtro=1` (com estoque) +
+> `txt_extras_opcao=1` (Sem) + `txt_extras[]=2` (Foil) para listar exatamente as
+> erradas, e marcando `txt_extras_<n>[]` = `2` em cada linha. Isso **atualiza o
+> anúncio existente** (mesmo `h_id`, estoque intacto) — verificado.
 
 Mantenha as duas linhas de cabeçalho e **um arquivo por edição**. Limites: 500kb
 e 1000 linhas; só linhas com quantidade **e** preço são processadas.

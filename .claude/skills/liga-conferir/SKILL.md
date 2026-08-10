@@ -195,3 +195,27 @@ Herda tudo de `liga-singles-riftbound`; o que mais importa aqui:
 4. A saída do `javascript_tool` é bloqueada se ecoar URL com query string.
 5. A loja pública renderiza dentro de iframe: `innerText` não traz os cards, use
    screenshot.
+
+---
+
+## Aprendizados 2026-08-03 (Pokémon, 342 linhas × 147 cadastros)
+
+- **Export sem download**: o mesmo POST via `fetch` in-page das skills de cadastro
+  funciona com `txt_edicao_2=-1` (Somente do Estoque) + `btExport` no FormData —
+  a resposta é o CSV direto, sem depender do Chrome salvar arquivo. Se vier
+  "Just a moment..." (challenge da CF no fetch), navegar de verdade até a tela
+  de export resolve o cookie e o fetch seguinte passa.
+- **O cabeçalho desse export tem quebra de linha DENTRO de célula** ("Idioma
+  (DE, TW…)"). Não use "pular 2 linhas": filtre as linhas de dados por
+  `/^"2",/` (tipo do TCG na col 0).
+- **Linhas com Quantidade Existente 0 vêm no export** (cadastro zerado =
+  vendido/removido). Para a conferência, qty 0 = ausente da loja.
+- Casamentos que quebram se ignorados: linhas legadas do dashboard guardam o
+  **número no nome** (`(#NN/DD)`) com campo number vazio — extrair por regex;
+  siglas divergentes dash→Liga: `SVI→SV1`, `SM01→SUM`, `MCAP→SVP` (e o número
+  vira `167b`), `CRZ:GG→CZGG`, `SWSH04→VIV`, `SWSH09→BRS`, `SWSH10→ASR`,
+  `SWSH12→SIT`, TGs→`ARTG`/`SITTG`, "(2021)"→CCC, "(2011)"→BLW, "Coleção
+  151"→MEW. Nomes PT×EN do mesmo card (Clarita=Gwynn, Defensor Férreo=Iron
+  Defender) não são divergência.
+- **Import de CSV grande pode pular linha sem avisar** (1 de 75 ficou de fora —
+  Solgaleo SUM 155). A conferência pós-import não é opcional.

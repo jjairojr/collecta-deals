@@ -11,6 +11,8 @@ numeração com sufixo de variante, promos numa edição separada e nomes de est
 cheios de ruído.
 
 Executado em **2026-07-30**: 167 de 181 cards, 365 unidades, R$ 21.498,10.
+Complemento em **2026-07-31**: +7 cards (12 un., R$ 437,52) que estavam listados
+como impossíveis — ver a tabela de pendências no fim. Loja hoje: **174 linhas**.
 
 Pokémon → `liga-singles-pokemon` · Riftbound → `liga-singles-riftbound`
 (o fluxo de importação é o mesmo daquela; aqui documento só o que difere).
@@ -156,14 +158,31 @@ reprints de PRB/PRB2 vêm com o número do set original.
 | ST15 | 40 | ST21 | 51 | ST23 | 54 |
 | ST29 | 76 | ST30 | 82 | P / PR | **2 (PC-01)** |
 
+⚠️ **A edição do ledger não é a edição da Liga.** `EB04` (78, "Egghead Crisis")
+está vazia, mas os cards EB04 **existem** — repartidos dentro das edições do set
+principal da época:
+
+| números | mora em |
+| --- | --- |
+| `EB04-011` … `EB04-041` | **73** (OP-14) |
+| `EB04-001` … `EB04-061` | **77** (OP-15) |
+
+Antes de declarar "número inexistente", procure o número nas edições vizinhas —
+o prefixo do número é confiável, o `set` do ledger não.
+
 **`2` = One Piece Promotion Cards (PC-01), 1203 cards** — onde moram as versões
 de pacote promocional de cards de *qualquer* set (uma carta com
 `(Winner Pack 2026 Vol. 1)` no nome tem número `OP12-093` mas mora na PC-01 como
 `OP12-093-WP`). **Exporte esta edição, mas só para reconhecer promos e pulá-los**
 — nada dela entra no CSV de importação. Ver a regra dura no topo.
 
-⚠️ **EB04 (`78`) exporta vazia** — a edição existe no dropdown mas não tem
-catálogo na Liga. As 5 cartas de EB04 do estoque não têm como ser importadas.
+⚠️ **EB04 (`78`) exporta vazia** — a edição existe no dropdown mas o catálogo
+dela está nas edições 73 e 77, como na tabela acima.
+
+**Cards DON!!** não usam o número do set: são `DON-001`, `DON-002`… com sufixo
+`-G` para os Gold, e **a numeração reinicia por edição**. `DON-001` é
+Dracule Mihawk na OP-14 e Luffy na OP-15 — aqui o número sozinho é inútil, só o
+nome resolve.
 
 ---
 
@@ -297,8 +316,8 @@ em iframe; use screenshot).
 
 | motivo | cards |
 | --- | --- |
-| EB04 sem catálogo na Liga | `EB04-012` Kikunojo · `EB04-022-AA` Issho · `EB04-048` Rob Lucci · `EB04-052` Sanji · `EB04-061` Monkey.D.Luffy (só existe `-SN` Serial Number) |
-| sem número no ledger | `DON!! Card (Dracule Mihawk)` (OP14) · `DON!! Card (Luffy)(Gold)` (OP15) |
+| ~~EB04 sem catálogo~~ **resolvido 2026-07-31** | `EB04-012` Kikunojo e `EB04-022-AA` Issho na ed. **73**; `EB04-048` Rob Lucci, `EB04-052-AA` Sanji e `EB04-061` Monkey.D.Luffy na ed. **77**. Eram 5 "impossíveis" que só estavam na edição errada. |
+| ~~sem número no ledger~~ **resolvido 2026-07-31** | `DON!! Card (Dracule Mihawk)` = `DON-001` na ed. **73** · `DON!! Card (Luffy)(Gold)` = `DON-001-G` na ed. **77** |
 | variante ambígua | `OP02-018` Marco (Alternate Art) — candidatos base/`-E`/`-PP`/`-TC`, nenhum "Alternate Art" · `OP02-036` Nami (Parallel) — base/`-E`/`-BS` |
 | marcador de produto sem par | `ST21-001` / `ST21-014` / `ST21-017` "(Luffy Deck)" — base vs `-PA` vs `-BS` |
 | promo (agora regra) | `OP07-053` Ace 3rd Anniversary · `P-078` Adio Regional — sairiam pelo filtro de promo de qualquer forma |
