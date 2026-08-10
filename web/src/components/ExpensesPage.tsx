@@ -18,7 +18,7 @@ import {
   updateExpense,
   type Expense,
 } from "../api";
-import { brl2 } from "../format";
+import { brl2, dayLabel } from "../format";
 import EmptyState from "./EmptyState";
 import { Kpi } from "./PortfolioPage";
 import { Button } from "./ui/button";
@@ -73,11 +73,6 @@ function monthLabel(month: string): string {
     year: "numeric",
   });
   return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function dayLabel(date: string): string {
-  const m = date.match(/^\d{4}-(\d{2})-(\d{2})$/);
-  return m ? `${m[2]}/${m[1]}` : date;
 }
 
 function activeInMonth(e: Expense, month: string): boolean {

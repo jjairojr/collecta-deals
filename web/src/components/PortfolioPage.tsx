@@ -761,7 +761,7 @@ export function Kpi({
   );
 }
 
-function Chip({
+export function Chip({
   active,
   onClick,
   children,

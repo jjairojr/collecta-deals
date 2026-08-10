@@ -656,6 +656,18 @@ export function getPortfolio(pct: number): Promise<PortfolioResponse> {
   return getJSON<PortfolioResponse>(`${base}/trades?${params.toString()}`);
 }
 
+// A Liga order is packed out of whatever the buyer picked, so it mixes games.
+// SaleRow therefore carries its own game instead of following the game switcher,
+// and /api/sales takes no ?game= param.
+export interface SaleRow extends TradeView {
+  game: string;
+  gameName: string;
+}
+
+export function listSales(): Promise<{ sales: SaleRow[] }> {
+  return getJSON<{ sales: SaleRow[] }>(`${base}/sales`);
+}
+
 export function getQuote(
   q: string,
   limit = 25,
@@ -758,8 +770,12 @@ export function createTrade(t: Partial<Trade>): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades?${gp(new URLSearchParams()).toString()}`, "POST", t);
 }
 
-export function updateTrade(id: string, t: Partial<Trade>): Promise<Trade> {
-  return sendJSON<Trade>(`${base}/trades/${id}?${gp(new URLSearchParams()).toString()}`, "PUT", t);
+export function updateTrade(id: string, t: Partial<Trade>, game?: string): Promise<Trade> {
+  const params = gp(new URLSearchParams());
+  if (game) {
+    params.set("game", game);
+  }
+  return sendJSON<Trade>(`${base}/trades/${id}?${params.toString()}`, "PUT", t);
 }
 
 export interface SellTradeInput {

@@ -151,6 +151,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/trades/liga", s.handleTradesLiga)
 	mux.HandleFunc("POST /api/trades/merge", s.handleTradesMerge)
 	mux.HandleFunc("GET /api/portfolio/all", s.handlePortfolioAll)
+	mux.HandleFunc("GET /api/sales", s.handleSales)
 	mux.HandleFunc("GET /api/storefront", s.handleStorefront)
 	mux.HandleFunc("GET /api/expenses", s.handleExpensesList)
 	mux.HandleFunc("POST /api/expenses", s.handleExpensesCreate)

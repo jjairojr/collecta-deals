@@ -19,6 +19,13 @@ export function pct(value: number): string {
   return `${rounded > 0 ? "+" : ""}${rounded}%`;
 }
 
+// dayLabel renders an ISO date the Brazilian way (DD/MM), for ledgers and charts
+// whose dates are read by the store owner, not by the US side of the business.
+export function dayLabel(date: string): string {
+  const m = date.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return m ? `${m[2]}/${m[1]}` : date;
+}
+
 export function stampLabel(s: string): string {
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}))?$/);
   if (!m) {
