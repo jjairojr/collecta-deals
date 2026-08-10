@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { Coins, Receipt, Store, TrendingUp } from "lucide-react";
 import { listExpenses, listSales, type Expense, type SaleRow } from "../api";
-import { brl0, brl2 } from "../format";
+import { brl0, brl2, dayLabel } from "../format";
 import {
   currentMonth,
   eligibleSales,
@@ -33,6 +33,7 @@ import {
 } from "../finance";
 import EmptyState from "./EmptyState";
 import { Chip, Kpi } from "./PortfolioPage";
+import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -438,6 +439,10 @@ export default function FinanceiroPage() {
         </div>
       )}
 
+      {visible.length > 0 && (
+        <TopSales sales={visible} unmarkedIsLiga={unmarkedIsLiga} />
+      )}
+
       {visible.length === 0 ? (
         <EmptyState hint="troque o período ou os filtros">Nenhuma venda no recorte atual.</EmptyState>
       ) : (
@@ -549,6 +554,99 @@ export default function FinanceiroPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+const RANK_ORDER = [
+  { value: "top", label: "Maiores lucros" },
+  { value: "bottom", label: "Maiores prejuízos" },
+];
+
+function TopSales({ sales, unmarkedIsLiga }: { sales: SaleRow[]; unmarkedIsLiga: boolean }) {
+  const [order, setOrder] = useState("top");
+  const [limit, setLimit] = useState(10);
+
+  const ranked = useMemo(() => {
+    const sorted = [...sales].sort((a, b) =>
+      order === "top" ? b.profitBRL - a.profitBRL : a.profitBRL - b.profitBRL,
+    );
+    return sorted.slice(0, limit);
+  }, [sales, order, limit]);
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display text-base font-extrabold text-fg">Vendas item a item</h2>
+        <ToggleGroup
+          value={order}
+          options={RANK_ORDER}
+          onChange={(v) => {
+            setOrder(v);
+            setLimit(10);
+          }}
+        />
+      </div>
+      <div className="overflow-x-auto">
+        <Table className="min-w-[820px]">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="px-2">Item</TableHead>
+              <TableHead className="px-2">Data</TableHead>
+              <TableHead className="px-2">Canal</TableHead>
+              <TableHead className="px-2 text-right">Un.</TableHead>
+              <TableHead className="px-2 text-right">Receita</TableHead>
+              <TableHead className="px-2 text-right">Custo</TableHead>
+              <TableHead className="px-2 text-right">Lucro</TableHead>
+              <TableHead className="px-2 text-right">Mg</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ranked.map((s) => (
+              <TableRow key={s.id}>
+                <TableCell className="px-2">
+                  <div className="truncate text-slate-200">{s.name}</div>
+                  <div className="truncate text-[10px] text-slate-500">
+                    {[s.number, s.set, s.variant, s.gameName].filter(Boolean).join(" · ")}
+                  </div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap px-2 tabular-nums text-slate-400">
+                  {s.sellDate ? dayLabel(s.sellDate) : "—"}
+                </TableCell>
+                <TableCell className="px-2 text-[11px] text-slate-400">
+                  <div>{sideLabels[sideOf(s, unmarkedIsLiga)]}</div>
+                  <div className="truncate text-[10px] text-slate-500">
+                    {isUSD(s) ? `TCGplayer · US$ ${(s.sellPrice ?? 0).toFixed(2)}` : s.buyer || "sem comprador"}
+                  </div>
+                </TableCell>
+                <TableCell className="px-2 text-right tabular-nums text-slate-400">{s.qty}</TableCell>
+                <TableCell className="px-2 text-right tabular-nums text-slate-200">
+                  {brl2(s.valueBRL)}
+                </TableCell>
+                <TableCell className="px-2 text-right tabular-nums text-slate-400">
+                  {brl2(s.costBRL)}
+                </TableCell>
+                <TableCell className={`px-2 text-right font-bold tabular-nums ${moneyClass(s.profitBRL)}`}>
+                  {brl2(s.profitBRL)}
+                </TableCell>
+                <TableCell className={`px-2 text-right tabular-nums ${moneyClass(s.profitBRL)}`}>
+                  {s.valueBRL > 0 ? pctLabel((s.profitBRL / s.valueBRL) * 100) : "—"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {limit < sales.length && (
+        <div className="mt-3 flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setLimit((n) => n + 20)}>
+            Mostrar mais
+          </Button>
+          <span className="text-[11px] text-slate-500">
+            {Math.min(limit, sales.length)} de {sales.length} itens
+          </span>
+        </div>
+      )}
+    </Card>
   );
 }
 
