@@ -461,6 +461,14 @@ export function cardImageURL(set: string, number: string, productID?: number): s
   return `${base}/card-image?${params.toString()}`;
 }
 
+// imageProxyURL routes a product's own art through our server. The CDNs that
+// host it (Liga, TCGplayer, marketplaces) send no CORS headers, so a canvas
+// can't draw those images directly — every hand-picked image came out as a hole
+// in the exported list until it went same-origin.
+export function imageProxyURL(url: string): string {
+  return `${base}/image?url=${encodeURIComponent(url)}`;
+}
+
 export function tcgProductImageURL(productID: number): string {
   return `https://product-images.tcgplayer.com/fit-in/200x279/${productID}.jpg`;
 }

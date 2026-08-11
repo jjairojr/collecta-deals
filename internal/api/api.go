@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -139,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/tracking/capture", s.handleCapture)
 	mux.HandleFunc("POST /api/tracking/capture-sealed", s.handleCaptureSealed)
 	mux.HandleFunc("GET /api/card-image", s.handleCardImage)
+	mux.HandleFunc("GET /api/image", s.handleImageProxy)
 	mux.HandleFunc("POST /api/export/image", s.handleExportImage)
 	mux.HandleFunc("GET /api/games", s.handleGames)
 	mux.HandleFunc("GET /api/trades", s.handleTradesList)
@@ -1053,6 +1055,90 @@ func (s *Server) handleCardImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(body)
+}
+
+// imageProxyHosts are the CDNs a hand-picked product image can come from. None
+// of them sends CORS headers, so a browser <canvas> cannot draw them directly —
+// the share-list export ended up with holes where sealed products and any card
+// with its own art should be. Proxying them puts the bytes on our own origin.
+var imageProxyHosts = map[string]struct{}{
+	"repositorio.sbrauble.com":        {},
+	"tcgplayer-cdn.tcgplayer.com":     {},
+	"product-images.tcgplayer.com":    {},
+	"images-na.ssl-images-amazon.com": {},
+	"m.media-amazon.com":              {},
+	"http2.mlstatic.com":              {},
+	"storage.googleapis.com":          {},
+	"images.pricecharting.com":        {},
+	"www.ligamagic.com.br":            {},
+	"images.ligamagic.com.br":         {},
+}
+
+// allowedImageURL keeps the proxy from becoming an open fetcher: only https and
+// only hosts we already store art from.
+func allowedImageURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	_, ok := imageProxyHosts[u.Host]
+	return ok
+}
+
+// ledgerImageURL reports whether an https URL is the art of some holding. It is
+// the fallback for a host nobody listed yet: a seller can paste an image from
+// any store and it still draws on the canvas, while a URL that sits in no
+// ledger is never fetched.
+func (s *Server) ledgerImageURL(gs *GameStack, raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	for _, st := range []*trades.Store{gs.Trades, s.accessories} {
+		if st == nil {
+			continue
+		}
+		all, err := st.List()
+		if err != nil {
+			continue
+		}
+		for _, t := range all {
+			if t.ImageURL == raw {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// handleImageProxy serves an already-known product image URL from our origin so
+// a canvas can draw it. It refuses anything that doesn't come back as an image,
+// since a CDN error page is worth less than the text fallback the client draws.
+func (s *Server) handleImageProxy(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	gs := s.stackFor(q)
+	if gs.Cardimg == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	raw := q.Get("url")
+	if !allowedImageURL(raw) && !s.ledgerImageURL(gs, raw) {
+		http.Error(w, "unsupported image host", http.StatusBadRequest)
+		return
+	}
+	body, err := gs.Cardimg.FetchURL(r.Context(), raw)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	ct := http.DetectContentType(body)
+	if !strings.HasPrefix(ct, "image/") {
+		http.Error(w, "not an image", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(body)
 }

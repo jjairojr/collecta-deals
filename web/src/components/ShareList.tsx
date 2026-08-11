@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Download, ImageDown, Images, Send, X } from "lucide-react";
-import { cardImageURL, getGame, productIDFromTcgURL, type TradeView } from "../api";
+import {
+  cardImageURL,
+  getGame,
+  imageProxyURL,
+  productIDFromTcgURL,
+  type TradeView,
+} from "../api";
 import { brl0, pct as pctFmt, usd } from "../format";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -852,13 +858,12 @@ interface PageInfo {
 
 // imgSrc resolves a product's art. A hand-picked image URL (the only art sealed
 // products and accessories have) wins; otherwise the exact TCGplayer product
-// image, routed through the same-origin proxy so the canvas isn't tainted,
-// beats the number-keyed Liga lookup — the latter can't tell variant prints
-// apart. A remote URL without CORS simply fails to load and the cell falls back
-// to text, so it can never taint the canvas either.
+// image beats the number-keyed Liga lookup — the latter can't tell variant
+// prints apart. Every source goes through the same-origin proxy: the CDNs
+// hosting card art send no CORS headers, so a canvas can't draw them directly.
 function imgSrc(t: TradeView): string | null {
   if (t.imageURL) {
-    return t.imageURL;
+    return imageProxyURL(t.imageURL);
   }
   const pid = productIDFromTcgURL(t.tcgUrl);
   if (pid) {
