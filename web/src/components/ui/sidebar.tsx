@@ -154,7 +154,7 @@ export function SidebarGroupLabel({ className, children }: { className?: string;
   return (
     <span
       className={cn(
-        "font-pixel px-3 pb-1.5 text-[9px] uppercase tracking-normal text-brand-label transition-opacity duration-200",
+        "font-pixel block px-3 pb-1.5 text-[9px] uppercase leading-[1.7] tracking-normal text-brand-label transition-opacity duration-200",
         collapsed ? "pointer-events-none h-0 select-none overflow-hidden pb-0 opacity-0 lg:h-0" : "opacity-100",
         className,
       )}
@@ -218,7 +218,7 @@ export function SidebarTrigger({ className }: { className?: string }) {
       )}
     >
       <ChevronsLeft className={cn("h-4 w-4 shrink-0 transition-transform duration-300", collapsed && "rotate-180")} />
-      <span className={cn(collapsed && "hidden")}>Collapse</span>
+      <span className={cn(collapsed && "hidden")}>Recolher</span>
     </button>
   );
 }

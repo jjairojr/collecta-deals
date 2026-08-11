@@ -34,7 +34,7 @@ import {
   type QuoteMatch,
   type TradeView,
 } from "../api";
-import { brl0, usd, timeAgo, fullStamp } from "../format";
+import { brl0, usd, dayLabel, timeAgo, fullStamp } from "../format";
 import { toCSV, downloadCSV } from "../csv";
 
 // In BR-only games (no US deals pipeline) there is no US price: the portfolio
@@ -199,10 +199,14 @@ function csvRows(list: TradeView[]): (string | number)[][] {
 type QuickFilter = "all" | "transit" | "delivered";
 type GroupBy = "set" | "store" | "none";
 
+// The page shows one list at a time: what is still in stock or what was sold.
+// Stacking both meant scrolling past every holding to reach the sales.
+type Tab = "holding" | "sold";
+
 const QUICK: { v: QuickFilter; label: string }[] = [
-  { v: "all", label: "All" },
-  { v: "transit", label: "In transit" },
-  { v: "delivered", label: "Delivered" },
+  { v: "all", label: "Todas" },
+  { v: "transit", label: "Em trânsito" },
+  { v: "delivered", label: "Entregues" },
 ];
 
 function passesQuick(t: TradeView, f: QuickFilter): boolean {
@@ -268,6 +272,7 @@ export default function PortfolioPage({
   lockedSection?: Section;
 }) {
   const [section, setSection] = useState<Section>(lockedSection ?? "singles");
+  const [tab, setTab] = useState<Tab>("holding");
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,7 +280,6 @@ export default function PortfolioPage({
   const [sharing, setSharing] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortState>({ key: "added", dir: "desc" });
-  const [soldOpen, setSoldOpen] = useState(true);
   const [quick, setQuick] = useState<QuickFilter>("all");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -326,28 +330,18 @@ export default function PortfolioPage({
     () => holdings.filter((t) => passesQuick(t, quick)),
     [holdings, quick],
   );
-  const soldVisible = useMemo(
-    () =>
-      quick === "transit" || quick === "delivered"
-        ? []
-        : sold.filter((t) => passesQuick(t, quick)),
-    [sold, quick],
-  );
   const holdingsInvested = useMemo(
     () => visibleHoldings.reduce((s, t) => s + t.costBRL, 0),
     [visibleHoldings],
   );
   const soldReceived = useMemo(
-    () => soldVisible.reduce((s, t) => s + t.valueBRL, 0),
-    [soldVisible],
+    () => sold.reduce((s, t) => s + t.valueBRL, 0),
+    [sold],
   );
-  const holdingsGroups = useMemo(
-    () => (groupBy === "none" ? [] : groupTrades(visibleHoldings, groupBy)),
-    [visibleHoldings, groupBy],
-  );
-  const soldGroups = useMemo(
-    () => (groupBy === "none" ? [] : groupTrades(soldVisible, groupBy)),
-    [soldVisible, groupBy],
+  const rows = tab === "sold" ? sold : visibleHoldings;
+  const groups = useMemo(
+    () => (groupBy === "none" ? [] : groupTrades(rows, groupBy)),
+    [rows, groupBy],
   );
   const quickCounts = useMemo(
     () => ({
@@ -360,6 +354,15 @@ export default function PortfolioPage({
   const isSealed = section === "sealed";
   const isManual = section !== "singles";
   const anyExpanded = expanded.size > 0;
+  const filtered = Boolean(q) || (tab === "holding" && quick !== "all");
+  const emptyList =
+    tab === "sold"
+      ? filtered
+        ? "Nenhuma venda bate com a busca."
+        : "Nenhuma venda registrada ainda."
+      : filtered
+        ? `Nenhum${isManual ? " produto bate" : "a carta bate"} com os filtros.`
+        : `Nada em estoque agora.`;
 
   const onSort = useCallback((key: SortKey) => {
     setSort((s) =>
@@ -387,76 +390,65 @@ export default function PortfolioPage({
   }, []);
 
   const expandAll = useCallback(() => {
-    setExpanded(new Set([...holdingsGroups, ...soldGroups].map((g) => g.key)));
-  }, [holdingsGroups, soldGroups]);
+    setExpanded(new Set(groups.map((g) => g.key)));
+  }, [groups]);
 
   const collapseAll = useCallback(() => setExpanded(new Set()), []);
 
   const exportCSV = useCallback(() => {
-    const rows = csvRows([...visibleHoldings, ...soldVisible]);
     const date = new Date().toISOString().slice(0, 10);
     downloadCSV(
       `portfolio-${getGame()}-${section}-${date}.csv`,
-      toCSV(CSV_HEADERS, rows),
+      toCSV(CSV_HEADERS, csvRows([...visibleHoldings, ...sold])),
     );
-  }, [visibleHoldings, soldVisible, section]);
+  }, [visibleHoldings, sold, section]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            {isSealed
-              ? "Your sealed buys and sales — what you invested and what you sold."
-              : section === "accessories"
-                ? "Your accessories (sleeves, deckboxes, playmats…). They belong to no game — the same list shows up whichever game is selected."
-                : "Your buys and sales — what you invested and what you sold."}
-          </p>
+      {!lockedSection && (
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          <ToggleGroup
+            value={section}
+            onChange={(v) => {
+              setSection(
+                v === "sealed"
+                  ? "sealed"
+                  : v === "accessories"
+                    ? "accessories"
+                    : "singles",
+              );
+              setTab("holding");
+              setAdding(false);
+              setSharing(false);
+            }}
+            options={[
+              { value: "singles", label: "Cartas" },
+              { value: "sealed", label: "Selados" },
+              { value: "accessories", label: "Acessórios" },
+            ]}
+          />
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          {!lockedSection && (
-            <ToggleGroup
-              value={section}
-              onChange={(v) => {
-                setSection(
-                  v === "sealed"
-                    ? "sealed"
-                    : v === "accessories"
-                      ? "accessories"
-                      : "singles",
-                );
-                setAdding(false);
-                setSharing(false);
-              }}
-              options={[
-                { value: "singles", label: "Singles" },
-                { value: "sealed", label: "Sealed" },
-                { value: "accessories", label: "Accessories" },
-              ]}
-            />
-          )}
-        </div>
-      </div>
+      )}
 
       {data && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Kpi
             icon={<Wallet className="h-5 w-5" />}
-            label="Invested (holding)"
+            label="Investido (em estoque)"
             value={brl0(summary.investedBRL)}
-            sub={`${summary.holdings} ${isManual ? "products" : "cards"}`}
+            sub={`${summary.holdings} ${isManual ? "produtos" : "cartas"}`}
           />
           <Kpi
             icon={<Banknote className="h-5 w-5" />}
-            label="Total invested"
+            label="Investido total"
             value={brl0(summary.investedBRL + summary.costOfSoldBRL)}
-            sub="holding + sold, all time"
+            sub="em estoque + vendido, desde sempre"
           />
           <Kpi
             icon={<Coins className="h-5 w-5" />}
-            label="Sold"
+            label="Vendido"
             value={brl0(summary.proceedsBRL)}
-            sub={`${summary.sold} sold`}
+            sub={`${summary.sold} ${summary.sold === 1 ? "venda" : "vendas"}`}
           />
         </div>
       )}
@@ -464,6 +456,41 @@ export default function PortfolioPage({
       {error && (
         <div className="rounded-[14px] border-2 border-rose-900/50 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
           {error}
+        </div>
+      )}
+
+      {!loading && active.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-b-[3px] border-outline pb-3">
+          <ToggleGroup
+            value={tab}
+            onChange={(v) => setTab(v === "sold" ? "sold" : "holding")}
+            options={[
+              {
+                value: "holding",
+                label: (
+                  <>
+                    Em estoque <span className="opacity-60">· {holdings.length}</span>
+                  </>
+                ),
+              },
+              {
+                value: "sold",
+                label: (
+                  <>
+                    {isManual ? "Vendidos" : "Vendidas"}{" "}
+                    <span className="opacity-60">· {sold.length}</span>
+                  </>
+                ),
+              },
+            ]}
+          />
+          <span
+            className={`ml-auto tabular-nums text-xs font-medium ${tab === "sold" ? "text-emerald-300" : "text-slate-400"}`}
+          >
+            {tab === "sold"
+              ? `${brl0(soldReceived)} recebidos`
+              : `${brl0(holdingsInvested)} investidos`}
+          </span>
         </div>
       )}
 
@@ -475,8 +502,8 @@ export default function PortfolioPage({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={
               isManual
-                ? "Search products, store…"
-                : "Search cards, number, store…"
+                ? "Buscar produto, loja…"
+                : "Buscar carta, número, loja…"
             }
             className="w-full pl-9 pr-8"
           />
@@ -484,7 +511,7 @@ export default function PortfolioPage({
             <button
               onClick={() => setQuery("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-500 hover:text-slate-300"
-              title="Clear search"
+              title="Limpar busca"
             >
               <X className="h-4 w-4" />
             </button>
@@ -495,51 +522,53 @@ export default function PortfolioPage({
             variant="outline"
             onClick={exportCSV}
             disabled={active.length === 0}
-            title="Download this view as a spreadsheet"
+            title="Baixar esta lista como planilha"
           >
-            <Download /> Export CSV
+            <Download /> Exportar CSV
           </Button>
           {!isManual && (
             <Button
               variant="outline"
               onClick={() => setSharing(true)}
               disabled={holdings.length === 0}
-              title="Build a list to send to buyers"
+              title="Montar uma lista para mandar pro comprador"
             >
-              <Share2 /> Share list
+              <Share2 /> Lista p/ cliente
             </Button>
           )}
           <Button onClick={() => setAdding((a) => !a)}>
             <Plus />{" "}
             {adding
-              ? "Close"
+              ? "Fechar"
               : isSealed
-                ? "Add sealed"
+                ? "Add selado"
                 : section === "accessories"
-                  ? "Add accessory"
-                  : "Add trade"}
+                  ? "Add acessório"
+                  : "Add compra"}
           </Button>
         </div>
       </div>
 
       {!loading && active.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {QUICK.map((qf) => (
-              <Chip
-                key={qf.v}
-                active={quick === qf.v}
-                onClick={() => setQuick(qf.v)}
-              >
-                {qf.label}{" "}
-                <span className="opacity-60">{quickCounts[qf.v]}</span>
-              </Chip>
-            ))}
-          </div>
+          {tab === "holding" && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {QUICK.map((qf) => (
+                <Chip
+                  key={qf.v}
+                  active={quick === qf.v}
+                  onClick={() => setQuick(qf.v)}
+                >
+                  {qf.label}{" "}
+                  <span className="opacity-60">{quickCounts[qf.v]}</span>
+                </Chip>
+              ))}
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                Group by
+                Agrupar por
               </span>
               <ToggleGroup
                 value={groupBy}
@@ -550,20 +579,19 @@ export default function PortfolioPage({
                 }
                 options={[
                   { value: "set", label: "Set" },
-                  { value: "store", label: "Store" },
-                  { value: "none", label: "None" },
+                  { value: "store", label: "Loja" },
+                  { value: "none", label: "Nenhum" },
                 ]}
               />
             </div>
-            {groupBy !== "none" &&
-              holdingsGroups.length + soldGroups.length > 0 && (
-                <button
-                  onClick={anyExpanded ? collapseAll : expandAll}
-                  className="text-xs font-medium text-sky-300 hover:text-sky-200"
-                >
-                  {anyExpanded ? "Collapse all" : "Expand all"}
-                </button>
-              )}
+            {groupBy !== "none" && groups.length > 0 && (
+              <button
+                onClick={anyExpanded ? collapseAll : expandAll}
+                className="text-xs font-medium text-sky-300 hover:text-sky-200"
+              >
+                {anyExpanded ? "Recolher tudo" : "Abrir tudo"}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -596,134 +624,49 @@ export default function PortfolioPage({
       )}
 
       {loading ? (
-        <Panel>Loading portfolio…</Panel>
+        <Panel>Carregando portfólio…</Panel>
       ) : active.length === 0 ? (
         <Panel>
           {isSealed
-            ? "No sealed products yet. Click “Add sealed” to log your first box."
+            ? "Nenhum selado ainda. Clique em “Add selado” para lançar a primeira caixa."
             : section === "accessories"
-              ? "No accessories yet. Click “Add accessory” to log your first product."
-              : "No trades yet. Click “Add trade” to log your first buy."}
+              ? "Nenhum acessório ainda. Clique em “Add acessório” para lançar o primeiro produto."
+              : "Nenhuma compra ainda. Clique em “Add compra” para lançar a primeira."}
         </Panel>
+      ) : groupBy === "none" ? (
+        isManual ? (
+          <ManualTable
+            trades={rows}
+            onChanged={refresh}
+            empty={emptyList}
+            sort={sort}
+            onSort={onSort}
+          />
+        ) : (
+          <TradeTable
+            trades={rows}
+            onChanged={refresh}
+            empty={emptyList}
+            sort={sort}
+            onSort={onSort}
+          />
+        )
+      ) : groups.length === 0 ? (
+        <Panel>{emptyList}</Panel>
       ) : (
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-base font-extrabold text-fg">
-                Holdings{" "}
-                <span className="font-normal text-slate-500">
-                  · {visibleHoldings.length}
-                </span>
-              </h2>
-              <span className="ml-auto tabular-nums text-xs font-medium text-slate-400">
-                {brl0(holdingsInvested)} invested
-              </span>
-            </div>
-            {groupBy === "none" ? (
-              isManual ? (
-                <ManualTable
-                  trades={visibleHoldings}
-                  onChanged={refresh}
-                  empty={
-                    q || quick !== "all"
-                      ? "No products match your filters."
-                      : "No products held right now."
-                  }
-                  sort={sort}
-                  onSort={onSort}
-                />
-              ) : (
-                <TradeTable
-                  trades={visibleHoldings}
-                  onChanged={refresh}
-                  empty={
-                    q || quick !== "all"
-                      ? "No cards match your filters."
-                      : "No cards held right now."
-                  }
-                  sort={sort}
-                  onSort={onSort}
-                />
-              )
-            ) : holdingsGroups.length === 0 ? (
-              <Panel>
-                {q || quick !== "all"
-                  ? "No cards match your filters."
-                  : "Nothing held right now."}
-              </Panel>
-            ) : (
-              <div className="space-y-2">
-                {holdingsGroups.map((g) => (
-                  <GroupBlock
-                    key={g.key}
-                    g={g}
-                    manual={isManual}
-                    open={expanded.has(g.key)}
-                    onToggle={() => toggleGroup(g.key)}
-                    sort={sort}
-                    onSort={onSort}
-                    onChanged={refresh}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-          {soldVisible.length > 0 && (
-            <div className="space-y-3">
-              <button
-                onClick={() => setSoldOpen((o) => !o)}
-                className="flex w-full items-center gap-2 text-left"
-              >
-                <ChevronDown
-                  className={`h-4 w-4 text-slate-500 transition-transform ${soldOpen ? "" : "-rotate-90"}`}
-                />
-                <h2 className="font-display text-base font-extrabold text-fg">
-                  Sold{" "}
-                  <span className="font-normal text-slate-500">
-                    · {soldVisible.length}
-                  </span>
-                </h2>
-                <span className="ml-auto tabular-nums text-xs font-medium text-emerald-300">
-                  {brl0(soldReceived)} received
-                </span>
-              </button>
-              {soldOpen &&
-                (groupBy === "none" ? (
-                  isManual ? (
-                    <ManualTable
-                      trades={soldVisible}
-                      onChanged={refresh}
-                      empty=""
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                  ) : (
-                    <TradeTable
-                      trades={soldVisible}
-                      onChanged={refresh}
-                      empty=""
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                  )
-                ) : (
-                  <div className="space-y-2">
-                    {soldGroups.map((g) => (
-                      <GroupBlock
-                        key={g.key}
-                        g={g}
-                        manual={isManual}
-                        open={expanded.has(g.key)}
-                        onToggle={() => toggleGroup(g.key)}
-                        sort={sort}
-                        onSort={onSort}
-                        onChanged={refresh}
-                      />
-                    ))}
-                  </div>
-                ))}
-            </div>
-          )}
+        <div className="space-y-2">
+          {groups.map((g) => (
+            <GroupBlock
+              key={g.key}
+              g={g}
+              manual={isManual}
+              open={expanded.has(g.key)}
+              onToggle={() => toggleGroup(g.key)}
+              sort={sort}
+              onSort={onSort}
+              onChanged={refresh}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -802,10 +745,10 @@ function GroupBlock({
   const noun = manual
     ? g.count === 1
       ? "item"
-      : "items"
+      : "itens"
     : g.count === 1
-      ? "card"
-      : "cards";
+      ? "carta"
+      : "cartas";
   return (
     <div className="overflow-hidden rounded-[14px] border-[3px] border-outline bg-panel">
       <button
@@ -825,7 +768,8 @@ function GroupBlock({
           </span>
           {g.soldBRL > 0 && (
             <span className="text-slate-500">
-              sold <span className="text-emerald-300">{brl0(g.soldBRL)}</span>
+              vendido{" "}
+              <span className="text-emerald-300">{brl0(g.soldBRL)}</span>
             </span>
           )}
         </div>
@@ -926,26 +870,26 @@ function TradeTable({
         <thead>
           <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
             <SortableTh
-              label="Card"
+              label="Carta"
               sortKey="name"
               sort={sort}
               onSort={onSort}
               align="left"
             />
             <SortableTh
-              label="Cost"
+              label="Custo"
               sortKey="cost"
               sort={sort}
               onSort={onSort}
             />
             <SortableTh
-              label="Sold"
+              label="Vendido"
               sortKey="value"
               sort={sort}
               onSort={onSort}
             />
             <SortableTh
-              label="Added"
+              label="Lançado"
               sortKey="added"
               sort={sort}
               onSort={onSort}
@@ -986,8 +930,8 @@ function DeliveryToggle({
       disabled={saving}
       title={
         t.delivered
-          ? "Delivered — click to mark in transit"
-          : "In transit — click to mark delivered"
+          ? "Entregue — clique para marcar em trânsito"
+          : "Em trânsito — clique para marcar entregue"
       }
       className={`flex items-center gap-1 rounded-[8px] border-2 border-outline px-2 py-1 text-xs font-bold disabled:opacity-50 ${
         t.delivered
@@ -1000,7 +944,7 @@ function DeliveryToggle({
       ) : (
         <Truck className="h-3 w-3" />
       )}
-      {t.delivered ? "Delivered" : "In transit"}
+      {t.delivered ? "Entregue" : "Em trânsito"}
     </button>
   );
 }
@@ -1013,7 +957,9 @@ function SoldCell({ t }: { t: TradeView }) {
   return (
     <td className="px-3 py-2 text-right tabular-nums text-emerald-300">
       {brl0(t.valueBRL)}
-      <div className="text-[10px] text-slate-500">{t.sellDate || "sold"}</div>
+      <div className="text-[10px] text-slate-500">
+        {t.sellDate ? dayLabel(t.sellDate) : "vendido"}
+      </div>
     </td>
   );
 }
@@ -1077,7 +1023,7 @@ function TradeRow({
               </a>
             )}
             {t.realized ? (
-              <Badge variant="emerald">sold</Badge>
+              <Badge variant="emerald">vendido</Badge>
             ) : (
               <>
                 <DeliveryToggle t={t} onChanged={onChanged} />
@@ -1087,9 +1033,9 @@ function TradeRow({
                     setSelling(false);
                   }}
                   className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
-                  title="Edit what you paid and the trade details"
+                  title="Editar o que você pagou e os detalhes da compra"
                 >
-                  <Pencil className="h-3 w-3" /> Edit
+                  <Pencil className="h-3 w-3" /> Editar
                 </button>
                 <button
                   onClick={() => {
@@ -1098,18 +1044,18 @@ function TradeRow({
                   }}
                   className="rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
                 >
-                  Sell
+                  Vender
                 </button>
               </>
             )}
             <button
               onClick={() => {
-                if (confirm("Delete this trade?")) {
+                if (confirm("Excluir este lançamento?")) {
                   deleteTrade(t.id).then(onChanged);
                 }
               }}
               className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
-              title="Delete"
+              title="Excluir"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -1514,26 +1460,26 @@ function ManualTable({
         <thead>
           <tr className="font-pixel border-b-2 border-outline bg-raised text-left text-[8px] uppercase text-brand-label">
             <SortableTh
-              label="Product"
+              label="Produto"
               sortKey="name"
               sort={sort}
               onSort={onSort}
               align="left"
             />
             <SortableTh
-              label="Cost"
+              label="Custo"
               sortKey="cost"
               sort={sort}
               onSort={onSort}
             />
             <SortableTh
-              label="Sold"
+              label="Vendido"
               sortKey="value"
               sort={sort}
               onSort={onSort}
             />
             <SortableTh
-              label="Added"
+              label="Lançado"
               sortKey="added"
               sort={sort}
               onSort={onSort}
@@ -1603,7 +1549,7 @@ function ManualRow({
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-1">
             {t.realized ? (
-              <Badge variant="emerald">sold</Badge>
+              <Badge variant="emerald">vendido</Badge>
             ) : (
               <>
                 <DeliveryToggle t={t} onChanged={onChanged} />
@@ -1613,9 +1559,9 @@ function ManualRow({
                     setSelling(false);
                   }}
                   className="flex items-center gap-1 rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
-                  title="Edit current value and what you paid"
+                  title="Editar o valor atual e o que você pagou"
                 >
-                  <Pencil className="h-3 w-3" /> Edit
+                  <Pencil className="h-3 w-3" /> Editar
                 </button>
                 <button
                   onClick={() => {
@@ -1624,18 +1570,18 @@ function ManualRow({
                   }}
                   className="rounded-[8px] border-2 border-outline bg-panel px-2 py-1 text-xs font-bold text-slate-200 hover:bg-raised"
                 >
-                  Sell
+                  Vender
                 </button>
               </>
             )}
             <button
               onClick={() => {
-                if (confirm("Delete this trade?")) {
+                if (confirm("Excluir este lançamento?")) {
                   deleteTrade(t.id).then(onChanged);
                 }
               }}
               className="rounded-[8px] border-2 border-outline bg-panel p-1.5 text-slate-400 hover:bg-rose-950/40 hover:text-rose-300"
-              title="Delete"
+              title="Excluir"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

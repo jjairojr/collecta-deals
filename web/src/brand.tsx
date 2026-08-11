@@ -40,6 +40,11 @@ export type View =
 
 export type Icon = ComponentType<{ className?: string }>;
 
+// A view is either scoped to the game picked in the switcher or business-wide
+// (financeiro, vendas, despesas, acessórios): the sidebar groups them apart so
+// the switcher never looks like it drives a screen it has no say over.
+export type NavScope = "game" | "global";
+
 export interface NavItem {
   key: View;
   label: string;
@@ -48,40 +53,41 @@ export interface NavItem {
 
 export interface NavGroup {
   label: string;
+  hint?: string;
+  scope: NavScope;
   items: NavItem[];
 }
 
 export const navGroups: NavGroup[] = [
   {
-    label: "Discover",
+    label: "Jogo",
+    scope: "game",
     items: [
-      { key: "deals", label: "Deals", icon: Sparkles },
-      { key: "browse", label: "Browse", icon: LayoutGrid },
-    ],
-  },
-  {
-    label: "Market",
-    items: [
-      { key: "tracking", label: "Tracking", icon: LineChart },
-      { key: "sealed", label: "Sealed", icon: Boxes },
-    ],
-  },
-  {
-    label: "Inventory",
-    items: [
-      { key: "portfolio", label: "Portfolio", icon: Wallet },
-      { key: "allportfolio", label: "All Games", icon: Layers },
-      { key: "vendas", label: "Vendas", icon: ShoppingBag },
-      { key: "financeiro", label: "Financeiro", icon: PiggyBank },
-      { key: "acessorios", label: "Acessórios", icon: Package },
-      { key: "despesas", label: "Despesas", icon: Receipt },
+      { key: "deals", label: "Ofertas", icon: Sparkles },
+      { key: "browse", label: "Catálogo", icon: LayoutGrid },
+      { key: "tracking", label: "Mercado", icon: LineChart },
+      { key: "sealed", label: "Selados", icon: Boxes },
+      { key: "portfolio", label: "Portfólio", icon: Wallet },
       { key: "estoque", label: "Estoque", icon: Store },
       { key: "orcamento", label: "Orçamento", icon: FileText },
       { key: "buyout", label: "Buyout", icon: HandCoins },
     ],
   },
   {
-    label: "Ajuda",
+    label: "Negócio",
+    hint: "todos os jogos",
+    scope: "global",
+    items: [
+      { key: "financeiro", label: "Financeiro", icon: PiggyBank },
+      { key: "vendas", label: "Vendas", icon: ShoppingBag },
+      { key: "despesas", label: "Despesas", icon: Receipt },
+      { key: "acessorios", label: "Acessórios", icon: Package },
+      { key: "allportfolio", label: "Todos os jogos", icon: Layers },
+    ],
+  },
+  {
+    label: "Liga",
+    scope: "game",
     items: [
       { key: "ligaexport", label: "Exportar p/ Liga", icon: Upload },
       { key: "guialiga", label: "Guia da Liga", icon: BookOpen },
@@ -93,6 +99,10 @@ export const navItems: NavItem[] = navGroups.flatMap((group) => group.items);
 
 export function isView(value: string): value is View {
   return navItems.some((item) => item.key === value);
+}
+
+export function scopeOf(view: View): NavScope {
+  return navGroups.find((group) => group.items.some((item) => item.key === view))?.scope ?? "game";
 }
 
 export interface Brand {

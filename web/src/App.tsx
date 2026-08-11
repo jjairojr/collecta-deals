@@ -8,7 +8,7 @@ import {
   type GameInfo,
   type Status,
 } from "./api";
-import { isView, ligaLabels, navItems, type View } from "./brand";
+import { brandFor, isView, ligaLabels, navItems, scopeOf, type View } from "./brand";
 import DealsPage from "./components/DealsPage";
 import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
@@ -31,28 +31,28 @@ import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 
 const pageMeta: Record<View, { title: string; description: string }> = {
   deals: {
-    title: "Deals",
-    description: "Cross-border price gaps — cheapest Brazil listing vs live US floor.",
+    title: "Ofertas",
+    description: "Diferença de preço entre o piso da Liga e o mercado americano.",
   },
   browse: {
-    title: "Browse",
-    description: "Explore the full catalog with live prices.",
+    title: "Catálogo",
+    description: "Todas as cartas do jogo com preço atual.",
   },
   tracking: {
-    title: "Tracking",
-    description: "Daily price trends and per-store sales across the Brazil market.",
+    title: "Mercado",
+    description: "Preço dia a dia e vendas por loja no mercado brasileiro.",
   },
   sealed: {
-    title: "Sealed",
-    description: "Sealed products — price trends and inferred sales.",
+    title: "Selados",
+    description: "Produtos selados — tendência de preço e vendas inferidas.",
   },
   portfolio: {
-    title: "Portfolio",
-    description: "Your holdings and sales — what you invested and what you sold.",
+    title: "Portfólio",
+    description: "Suas compras e vendas — quanto investiu e quanto já vendeu.",
   },
   allportfolio: {
-    title: "All Games",
-    description: "Combined portfolio across every game.",
+    title: "Todos os jogos",
+    description: "Portfólio somado de todos os jogos.",
   },
   vendas: {
     title: "Vendas da Liga",
@@ -76,11 +76,11 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   },
   orcamento: {
     title: "Orçamento",
-    description: "Build a purchase quote to send a customer.",
+    description: "Monte um orçamento de compra para mandar pro cliente.",
   },
   buyout: {
     title: "Buyout",
-    description: "Value a bulk buyout lot against the market.",
+    description: "Avalie um lote inteiro contra o mercado.",
   },
   ligaexport: {
     title: "Exportar p/ Liga",
@@ -159,6 +159,11 @@ export default function App() {
   const activeView: View = view === "deals" && !dealsEnabled ? "tracking" : view;
   const meta = pageMeta[activeView];
   const ViewIcon = iconFor(activeView);
+  const scopeBadge = (
+    <span className="pill pill-sm bg-panel px-2.5 py-1 font-pixel text-[8px] uppercase text-brand-label">
+      {scopeOf(activeView) === "global" ? "Todos os jogos" : brandFor(game).short}
+    </span>
+  );
 
   return (
     <SelectionProvider>
@@ -176,7 +181,7 @@ export default function App() {
           <TopBar game={game} status={status} onRefresh={onRefresh} dealsEnabled={dealsEnabled} />
           <div key={game} className="bg-grid flex flex-1 flex-col">
             <main key={activeView} className="animate-fade-in mx-auto w-full max-w-7xl flex-1 px-4 py-7 sm:px-6 lg:px-8">
-              <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} />
+              <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} badge={scopeBadge} />
 
               {activeView === "buyout" ? (
                 <div className="mt-6">
@@ -287,14 +292,16 @@ function Footer({ game, hasDeals }: { game: string; hasDeals: boolean }) {
     <footer className="mx-auto w-full max-w-7xl border-t-[3px] border-outline px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
       {hasDeals ? (
         <>
-          Margin is an FX-adjusted gross price gap (lowest current TCGPlayer listing vs cheapest {liga} price). It does
-          not include TCGPlayer fees or shipping. High-value deals use live TCGPlayer listing prices and are verified to
-          have current {liga} sellers. Catalog via TCGCSV; live prices via TCGPlayer; Brazil prices via {liga}.
+          A margem é a diferença bruta de preço já convertida pelo câmbio (menor anúncio atual na TCGplayer vs menor
+          preço na {liga}). Não desconta taxas da TCGplayer nem frete. Ofertas de valor alto usam preço ao vivo da
+          TCGplayer e são verificadas contra vendedores atuais da {liga}. Catálogo via TCGCSV; preços ao vivo via
+          TCGplayer; preços do Brasil via {liga}.
         </>
       ) : (
         <>
-          Brazil market data via {liga}. Prices are the current per-store floor; quantities and prices are decoded per
-          snapshot. Sales are inferred from day-over-day per-store stock drops. Not affiliated with {liga}.
+          Dados do mercado brasileiro via {liga}. Os preços são o piso atual por loja; preços e quantidades são
+          decodificados a cada snapshot. As vendas são inferidas pela queda de estoque de um dia para o outro. Sem
+          vínculo com a {liga}.
         </>
       )}
     </footer>

@@ -6,12 +6,14 @@ export default function PageHeader({
   title,
   description,
   icon: IconCmp,
+  badge,
   actions,
   className,
 }: {
   title: string;
   description?: string;
   icon?: Icon;
+  badge?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }) {
@@ -24,7 +26,10 @@ export default function PageHeader({
           </div>
         )}
         <div>
-          <h1 className="font-display text-3xl font-extrabold text-fg">{title}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-3xl font-extrabold text-fg">{title}</h1>
+            {badge}
+          </div>
           {description && <p className="mt-0.5 text-sm text-slate-400">{description}</p>}
         </div>
       </div>

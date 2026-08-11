@@ -53,7 +53,7 @@ export default function TopBar({
             <div className="hidden md:block">
               <StatPill
                 live={refreshing}
-                label={refreshing ? "Syncing" : "Updated"}
+                label={refreshing ? "Sincronizando" : "Atualizado"}
                 value={refreshing ? "…" : timeAgo(status.updatedAt)}
               />
             </div>
@@ -63,7 +63,7 @@ export default function TopBar({
         {dealsEnabled && (
           <Button variant="accent" size="sm" onClick={onRefresh} disabled={refreshing}>
             <RefreshCw className={refreshing ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">{refreshing ? "Refreshing…" : "Refresh"}</span>
+            <span className="hidden sm:inline">{refreshing ? "Atualizando…" : "Atualizar"}</span>
           </Button>
         )}
       </div>

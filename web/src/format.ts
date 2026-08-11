@@ -32,7 +32,7 @@ export function stampLabel(s: string): string {
     return s;
   }
   const [, , mo, d, h] = m;
-  return h ? `${mo}/${d} ${h}h` : `${mo}/${d}`;
+  return h ? `${d}/${mo} ${h}h` : `${d}/${mo}`;
 }
 
 export function fullStamp(iso: string): string {
@@ -43,9 +43,9 @@ export function fullStamp(iso: string): string {
   if (Number.isNaN(d.getTime())) {
     return "";
   }
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -53,23 +53,23 @@ export function fullStamp(iso: string): string {
 
 export function timeAgo(iso: string): string {
   if (!iso) {
-    return "never";
+    return "nunca";
   }
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) {
-    return "never";
+    return "nunca";
   }
   const seconds = Math.floor((Date.now() - then) / 1000);
   if (seconds < 60) {
-    return "just now";
+    return "agora";
   }
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) {
-    return `${minutes}m ago`;
+    return `há ${minutes}min`;
   }
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return `${hours}h ago`;
+    return `há ${hours}h`;
   }
-  return `${Math.floor(hours / 24)}d ago`;
+  return `há ${Math.floor(hours / 24)}d`;
 }
