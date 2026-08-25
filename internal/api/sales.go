@@ -28,34 +28,17 @@ type salesResponse struct {
 func (s *Server) handleSales(w http.ResponseWriter, r *http.Request) {
 	pct := floatParam(r.URL.Query(), "pct", 90)
 	resp := salesResponse{Sales: []saleRow{}}
-	collect := func(id, name string, all []trades.Trade, fx float64, lookup trades.PriceLookup) {
-		for _, v := range trades.BuildPortfolio(all, pct, fx, lookup).Trades {
+	err := s.forEachLedger(pct, func(id, name string, p trades.PortfolioResponse) {
+		for _, v := range p.Trades {
 			if !v.Realized {
 				continue
 			}
 			resp.Sales = append(resp.Sales, saleRow{TradeView: v, Game: id, GameName: name})
 		}
-	}
-	for _, id := range s.orderedGameIDs() {
-		gs := s.games[id]
-		if gs.Trades == nil {
-			continue
-		}
-		all, err := gs.Trades.List()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		lookup, fx := s.priceLookup(gs)
-		collect(gs.Game.ID, gs.Game.Name, all, fx, lookup)
-	}
-	if s.accessories != nil {
-		all, err := s.accessories.List()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		collect("acessorios", "Acessórios", all, 1, nil)
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	sort.SliceStable(resp.Sales, func(i, j int) bool {
 		if resp.Sales[i].SellDate != resp.Sales[j].SellDate {

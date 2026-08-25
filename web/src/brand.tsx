@@ -13,6 +13,7 @@ import {
   PiggyBank,
   Receipt,
   ShoppingBag,
+  ShoppingCart,
   Sparkles,
   Store,
   Swords,
@@ -29,6 +30,7 @@ export type View =
   | "portfolio"
   | "allportfolio"
   | "vendas"
+  | "compras"
   | "financeiro"
   | "acessorios"
   | "despesas"
@@ -80,6 +82,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { key: "financeiro", label: "Financeiro", icon: PiggyBank },
       { key: "vendas", label: "Vendas", icon: ShoppingBag },
+      { key: "compras", label: "Compras", icon: ShoppingCart },
       { key: "despesas", label: "Despesas", icon: Receipt },
       { key: "acessorios", label: "Acessórios", icon: Package },
       { key: "allportfolio", label: "Todos os jogos", icon: Layers },

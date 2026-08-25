@@ -20,6 +20,7 @@ import (
 	"opdeals/internal/expenses"
 	"opdeals/internal/game"
 	"opdeals/internal/model"
+	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
 	"opdeals/internal/store"
 	"opdeals/internal/tracking"
@@ -50,7 +51,10 @@ type Server struct {
 	accessories *trades.Store
 	// expenses is the single, game-independent business expense ledger (frete,
 	// embalagens, aluguel…): costs are of the operation, not of any game.
-	expenses   *expenses.Store
+	expenses *expenses.Store
+	// purchases is the single ledger of buy orders. One order mixes games, so its
+	// header lives here while the items stay in each game's trade ledger.
+	purchases  *purchases.Store
 	readOnly   bool
 	adminToken string
 }
@@ -59,13 +63,14 @@ type Server struct {
 // (refresh/capture) so a serve-only prod instance never scrapes; adminToken (when
 // non-empty) enables POST /api/admin/reload to reload deals snapshots from disk
 // after a local scrape pushes fresh files onto the volume.
-func New(webDir string, games map[string]*GameStack, defaultGame string, accessories *trades.Store, expenseStore *expenses.Store, readOnly bool, adminToken string) *Server {
+func New(webDir string, games map[string]*GameStack, defaultGame string, accessories *trades.Store, expenseStore *expenses.Store, purchaseStore *purchases.Store, readOnly bool, adminToken string) *Server {
 	return &Server{
 		webDir:      webDir,
 		games:       games,
 		defaultGame: defaultGame,
 		accessories: accessories,
 		expenses:    expenseStore,
+		purchases:   purchaseStore,
 		readOnly:    readOnly,
 		adminToken:  adminToken,
 	}
@@ -154,6 +159,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/trades/merge", s.handleTradesMerge)
 	mux.HandleFunc("GET /api/portfolio/all", s.handlePortfolioAll)
 	mux.HandleFunc("GET /api/sales", s.handleSales)
+	mux.HandleFunc("GET /api/purchases", s.handlePurchases)
+	mux.HandleFunc("POST /api/purchases", s.handlePurchasesCreate)
+	mux.HandleFunc("PUT /api/purchases/{id}", s.handlePurchasesUpdate)
+	mux.HandleFunc("DELETE /api/purchases/{id}", s.handlePurchasesDelete)
+	mux.HandleFunc("POST /api/purchases/{id}/items", s.handlePurchaseItemCreate)
+	mux.HandleFunc("POST /api/purchases/{id}/attach", s.handlePurchaseAttach)
+	mux.HandleFunc("POST /api/purchases/detach", s.handlePurchaseDetach)
 	mux.HandleFunc("GET /api/storefront", s.handleStorefront)
 	mux.HandleFunc("GET /api/expenses", s.handleExpensesList)
 	mux.HandleFunc("POST /api/expenses", s.handleExpensesCreate)

@@ -453,10 +453,15 @@ export function getCards(set: string): Promise<{ set: string; cards: TrackCard[]
 // served wrong art for per-set-numbered games.
 const imgVersion = "2";
 
-export function cardImageURL(set: string, number: string, productID?: number): string {
+// game overrides the switcher for screens that show several games at once (the
+// purchases page), where the active game would resolve another game's art.
+export function cardImageURL(set: string, number: string, productID?: number, game?: string): string {
   const params = gp(new URLSearchParams({ set, number, v: imgVersion }));
   if (productID) {
     params.set("productID", String(productID));
+  }
+  if (game) {
+    params.set("game", game);
   }
   return `${base}/card-image?${params.toString()}`;
 }
@@ -565,6 +570,8 @@ export interface Trade {
   store?: string;
   buyDate?: string;
   delivered?: boolean;
+  // The buy order this item came in; empty when it was logged on its own.
+  purchaseID?: string;
   refUSD?: number;
   manualBRL?: number;
   askBRL?: number;
@@ -680,10 +687,14 @@ export function getQuote(
   q: string,
   limit = 25,
   kind?: "sealed",
+  game?: string,
 ): Promise<{ fxRate: number; matches: QuoteMatch[] }> {
   const params = gp(new URLSearchParams({ q, limit: String(limit) }));
   if (kind) {
     params.set("kind", kind);
+  }
+  if (game) {
+    params.set("game", game);
   }
   return getJSON<{ fxRate: number; matches: QuoteMatch[] }>(
     `${base}/trades/quote?${params.toString()}`,
@@ -798,11 +809,91 @@ export function sellTrade(id: string, sale: SellTradeInput): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades/${id}/sell?${gp(new URLSearchParams()).toString()}`, "POST", sale);
 }
 
-export async function deleteTrade(id: string): Promise<void> {
-  const res = await fetch(`${base}/trades/${id}?${gp(new URLSearchParams()).toString()}`, { method: "DELETE" });
+export async function deleteTrade(id: string, game?: string): Promise<void> {
+  const params = gp(new URLSearchParams());
+  if (game) {
+    params.set("game", game);
+  }
+  const res = await fetch(`${base}/trades/${id}?${params.toString()}`, { method: "DELETE" });
   if (!res.ok) {
     throw new Error(`delete failed: ${res.status}`);
   }
+}
+
+// A buy order (compra) is business-wide: one order from a seller routinely mixes
+// games, so it lives outside the game switcher and its items point back at it.
+export interface Purchase {
+  id: string;
+  date: string;
+  store?: string;
+  shippingBRL?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseItem extends TradeView {
+  game: string;
+  gameName: string;
+}
+
+export interface PurchaseView extends Purchase {
+  items: PurchaseItem[];
+  units: number;
+  itemsCostBRL: number;
+  totalBRL: number;
+  sold: number;
+  proceedsBRL: number;
+}
+
+export interface PurchasesResponse {
+  purchases: PurchaseView[];
+  // Items bought before orders existed, or logged straight into a portfolio.
+  unassigned: PurchaseItem[];
+}
+
+export interface ItemRef {
+  id: string;
+  game: string;
+}
+
+export function listPurchases(): Promise<PurchasesResponse> {
+  return getJSON<PurchasesResponse>(`${base}/purchases`);
+}
+
+export function createPurchase(p: Partial<Purchase>): Promise<Purchase> {
+  return sendJSON<Purchase>(`${base}/purchases`, "POST", p);
+}
+
+export function updatePurchase(id: string, p: Partial<Purchase>): Promise<Purchase> {
+  return sendJSON<Purchase>(`${base}/purchases/${id}`, "PUT", p);
+}
+
+// deletePurchase refuses while the order still has items — the server answers 409
+// so that deleting an order can never read as a way to delete stock.
+export async function deletePurchase(id: string): Promise<void> {
+  const res = await fetch(`${base}/purchases/${id}`, { method: "DELETE" });
+  if (res.status === 409) {
+    throw new Error("essa compra ainda tem itens — desvincule ou exclua os itens antes");
+  }
+  if (!res.ok) {
+    throw new Error(`delete failed: ${res.status}`);
+  }
+}
+
+// addPurchaseItem creates the item in the ledger of the game given, already tied
+// to the order. Accessories are routed to the shared ledger by their kind, so the
+// game sent for them does not matter.
+export function addPurchaseItem(id: string, game: string, t: Partial<Trade>): Promise<Trade> {
+  return sendJSON<Trade>(`${base}/purchases/${id}/items?game=${encodeURIComponent(game)}`, "POST", t);
+}
+
+export function attachPurchaseItems(id: string, items: ItemRef[]): Promise<{ updated: number }> {
+  return sendJSON<{ updated: number }>(`${base}/purchases/${id}/attach`, "POST", { items });
+}
+
+export function detachPurchaseItems(items: ItemRef[]): Promise<{ updated: number }> {
+  return sendJSON<{ updated: number }>(`${base}/purchases/detach`, "POST", { items });
 }
 
 export function mergeTrades(ids: string[]): Promise<Trade> {

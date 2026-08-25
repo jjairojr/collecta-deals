@@ -8,6 +8,7 @@ export default function CardArt({
   name,
   productID,
   imageURL,
+  game,
   className = "",
 }: {
   set: string;
@@ -15,6 +16,7 @@ export default function CardArt({
   name?: string;
   productID?: number;
   imageURL?: string;
+  game?: string;
   className?: string;
 }) {
   const sources: string[] = [];
@@ -25,14 +27,14 @@ export default function CardArt({
     sources.push(tcgProductImageURL(productID));
   }
   if (set) {
-    sources.push(cardImageURL(set, number));
+    sources.push(cardImageURL(set, number, undefined, game));
   }
   const [sourceIdx, setSourceIdx] = useState(0);
   // Reset to the first source whenever the inputs change (e.g. the seller edits
   // the image URL live), so a prior onError fallthrough doesn't stick.
   useEffect(() => {
     setSourceIdx(0);
-  }, [imageURL, productID, set, number]);
+  }, [imageURL, productID, set, number, game]);
   if (sourceIdx >= sources.length) {
     return (
       <div

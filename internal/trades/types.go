@@ -22,6 +22,11 @@ type Trade struct {
 	BuyDate     string  `json:"buyDate,omitempty"`
 	Delivered   bool    `json:"delivered,omitempty"`
 
+	// PurchaseID links this item to the buy order it came in, kept in the shared
+	// purchases ledger. Empty means the item was logged on its own, which is how
+	// every holding created before orders existed reads.
+	PurchaseID string `json:"purchaseID,omitempty"`
+
 	RefUSD    float64 `json:"refUSD,omitempty"`
 	ManualBRL float64 `json:"manualBRL,omitempty"`
 

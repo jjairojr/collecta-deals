@@ -68,6 +68,36 @@ func (s *Server) ledgersFor(gs *GameStack) []*trades.Store {
 	return out
 }
 
+// forEachLedger walks every trade ledger — one per game, then the shared
+// accessories one under the "acessorios" pseudo-game — handing each to fn already
+// valued. Accessories are visited exactly once: handleTradesList appends them to
+// every game's list, so a caller fanning out over ?game= would count them as many
+// times as there are games.
+func (s *Server) forEachLedger(pct float64, fn func(id, name string, p trades.PortfolioResponse)) error {
+	for _, id := range s.orderedGameIDs() {
+		gs := s.games[id]
+		if gs.Trades == nil {
+			continue
+		}
+		all, err := gs.Trades.List()
+		if err != nil {
+			return err
+		}
+		lookup, fx := s.priceLookup(gs)
+		fn(gs.Game.ID, gs.Game.Name, trades.BuildPortfolio(all, pct, fx, lookup))
+	}
+	if s.accessories == nil {
+		return nil
+	}
+	all, err := s.accessories.List()
+	if err != nil {
+		return err
+	}
+	// Accessories carry their own manual value, so no price lookup and fx = 1.
+	fn("acessorios", "Acessórios", trades.BuildPortfolio(all, pct, 1, nil))
+	return nil
+}
+
 // onLedger runs a write against whichever ledger actually holds the id. Trade ids
 // are unique across ledgers and every mutation reports ErrNotFound before it
 // persists anything, so trying the game's ledger first is free: a miss just means
@@ -114,21 +144,17 @@ func (s *Server) handleTradesList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, trades.BuildPortfolio(all, pct, fx, lookup))
 }
 
-func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
-	gs := s.stackFor(r.URL.Query())
-	if gs.Trades == nil {
-		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	var t trades.Trade
-	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+// errNoIdentity rejects a trade that names no card at all: without a number or a
+// name there is nothing to price, match or show.
+var errNoIdentity = errors.New("number or name required")
+
+// addTrade files a new trade under the right ledger for a game, seeding its
+// reference value from whichever market the game has. Shared by the plain
+// create endpoint and by adding an item to a purchase order.
+func (s *Server) addTrade(gs *GameStack, t trades.Trade) (trades.Trade, error) {
 	t.Number = model.NormalizeNumber(t.Number)
 	if t.Number == "" && t.Name == "" {
-		http.Error(w, "number or name required", http.StatusBadRequest)
-		return
+		return trades.Trade{}, errNoIdentity
 	}
 	if t.RefUSD == 0 && t.Kind == "" {
 		if gs.Deals != nil {
@@ -147,7 +173,25 @@ func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
 	if t.Kind == trades.KindAccessory && s.accessories != nil {
 		ledger = s.accessories
 	}
-	created, err := ledger.Add(t)
+	return ledger.Add(t)
+}
+
+func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
+	gs := s.stackFor(r.URL.Query())
+	if gs.Trades == nil {
+		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var t trades.Trade
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	created, err := s.addTrade(gs, t)
+	if errors.Is(err, errNoIdentity) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -179,6 +223,9 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		if in.Kind == "" {
 			in.Kind = t.Kind
+		}
+		if in.PurchaseID == "" {
+			in.PurchaseID = t.PurchaseID
 		}
 		if in.Status == "" {
 			in.Status = t.Status
