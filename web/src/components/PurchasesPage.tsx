@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowUpDown,
   Boxes,
+  Check,
   ChevronDown,
   ChevronRight,
   Coins,
   FolderInput,
+  HandCoins,
   Link2,
+  Merge,
   Package,
   Pencil,
   Plus,
   ShoppingCart,
   Trash2,
+  Truck,
   Unlink,
   X,
 } from "lucide-react";
@@ -24,8 +29,11 @@ import {
   getGames,
   getQuote,
   listPurchases,
+  mergeTrades,
   productIDFromTcgURL,
+  sellTrade,
   updatePurchase,
+  updateTrade,
   type GameInfo,
   type ItemRef,
   type PurchaseItem,
@@ -59,12 +67,117 @@ const kindLabels: Record<ItemKind, string> = {
   accessory: "Acessório",
 };
 
+// tradeGame says which ledger a write should hit: accessories live in the shared
+// one, which the endpoints reach when no game is sent.
+function tradeGame(item: PurchaseItem): string | undefined {
+  return item.game === ACCESSORIES ? undefined : item.game;
+}
+
 function kindOf(item: PurchaseItem): ItemKind {
   return item.kind === "sealed" ? "sealed" : item.kind === "accessory" ? "accessory" : "single";
 }
 
+// Categorias na ordem em que uma compra é conferida: as cartas, que são o grosso
+// do pedido, depois os selados e por último os acessórios.
+const GROUP_ORDER: ItemKind[] = ["single", "sealed", "accessory"];
+
+const groupLabels: Record<ItemKind, string> = {
+  single: "Cartas",
+  sealed: "Selados",
+  accessory: "Acessórios",
+};
+
+// A sale never leaves the purchase it came from, so status is a filter instead of
+// a separate screen: the default hides what is already sold.
+type StatusFilter = "holding" | "sold" | "all";
+
+const statusLabels: Record<StatusFilter, string> = {
+  holding: "Em estoque",
+  sold: "Vendidos",
+  all: "Todos",
+};
+
+type SortKey = "name" | "game" | "qty" | "unit" | "cost" | "date";
+
+interface SortState {
+  key: SortKey;
+  dir: "asc" | "desc";
+}
+
+function sortValue(item: PurchaseItem, key: SortKey): string | number {
+  switch (key) {
+    case "game":
+      return item.gameName;
+    case "qty":
+      return item.qty;
+    case "unit":
+      return item.buyBRL;
+    case "cost":
+      return item.costBRL;
+    case "date":
+      return item.buyDate ?? "";
+    default:
+      return item.name.toLowerCase();
+  }
+}
+
+function sortItems(list: PurchaseItem[], sort: SortState): PurchaseItem[] {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const va = sortValue(a, sort.key);
+    const vb = sortValue(b, sort.key);
+    if (va === vb) {
+      return a.name.localeCompare(b.name);
+    }
+    return (
+      (typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb))) *
+      dir
+    );
+  });
+}
+
+function useSort(initial: SortState): [SortState, (key: SortKey) => void] {
+  const [sort, setSort] = useState<SortState>(initial);
+  const toggle = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+  return [sort, toggle];
+}
+
+// SortHead is a column header that sorts by its own key, showing which way the
+// list is ordered right now.
+function SortHead({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-fg ${active ? "text-fg" : ""}`}
+      >
+        {label}
+        <ArrowUpDown className={`h-3 w-3 ${active ? "opacity-100" : "opacity-30"}`} />
+      </button>
+    </TableHead>
+  );
+}
+
+// today is the local date: toISOString would roll over to tomorrow every evening
+// in São Paulo, dating a purchase or a sale a day ahead.
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function num(v: string): number {
@@ -102,6 +215,20 @@ export default function PurchasesPage() {
   const [gameFilter, setGameFilter] = useState<string>("all");
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [status, setStatus] = useState<StatusFilter>("holding");
+  const [kinds, setKinds] = useState<Set<ItemKind>>(new Set());
+  const [transitOnly, setTransitOnly] = useState(false);
+
+  const toggleKind = (kind: ItemKind) =>
+    setKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) {
+        next.delete(kind);
+      } else {
+        next.add(kind);
+      }
+      return next;
+    });
 
   const load = useCallback(async () => {
     try {
@@ -127,22 +254,40 @@ export default function PurchasesPage() {
   }, []);
 
   const q = query.trim().toLowerCase();
-  const byGame = useCallback(
-    (item: PurchaseItem) => gameFilter === "all" || item.game === gameFilter,
-    [gameFilter],
+  // One filter set drives both tabs: an item is shown when its game, category,
+  // status and the search all match. Orders keep their own totals, which stay the
+  // full order — a filter narrows what is listed, never what was paid.
+  const keep = useCallback(
+    (item: PurchaseItem) => {
+      if (gameFilter !== "all" && item.game !== gameFilter) {
+        return false;
+      }
+      if (kinds.size > 0 && !kinds.has(kindOf(item))) {
+        return false;
+      }
+      if (status === "holding" && item.realized) {
+        return false;
+      }
+      if (status === "sold" && !item.realized) {
+        return false;
+      }
+      if (transitOnly && (item.realized || item.delivered)) {
+        return false;
+      }
+      return matchesItem(item, q);
+    },
+    [gameFilter, kinds, status, transitOnly, q],
   );
 
   const visibleOrders = useMemo(
     () =>
       orders
-        .filter((o) => (gameFilter === "all" ? true : o.items.some(byGame)))
-        .filter((o) => matchesOrder(o, q)),
-    [orders, q, gameFilter, byGame],
+        .map((o) => ({ ...o, items: o.items.filter(keep) }))
+        .filter((o) => o.items.length > 0 || (!q && gameFilter === "all" && kinds.size === 0 && !transitOnly))
+        .filter((o) => o.items.length > 0 || matchesOrder(o, q)),
+    [orders, keep, q, gameFilter, kinds, transitOnly],
   );
-  const visibleLoose = useMemo(
-    () => loose.filter(byGame).filter((it) => matchesItem(it, q)),
-    [loose, q, byGame],
-  );
+  const visibleLoose = useMemo(() => loose.filter(keep), [loose, keep]);
 
   const totals = useMemo(() => {
     let spent = 0;
@@ -179,9 +324,9 @@ export default function PurchasesPage() {
   return (
     <div className="space-y-6">
       <p className="max-w-2xl text-sm text-slate-400">
-        Cada compra é um pedido: você abre com a data, o vendedor e o frete, e vai lançando os itens
-        dentro dela — de qualquer jogo. O item entra no portfólio do jogo que você escolher, e o
-        total aqui já soma o frete do pedido.
+        Cada compra é um pedido: você abre com a data, o vendedor e o frete, e vai lançando os itens dentro
+        dela — de qualquer jogo. O item entra no portfólio do jogo que você escolher, e o total aqui já soma o
+        frete do pedido.
       </p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -244,6 +389,31 @@ export default function PurchasesPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b-[3px] border-outline pb-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(Object.keys(statusLabels) as StatusFilter[]).map((s) => (
+            <Chip key={s} active={status === s} onClick={() => setStatus(s)}>
+              {statusLabels[s]}
+            </Chip>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {GROUP_ORDER.map((kind) => (
+            <Chip key={kind} active={kinds.has(kind)} onClick={() => toggleKind(kind)}>
+              {groupLabels[kind]}
+            </Chip>
+          ))}
+        </div>
+        <Chip active={transitOnly} onClick={() => setTransitOnly((v) => !v)}>
+          <span className="inline-flex items-center gap-1">
+            <Truck className="h-3 w-3" /> Em trânsito
+          </span>
+        </Chip>
+        <span className="ml-auto text-[11px] text-slate-500">
+          {kinds.size === 0 ? "todas as categorias" : `${kinds.size} de 3 categorias`}
+        </span>
+      </div>
+
       {tab === "orders" && creating && (
         <PurchaseForm
           onCancel={() => setCreating(false)}
@@ -302,7 +472,12 @@ function PurchaseForm({
     setSaving(true);
     setFailed(null);
     try {
-      const body = { date, store: store.trim(), shippingBRL: num(shipping), notes: notes.trim() };
+      const body = {
+        date,
+        store: store.trim(),
+        shippingBRL: num(shipping),
+        notes: notes.trim(),
+      };
       const saved = initial ? await updatePurchase(initial.id, body) : await createPurchase(body);
       onSaved(saved.id);
     } catch (err: unknown) {
@@ -319,10 +494,19 @@ function PurchaseForm({
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Field label="Vendedor / loja">
-          <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="ex.: Legends, Fulano (WhatsApp)" />
+          <Input
+            value={store}
+            onChange={(e) => setStore(e.target.value)}
+            placeholder="ex.: Legends, Fulano (WhatsApp)"
+          />
         </Field>
         <Field label="Frete do pedido R$">
-          <Input value={shipping} onChange={(e) => setShipping(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          <Input
+            value={shipping}
+            onChange={(e) => setShipping(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+          />
         </Field>
         <Field label="Observação">
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="opcional" />
@@ -360,6 +544,56 @@ function OrderCard({
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [sort, onSort] = useSort({ key: "cost", dir: "desc" });
+  const [collapsed, setCollapsed] = useState<Set<ItemKind>>(new Set());
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+
+  const togglePick = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+
+  const pickMany = (rows: PurchaseItem[]) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      const allPicked = rows.every((it) => next.has(it.id));
+      for (const it of rows) {
+        if (allPicked) {
+          next.delete(it.id);
+        } else {
+          next.add(it.id);
+        }
+      }
+      return next;
+    });
+
+  const toggleGroup = (kind: ItemKind) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) {
+        next.delete(kind);
+      } else {
+        next.add(kind);
+      }
+      return next;
+    });
+
+  const groups = GROUP_ORDER.map((kind) => {
+    const items = order.items.filter((it) => kindOf(it) === kind);
+    return {
+      kind,
+      items,
+      open: !collapsed.has(kind),
+      units: items.reduce((s, it) => s + it.qty, 0),
+      cost: items.reduce((s, it) => s + it.costBRL, 0),
+    };
+  }).filter((g) => g.items.length > 0);
 
   const remove = async () => {
     setFailed(null);
@@ -376,11 +610,7 @@ function OrderCard({
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        >
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           {open ? (
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
           ) : (
@@ -405,7 +635,9 @@ function OrderCard({
         <div className="text-right">
           <div className="font-bold tabular-nums text-slate-100">{brl2(order.totalBRL)}</div>
           <div className="text-[10px] text-slate-500">
-            {order.shippingBRL ? `itens ${brl2(order.itemsCostBRL)} + frete ${brl2(order.shippingBRL)}` : "itens + frete"}
+            {order.shippingBRL
+              ? `itens ${brl2(order.itemsCostBRL)} + frete ${brl2(order.shippingBRL)}`
+              : "itens + frete"}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -438,26 +670,100 @@ function OrderCard({
           {order.items.length === 0 ? (
             <p className="px-1 text-sm text-slate-500">Nenhum item nesta compra ainda.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[720px]">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Item</TableHead>
-                    <TableHead>Jogo</TableHead>
-                    <TableHead className="text-right">Un.</TableHead>
-                    <TableHead className="text-right">Preço un.</TableHead>
-                    <TableHead className="text-right">Custo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.items.map((it) => (
-                    <ItemRow key={it.id} item={it} orders={orders} onChanged={onChanged} />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <MergeBar
+                items={order.items.filter((it) => picked.has(it.id))}
+                onDone={async () => {
+                  setPicked(new Set());
+                  await onChanged();
+                }}
+              />
+              <div className="overflow-x-auto">
+                <Table className="min-w-[720px]">
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-10" />
+                      <SortHead label="Item" sortKey="name" sort={sort} onSort={onSort} />
+                      <SortHead label="Jogo" sortKey="game" sort={sort} onSort={onSort} />
+                      <SortHead
+                        label="Un."
+                        sortKey="qty"
+                        sort={sort}
+                        onSort={onSort}
+                        className="text-right"
+                      />
+                      <SortHead
+                        label="Preço un."
+                        sortKey="unit"
+                        sort={sort}
+                        onSort={onSort}
+                        className="text-right"
+                      />
+                      <SortHead
+                        label="Custo"
+                        sortKey="cost"
+                        sort={sort}
+                        onSort={onSort}
+                        className="text-right"
+                      />
+                      <TableHead>Status</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groups.map((g) => (
+                      <Fragment key={g.kind}>
+                        <TableRow className="bg-raised/60">
+                          <TableCell className="py-2">
+                            <Checkbox
+                              checked={g.items.length > 0 && g.items.every((it) => picked.has(it.id))}
+                              onChange={() => pickMany(g.items)}
+                              title="Selecionar os itens desta categoria"
+                            />
+                          </TableCell>
+                          <TableCell
+                            colSpan={2}
+                            className="cursor-pointer py-2"
+                            onClick={() => toggleGroup(g.kind)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {g.open ? (
+                                <ChevronDown className="h-4 w-4 text-slate-500" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-slate-500" />
+                              )}
+                              <span className="font-semibold text-slate-200">{groupLabels[g.kind]}</span>
+                              <span className="text-[11px] text-slate-500">
+                                {g.items.length} {g.items.length === 1 ? "item" : "itens"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2 text-right tabular-nums text-slate-400">
+                            {g.units}
+                          </TableCell>
+                          <TableCell className="py-2" />
+                          <TableCell className="py-2 text-right font-semibold tabular-nums text-slate-200">
+                            {brl2(g.cost)}
+                          </TableCell>
+                          <TableCell className="py-2" colSpan={2} />
+                        </TableRow>
+                        {g.open &&
+                          sortItems(g.items, sort).map((it) => (
+                            <ItemRow
+                              key={it.id}
+                              item={it}
+                              orders={orders}
+                              selected={picked.has(it.id)}
+                              onSelect={() => togglePick(it.id)}
+                              onChanged={onChanged}
+                            />
+                          ))}
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           {adding ? (
@@ -483,16 +789,25 @@ function OrderCard({
 function ItemRow({
   item,
   orders,
+  selected,
+  onSelect,
+  showOrigin,
   onChanged,
 }: {
   item: PurchaseItem;
   orders: PurchaseView[];
+  selected?: boolean;
+  onSelect?: () => void;
+  // Outside a purchase card there is no header saying when and from whom the item
+  // came, so the row carries it.
+  showOrigin?: boolean;
   onChanged: () => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [moving, setMoving] = useState(false);
+  const [panel, setPanel] = useState<"none" | "move" | "edit" | "sell">("none");
   const unit = item.qty > 0 ? item.buyBRL : 0;
   const others = orders.filter((o) => o.id !== item.purchaseID);
+  const columns = onSelect ? 8 : 7;
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -504,27 +819,54 @@ function ItemRow({
     }
   };
 
-  if (moving) {
+  if (panel !== "none") {
     return (
       <TableRow className="hover:bg-transparent">
-        <TableCell colSpan={7}>
-          <MoveItem
-            item={item}
-            orders={others}
-            busy={busy}
-            onCancel={() => setMoving(false)}
-            onMove={async (target) => {
-              await run(() => attachPurchaseItems(target, [{ id: item.id, game: item.game }]));
-              setMoving(false);
-            }}
-          />
+        <TableCell colSpan={columns} className="bg-raised/40">
+          {panel === "move" && (
+            <MoveItem
+              item={item}
+              orders={others}
+              busy={busy}
+              onCancel={() => setPanel("none")}
+              onMove={async (target) => {
+                await run(() => attachPurchaseItems(target, [{ id: item.id, game: item.game }]));
+                setPanel("none");
+              }}
+            />
+          )}
+          {panel === "edit" && (
+            <EditItemForm
+              item={item}
+              onCancel={() => setPanel("none")}
+              onSaved={async () => {
+                setPanel("none");
+                await onChanged();
+              }}
+            />
+          )}
+          {panel === "sell" && (
+            <SellItemForm
+              item={item}
+              onCancel={() => setPanel("none")}
+              onSold={async () => {
+                setPanel("none");
+                await onChanged();
+              }}
+            />
+          )}
         </TableCell>
       </TableRow>
     );
   }
 
   return (
-    <TableRow>
+    <TableRow className={item.realized ? "opacity-70" : undefined}>
+      {onSelect && (
+        <TableCell>
+          <Checkbox checked={Boolean(selected)} onChange={onSelect} />
+        </TableCell>
+      )}
       <TableCell>
         <div className="flex items-center gap-2">
           <CardArt
@@ -539,7 +881,16 @@ function ItemRow({
           <div className="min-w-0">
             <div className="truncate text-slate-100">{item.name}</div>
             <div className="truncate text-[10px] text-slate-500">
-              {[item.number, item.set, item.variant, kindLabels[kindOf(item)]].filter(Boolean).join(" · ")}
+              {[
+                item.number,
+                item.set,
+                item.variant,
+                kindLabels[kindOf(item)],
+                showOrigin && item.buyDate ? dayLabel(item.buyDate) : "",
+                showOrigin ? item.store : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </div>
           </div>
         </div>
@@ -552,35 +903,62 @@ function ItemRow({
       </TableCell>
       <TableCell className="whitespace-nowrap text-[11px]">
         {item.realized ? (
-          <span className="text-emerald-300">vendido {brl2(item.valueBRL)}</span>
+          <span className="text-emerald-300">
+            vendido {brl2(item.valueBRL)}
+            {item.sellDate ? (
+              <span className="block text-[10px] text-slate-500">{dayLabel(item.sellDate)}</span>
+            ) : null}
+          </span>
         ) : (
-          <span className="text-slate-500">em estoque</span>
+          <DeliveryToggle item={item} onChanged={onChanged} />
         )}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
+          {!item.realized && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                title="Dar baixa: vender este item"
+                onClick={() => setPanel("sell")}
+              >
+                <HandCoins className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                title="Editar o item (preço, quantidade, variante, loja…)"
+                onClick={() => setPanel("edit")}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="sm"
             disabled={busy || others.length === 0}
             title={
-              others.length === 0
-                ? "Não há outra compra para mover este item"
-                : "Mover para outra compra"
+              others.length === 0 ? "Não há outra compra para mover este item" : "Mover para outra compra"
             }
-            onClick={() => setMoving(true)}
+            onClick={() => setPanel("move")}
           >
             <FolderInput className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            title="Tirar desta compra (o item continua no portfólio)"
-            onClick={() => run(() => detachPurchaseItems([{ id: item.id, game: item.game }]))}
-          >
-            <Unlink className="h-4 w-4" />
-          </Button>
+          {item.purchaseID && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              title="Tirar desta compra (o item continua no estoque, como avulso)"
+              onClick={() => run(() => detachPurchaseItems([{ id: item.id, game: item.game }]))}
+            >
+              <Unlink className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -593,6 +971,310 @@ function ItemRow({
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+// MergeBar collapses several lots of the same card into one, summing quantity and
+// freight and averaging what was paid. Merging only works inside one ledger, so
+// the selection has to be of a single game, and a sold lot can no longer change.
+function MergeBar({ items, onDone }: { items: PurchaseItem[]; onDone: () => Promise<void> | void }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  if (items.length === 0) {
+    return null;
+  }
+  const games = new Set(items.map((it) => it.game));
+  const anySold = items.some((it) => it.realized);
+  const canMerge = items.length >= 2 && games.size === 1 && !anySold;
+  const why = anySold
+    ? "um lote vendido não pode ser juntado"
+    : games.size > 1
+      ? "só dá para juntar itens do mesmo jogo"
+      : "selecione dois ou mais itens";
+
+  const merge = async () => {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await mergeTrades(
+        items.map((it) => it.id),
+        tradeGame(items[0]),
+      );
+      await onDone();
+    } catch (err: unknown) {
+      setFailed(err instanceof Error ? err.message : "falha ao juntar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-[10px] border-2 border-outline bg-panel px-3 py-2">
+      <span className="text-xs text-slate-400">{items.length} selecionados</span>
+      <div className="ml-auto flex items-center gap-2">
+        {!canMerge && <span className="text-[11px] text-slate-500">{why}</span>}
+        <Button variant="primary" size="sm" onClick={merge} disabled={busy || !canMerge}>
+          <Merge className="h-4 w-4" />
+          Juntar em um lote
+        </Button>
+      </div>
+      {failed && <p className="w-full text-[11px] text-rose-300">{failed}</p>}
+    </div>
+  );
+}
+
+// DeliveryToggle flips whether the item already arrived. An import takes weeks,
+// so "em trânsito" is the state most of a purchase sits in.
+function DeliveryToggle({ item, onChanged }: { item: PurchaseItem; onChanged: () => Promise<void> | void }) {
+  const [saving, setSaving] = useState(false);
+  const toggle = async () => {
+    setSaving(true);
+    try {
+      await updateTrade(item.id, { ...item, delivered: !item.delivered }, tradeGame(item));
+      await onChanged();
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={saving}
+      title={
+        item.delivered
+          ? "Entregue — clique para marcar em trânsito"
+          : "Em trânsito — clique para marcar entregue"
+      }
+      className={`flex items-center gap-1 rounded-[8px] border-2 border-outline px-2 py-1 text-xs font-bold disabled:opacity-50 ${
+        item.delivered
+          ? "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+          : "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+      }`}
+    >
+      {item.delivered ? <Check className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
+      {item.delivered ? "Entregue" : "Em trânsito"}
+    </button>
+  );
+}
+
+// EditItemForm changes what was actually bought. Accessories live in the shared
+// ledger, which the write endpoints reach without a game.
+function EditItemForm({
+  item,
+  onCancel,
+  onSaved,
+}: {
+  item: PurchaseItem;
+  onCancel: () => void;
+  onSaved: () => Promise<void> | void;
+}) {
+  const single = kindOf(item) === "single";
+  const [name, setName] = useState(item.name);
+  const [number, setNumber] = useState(item.number);
+  const [set, setSet] = useState(item.set);
+  const [variant, setVariant] = useState(item.variant ?? "");
+  const [condition, setCondition] = useState(item.condition ?? "");
+  const [qty, setQty] = useState(String(item.qty));
+  const [buyBRL, setBuyBRL] = useState(String(item.buyBRL));
+  const [shipping, setShipping] = useState(String(item.shippingBRL || ""));
+  const [store, setStore] = useState(item.store ?? "");
+  const [buyDate, setBuyDate] = useState(item.buyDate ?? "");
+  const [imageURL, setImageURL] = useState(item.imageURL ?? "");
+  const [notes, setNotes] = useState(item.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const submit = async () => {
+    setSaving(true);
+    setFailed(null);
+    try {
+      await updateTrade(
+        item.id,
+        {
+          ...item,
+          name,
+          number,
+          set,
+          variant,
+          condition,
+          qty: Number(qty) || 1,
+          buyBRL: num(buyBRL),
+          shippingBRL: num(shipping),
+          store,
+          buyDate,
+          imageURL: imageURL.trim(),
+          notes,
+        },
+        tradeGame(item),
+      );
+      await onSaved();
+    } catch (err: unknown) {
+      setFailed(err instanceof Error ? err.message : "falha ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Nome">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        {single && (
+          <>
+            <Field label="Número">
+              <Input value={number} onChange={(e) => setNumber(e.target.value)} />
+            </Field>
+            <Field label="Coleção">
+              <Input value={set} onChange={(e) => setSet(e.target.value)} />
+            </Field>
+            <Field label="Variante">
+              <Input value={variant} onChange={(e) => setVariant(e.target.value)} placeholder="Foil" />
+            </Field>
+            <Field label="Condição">
+              <Input value={condition} onChange={(e) => setCondition(e.target.value)} placeholder="NM" />
+            </Field>
+          </>
+        )}
+        <Field label="Un.">
+          <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
+        </Field>
+        <Field label="Preço pago R$ (un.)">
+          <Input value={buyBRL} onChange={(e) => setBuyBRL(e.target.value)} inputMode="decimal" />
+        </Field>
+        <Field label="Frete do item R$">
+          <Input value={shipping} onChange={(e) => setShipping(e.target.value)} inputMode="decimal" />
+        </Field>
+        <Field label="Vendedor / loja">
+          <Input value={store} onChange={(e) => setStore(e.target.value)} />
+        </Field>
+        <Field label="Comprado em">
+          <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
+        </Field>
+        <Field label="Imagem (URL)">
+          <Input value={imageURL} onChange={(e) => setImageURL(e.target.value)} placeholder="https://…" />
+        </Field>
+        <Field label="Observação">
+          <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
+      </div>
+      {failed && <p className="text-[11px] text-rose-300">{failed}</p>}
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </Button>
+        <Button variant="primary" size="sm" onClick={submit} disabled={saving}>
+          {saving ? "Salvando…" : "Salvar item"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// SellItemForm gives an item its exit. Selling fewer units than the lot has splits
+// it, so the rest stays in stock with its share of the freight.
+function SellItemForm({
+  item,
+  onCancel,
+  onSold,
+}: {
+  item: PurchaseItem;
+  onCancel: () => void;
+  onSold: () => Promise<void> | void;
+}) {
+  const [qty, setQty] = useState(String(item.qty));
+  const [priceEach, setPriceEach] = useState("");
+  const [currency, setCurrency] = useState<"BRL" | "USD">("BRL");
+  const [date, setDate] = useState(today());
+  const [buyer, setBuyer] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const units = Math.min(Math.max(Number(qty) || 0, 1), item.qty);
+  const each = num(priceEach);
+  const total = each * units;
+  const partial = units < item.qty;
+
+  const submit = async () => {
+    setSaving(true);
+    setFailed(null);
+    try {
+      await sellTrade(
+        item.id,
+        { qty: units, sellPrice: total, sellCurrency: currency, sellDate: date, buyer: buyer.trim() },
+        tradeGame(item),
+      );
+      await onSold();
+    } catch (err: unknown) {
+      setFailed(err instanceof Error ? err.message : "falha ao dar baixa");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-slate-300">
+          Vender <span className="font-semibold text-slate-100">{item.name}</span>
+        </span>
+        {item.qty > 1 && (
+          <Field label={`Un. (de ${item.qty})`}>
+            <Input
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              inputMode="numeric"
+              className="w-20"
+            />
+          </Field>
+        )}
+        <Field label={item.qty > 1 ? "Preço por un." : "Preço de venda"}>
+          <Input
+            value={priceEach}
+            onChange={(e) => setPriceEach(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+            className="w-32"
+          />
+        </Field>
+        <Field label="Moeda">
+          <Select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value === "USD" ? "USD" : "BRL")}
+            className="w-24"
+          >
+            <option value="BRL">R$</option>
+            <option value="USD">US$</option>
+          </Select>
+        </Field>
+        <Field label="Data">
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+        </Field>
+        <Field label="Comprador / canal">
+          <Input
+            value={buyer}
+            onChange={(e) => setBuyer(e.target.value)}
+            placeholder="ex.: Liga #11641862, balcão"
+            className="w-52"
+          />
+        </Field>
+        <Button variant="primary" size="sm" onClick={submit} disabled={saving || each <= 0}>
+          {saving ? "Salvando…" : partial ? `Vender ${units}` : "Dar baixa"}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <p className="text-[10px] text-slate-500">
+        {currency === "USD" ? "US$ " : "R$ "}
+        {(total || 0).toFixed(2)} no total{partial ? ` · ${item.qty - units} ficam em estoque` : ""}. O
+        comprador define o canal: “Liga #nº” marca pedido da Liga.
+      </p>
+      {failed && <p className="text-[11px] text-rose-300">{failed}</p>}
+    </div>
   );
 }
 
@@ -850,13 +1532,28 @@ function AddItemForm({
           <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
         </Field>
         <Field label="Preço pago R$ (un.)">
-          <Input value={buyBRL} onChange={(e) => setBuyBRL(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          <Input
+            value={buyBRL}
+            onChange={(e) => setBuyBRL(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+          />
         </Field>
         <Field label="Frete do item R$">
-          <Input value={shipping} onChange={(e) => setShipping(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          <Input
+            value={shipping}
+            onChange={(e) => setShipping(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+          />
         </Field>
         <Field label={kind === "single" ? "Referência de mercado" : "Valor atual R$ (un.)"}>
-          <Input value={refValue} onChange={(e) => setRefValue(e.target.value)} inputMode="decimal" placeholder="0,00" />
+          <Input
+            value={refValue}
+            onChange={(e) => setRefValue(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+          />
         </Field>
       </div>
 
@@ -871,8 +1568,8 @@ function AddItemForm({
       </div>
       <p className="text-[10px] text-slate-500">
         O item entra no portfólio de {games.find((g) => g.id === game)?.name ?? game}, dentro da compra
-        escolhida acima, e herda a data e o vendedor dela. Depois de salvar, o formulário fica aberto
-        para o próximo item.
+        escolhida acima, e herda a data e o vendedor dela. Depois de salvar, o formulário fica aberto para o
+        próximo item.
       </p>
     </Card>
   );
@@ -893,6 +1590,8 @@ function LooseItems({
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [sort, onSort] = useSort({ key: "date", dir: "desc" });
+  const [collapsed, setCollapsed] = useState<Set<ItemKind>>(new Set());
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -901,6 +1600,33 @@ function LooseItems({
         next.delete(id);
       } else {
         next.add(id);
+      }
+      return next;
+    });
+
+  const toggleGroup = (kind: ItemKind) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) {
+        next.delete(kind);
+      } else {
+        next.add(kind);
+      }
+      return next;
+    });
+
+  // Picking a whole category at once is the point of the grouping here: bulk was
+  // bought as one lot, so it gets attached to an order as one lot.
+  const toggleAll = (rows: PurchaseItem[]) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      const allPicked = rows.every((it) => next.has(it.id));
+      for (const it of rows) {
+        if (allPicked) {
+          next.delete(it.id);
+        } else {
+          next.add(it.id);
+        }
       }
       return next;
     });
@@ -932,9 +1658,22 @@ function LooseItems({
     return <EmptyState hint="ajuste a busca ou o jogo">Nenhum item avulso bate com o filtro.</EmptyState>;
   }
 
-  // Anos de lançamentos avulsos são centenas de linhas; a lista mostra as
-  // primeiras e diz quantas ficaram de fora, em vez de travar a tela.
-  const shown = items.slice(0, LOOSE_LIMIT);
+  // Anos de lançamentos avulsos são centenas de linhas, então cada categoria
+  // mostra as primeiras e diz quantas ficaram de fora, em vez de travar a tela.
+  const groups = GROUP_ORDER.map((kind) => {
+    const all = sortItems(
+      items.filter((it) => kindOf(it) === kind),
+      sort,
+    );
+    return {
+      kind,
+      total: all.length,
+      rows: all.slice(0, LOOSE_LIMIT),
+      units: all.reduce((s, it) => s + it.qty, 0),
+      cost: all.reduce((s, it) => s + it.costBRL, 0),
+      open: !collapsed.has(kind),
+    };
+  }).filter((g) => g.total > 0);
 
   return (
     <div className="space-y-3">
@@ -966,57 +1705,68 @@ function LooseItems({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-10" />
-              <TableHead>Item</TableHead>
-              <TableHead>Jogo</TableHead>
-              <TableHead>Comprado em</TableHead>
-              <TableHead>Vendedor</TableHead>
-              <TableHead className="text-right">Un.</TableHead>
-              <TableHead className="text-right">Custo</TableHead>
+              <SortHead label="Item" sortKey="name" sort={sort} onSort={onSort} />
+              <SortHead label="Jogo" sortKey="game" sort={sort} onSort={onSort} />
+              <SortHead label="Un." sortKey="qty" sort={sort} onSort={onSort} className="text-right" />
+              <SortHead label="Preço un." sortKey="unit" sort={sort} onSort={onSort} className="text-right" />
+              <SortHead label="Custo" sortKey="cost" sort={sort} onSort={onSort} className="text-right" />
+              <TableHead>Status</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shown.map((it) => (
-              <TableRow key={it.id}>
-                <TableCell>
-                  <Checkbox checked={picked.has(it.id)} onChange={() => toggle(it.id)} />
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <CardArt
-                      set={it.set}
-                      number={it.number}
-                      name={it.name}
-                      game={it.game}
-                      imageURL={it.imageURL}
-                      productID={productIDFromTcgURL(it.tcgUrl)}
-                      className="h-12 w-[34px] shrink-0 rounded"
+            {groups.map((g) => (
+              <Fragment key={g.kind}>
+                <TableRow className="bg-raised/60">
+                  <TableCell className="py-2">
+                    <Checkbox
+                      checked={g.rows.length > 0 && g.rows.every((it) => picked.has(it.id))}
+                      onChange={() => toggleAll(g.rows)}
+                      title="Selecionar os itens listados desta categoria"
                     />
-                    <div className="min-w-0">
-                      <div className="truncate text-slate-100">{it.name}</div>
-                      <div className="truncate text-[10px] text-slate-500">
-                        {[it.number, it.set, kindLabels[kindOf(it)]].filter(Boolean).join(" · ")}
-                      </div>
+                  </TableCell>
+                  <TableCell colSpan={3} className="cursor-pointer py-2" onClick={() => toggleGroup(g.kind)}>
+                    <div className="flex items-center gap-2">
+                      {g.open ? (
+                        <ChevronDown className="h-4 w-4 text-slate-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                      )}
+                      <span className="font-semibold text-slate-200">{groupLabels[g.kind]}</span>
+                      <span className="text-[11px] text-slate-500">
+                        {g.total} {g.total === 1 ? "item" : "itens"}
+                        {g.total > g.rows.length && ` · mostrando ${g.rows.length}`}
+                      </span>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-[11px] text-slate-400">{it.gameName}</TableCell>
-                <TableCell className="whitespace-nowrap text-[11px] text-slate-400">
-                  {it.buyDate ? dayLabel(it.buyDate) : "—"}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-[11px] text-slate-400">{it.store || "—"}</TableCell>
-                <TableCell className="text-right tabular-nums text-slate-400">{it.qty}</TableCell>
-                <TableCell className="text-right font-semibold tabular-nums text-slate-200">
-                  {brl2(it.costBRL)}
-                </TableCell>
-              </TableRow>
+                  </TableCell>
+                  <TableCell className="py-2 text-right tabular-nums text-slate-400">{g.units}</TableCell>
+                  <TableCell className="py-2" />
+                  <TableCell className="py-2 text-right font-semibold tabular-nums text-slate-200">
+                    {brl2(g.cost)}
+                  </TableCell>
+                  <TableCell className="py-2" colSpan={2} />
+                </TableRow>
+                {g.open &&
+                  g.rows.map((it) => (
+                    <ItemRow
+                      key={it.id}
+                      item={it}
+                      orders={orders}
+                      showOrigin
+                      selected={picked.has(it.id)}
+                      onSelect={() => toggle(it.id)}
+                      onChanged={onChanged}
+                    />
+                  ))}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
       </div>
-      {items.length > shown.length && (
+      {groups.some((g) => g.total > g.rows.length) && (
         <p className="text-[11px] text-slate-500">
-          Mostrando {shown.length} de {items.length} itens avulsos — use a busca ou o filtro de jogo
-          para chegar no resto.
+          Cada categoria mostra até {LOOSE_LIMIT} itens — use a busca ou o filtro de jogo para chegar no
+          resto.
         </p>
       )}
     </div>

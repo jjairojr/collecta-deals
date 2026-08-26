@@ -805,8 +805,12 @@ export interface SellTradeInput {
   buyer?: string;
 }
 
-export function sellTrade(id: string, sale: SellTradeInput): Promise<Trade> {
-  return sendJSON<Trade>(`${base}/trades/${id}/sell?${gp(new URLSearchParams()).toString()}`, "POST", sale);
+export function sellTrade(id: string, sale: SellTradeInput, game?: string): Promise<Trade> {
+  const params = gp(new URLSearchParams());
+  if (game) {
+    params.set("game", game);
+  }
+  return sendJSON<Trade>(`${base}/trades/${id}/sell?${params.toString()}`, "POST", sale);
 }
 
 export async function deleteTrade(id: string, game?: string): Promise<void> {
@@ -896,8 +900,14 @@ export function detachPurchaseItems(items: ItemRef[]): Promise<{ updated: number
   return sendJSON<{ updated: number }>(`${base}/purchases/detach`, "POST", { items });
 }
 
-export function mergeTrades(ids: string[]): Promise<Trade> {
-  return sendJSON<Trade>(`${base}/trades/merge?${gp(new URLSearchParams()).toString()}`, "POST", { ids });
+// Merging only works inside one ledger, so the game says which one: holdings of a
+// game merge with holdings of that game, accessories with accessories.
+export function mergeTrades(ids: string[], game?: string): Promise<Trade> {
+  const params = gp(new URLSearchParams());
+  if (game) {
+    params.set("game", game);
+  }
+  return sendJSON<Trade>(`${base}/trades/merge?${params.toString()}`, "POST", { ids });
 }
 
 // Expenses are business-wide (frete, embalagens, aluguel…), not tied to a game,
