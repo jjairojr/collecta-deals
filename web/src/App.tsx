@@ -97,6 +97,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   },
 };
 
+// Compras lista item a item com muitas colunas — a largura de leitura das outras
+// telas espremia a tabela e sobrava tela vazia dos dois lados.
+const wideViews = new Set<View>(["compras"]);
+
 function iconFor(view: View) {
   return navItems.find((item) => item.key === view)?.icon;
 }
@@ -185,7 +189,12 @@ export default function App() {
         <SidebarInset>
           <TopBar game={game} status={status} onRefresh={onRefresh} dealsEnabled={dealsEnabled} />
           <div key={game} className="bg-grid flex flex-1 flex-col">
-            <main key={activeView} className="animate-fade-in mx-auto w-full max-w-7xl flex-1 px-4 py-7 sm:px-6 lg:px-8">
+            <main
+              key={activeView}
+              className={`animate-fade-in mx-auto w-full flex-1 px-4 py-7 sm:px-6 lg:px-8 ${
+                wideViews.has(activeView) ? "max-w-[1800px]" : "max-w-7xl"
+              }`}
+            >
               <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} badge={scopeBadge} />
 
               {activeView === "buyout" ? (
