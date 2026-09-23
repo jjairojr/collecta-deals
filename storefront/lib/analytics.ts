@@ -2,6 +2,7 @@
 
 import { sendGAEvent } from "@next/third-parties/google";
 import type { Accessory, CartLine, ProductKind, Sealed, Single } from "@/lib/types";
+import { pixelTrack, type PixelParams } from "@/lib/meta-pixel";
 
 export const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
@@ -22,7 +23,43 @@ export interface GAItem {
 type GAValue = string | number | boolean | GAItem[];
 type GAParams = Record<string, GAValue | undefined>;
 
+const PIXEL_EVENTS: Record<string, string> = {
+  view_item: "ViewContent",
+  add_to_cart: "AddToCart",
+  add_to_wishlist: "AddToWishlist",
+  search: "Search",
+  begin_checkout: "InitiateCheckout",
+  generate_lead: "Lead",
+  whatsapp_contact: "Contact",
+};
+
+function pixelParams(params: GAParams): PixelParams {
+  const items = Array.isArray(params.items) ? params.items : [];
+  const out: PixelParams = {};
+  if (typeof params.value === "number") {
+    out.value = params.value;
+    out.currency = CURRENCY;
+  }
+  if (typeof params.search_term === "string") {
+    out.search_string = params.search_term;
+  }
+  if (items.length > 0) {
+    out.content_type = "product";
+    out.content_ids = items.map((i) => i.item_id);
+    out.contents = items.map((i) => ({ id: i.item_id, quantity: i.quantity }));
+    out.num_items = items.reduce((sum, i) => sum + i.quantity, 0);
+    if (items.length === 1) {
+      out.content_name = items[0].item_name;
+    }
+  }
+  return out;
+}
+
 function send(name: string, params: GAParams): void {
+  const pixelEvent = PIXEL_EVENTS[name];
+  if (pixelEvent) {
+    pixelTrack(pixelEvent, pixelParams(params));
+  }
   if (!GA_ID) {
     return;
   }

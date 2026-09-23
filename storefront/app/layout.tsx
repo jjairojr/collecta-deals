@@ -12,6 +12,7 @@ import TabBar from "@/components/chrome/TabBar";
 import Footer from "@/components/chrome/Footer";
 import Scanlines from "@/components/chrome/Scanlines";
 import CartToast from "@/components/cart/CartToast";
+import MetaPixel from "@/components/chrome/MetaPixel";
 import JsonLd from "@/components/seo/JsonLd";
 
 const baloo = Baloo_2({
@@ -88,6 +89,7 @@ export default async function RootLayout({
           <Footer />
           <CartToast />
         </CartProvider>
+        <MetaPixel />
       </body>
       {process.env.NEXT_PUBLIC_GA_ID && (
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />

@@ -63,3 +63,25 @@ Itens carregam: `item_id` (slug), `item_name`, `item_category` (jogo), `item_cat
 
 - Sem banner de consentimento por decisão de produto (2026-07); se um dia entrar, implementar Google Consent Mode v2 antes da tag.
 - Checkout é handoff para WhatsApp — não existe `purchase` no site. A venda fechada vive no WhatsApp; `generate_lead`/`begin_checkout` são o fim do funil mensurável. Se quiser medir conversão real, registrar as vendas manualmente ou via Measurement Protocol depois.
+
+## Meta Pixel (anúncios no Instagram/Facebook)
+
+Mesmo padrão do GA: desligado até `NEXT_PUBLIC_META_PIXEL_ID` existir no ambiente.
+
+1. Pixel/conjunto de dados **Collecta TCG** no Gerenciador de Eventos do portfólio Collecta TCG — id `959341777245828`.
+2. Vercel → Settings → Environment Variables → `NEXT_PUBLIC_META_PIXEL_ID = 959341777245828` (Production e Preview) → redeploy.
+3. Verificar o domínio `collectatcg.com.br` em Configurações da empresa → Segurança da marca → Domínios (meta tag `facebook-domain-verification` entra em `metadata.verification.other` no `app/layout.tsx`).
+
+`components/chrome/MetaPixel.tsx` carrega o script e dispara `PageView` no load e a cada troca de rota. Os eventos do GA são espelhados em `lib/analytics.ts` (`PIXEL_EVENTS`) como eventos padrão do pixel:
+
+| GA | Pixel |
+|---|---|
+| `view_item` | `ViewContent` |
+| `add_to_cart` | `AddToCart` |
+| `add_to_wishlist` | `AddToWishlist` |
+| `search` | `Search` |
+| `begin_checkout` | `InitiateCheckout` |
+| `generate_lead` | `Lead` (conversão principal: clique em "Fechar pedido no WhatsApp") |
+| `whatsapp_contact` | `Contact` |
+
+Validação: extensão **Meta Pixel Helper** no Chrome, ou Gerenciador de Eventos → Conjuntos de dados → Testar eventos.
