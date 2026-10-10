@@ -41,6 +41,7 @@ interface RawItem {
 interface RawResponse {
   fxRate: number;
   count: number;
+  artVersion?: string;
   items: RawItem[];
 }
 
@@ -72,19 +73,24 @@ function slugFor(it: RawItem): string {
 
 // Proxied art is cached for a day at every layer (Next data cache, Vercel CDN,
 // browser), and the Next data cache outlives deploys. Stamping the URL with the
-// deployment makes a corrected print show up on the next deploy instead of
-// whenever the caches happen to expire.
-const ART_VERSION = (
+// backend's art version (its image cache's write time) and the deployment makes
+// a corrected print show up as soon as either side changes, instead of whenever
+// the caches happen to expire.
+const DEPLOY_VERSION = (
   process.env.VERCEL_DEPLOYMENT_ID ??
   process.env.VERCEL_GIT_COMMIT_SHA ??
   "dev"
 ).slice(0, 12);
 
+function artVersion(backend: string | undefined): string {
+  return backend ? `${backend}-${DEPLOY_VERSION}` : DEPLOY_VERSION;
+}
+
 // Art URL: a seller-supplied photo when there is one, else a same-origin proxy
 // to the Go card-image endpoint (keeps the backend host off the client). The
 // productID goes along so the backend serves the exact print's TCGplayer art,
 // falling back to the Liga page image for prints the TCG CDN has no photo for.
-function resolveImage(it: RawItem): string | undefined {
+function resolveImage(it: RawItem, version: string): string | undefined {
   if (it.imageURL) {
     return it.imageURL;
   }
@@ -95,11 +101,11 @@ function resolveImage(it: RawItem): string | undefined {
   if (it.productID) {
     p.set("productID", String(it.productID));
   }
-  p.set("v", ART_VERSION);
+  p.set("v", version);
   return `/img?${p.toString()}`;
 }
 
-function mapItem(it: RawItem): Single {
+function mapItem(it: RawItem, version: string): Single {
   const condition = it.condition?.trim() || "NM";
   return {
     kind: "single",
@@ -115,7 +121,7 @@ function mapItem(it: RawItem): Single {
     price: Math.round(it.askBRL * 100),
     qty: it.qty > 0 ? it.qty : 1,
     grade: /^PSA/i.test(condition) ? condition : undefined,
-    imageURL: resolveImage(it),
+    imageURL: resolveImage(it, version),
   };
 }
 
@@ -190,7 +196,7 @@ function cleanSet(set: string): string {
   return /^(sealed|acessorio)$/i.test(s) ? "" : s;
 }
 
-function mapSealed(it: RawItem): Sealed {
+function mapSealed(it: RawItem, version: string): Sealed {
   const set = cleanSet(it.set);
   const language = sealedLanguage(it.name);
   const format = sealedFormat(it.name);
@@ -211,7 +217,7 @@ function mapSealed(it: RawItem): Sealed {
     price: Math.round(it.askBRL * 100),
     qty: it.qty > 0 ? it.qty : 1,
     badge: "LACRADO",
-    imageURL: resolveImage(it),
+    imageURL: resolveImage(it, version),
     featured: it.featured,
   };
 }
@@ -219,7 +225,7 @@ function mapSealed(it: RawItem): Sealed {
 // Accessories belong to no game — the backend publishes them under a neutral
 // "acessorios" id — so their meta line carries the product's own set/brand when
 // there is one instead of a game name.
-function mapAccessory(it: RawItem): Accessory {
+function mapAccessory(it: RawItem, version: string): Accessory {
   const set = cleanSet(it.set);
   return {
     kind: "accessory",
@@ -232,7 +238,7 @@ function mapAccessory(it: RawItem): Accessory {
     price: Math.round(it.askBRL * 100),
     qty: it.qty > 0 ? it.qty : 1,
     badge: "ACESSORIO",
-    imageURL: resolveImage(it),
+    imageURL: resolveImage(it, version),
     featured: it.featured,
   };
 }
@@ -321,10 +327,13 @@ export async function loadCatalog(): Promise<Catalog> {
   }
   const data = (await res.json()) as RawResponse;
   const raw = data.items ?? [];
-  const singles = dedup(raw.filter((it) => !it.kind).map(mapItem));
-  const sealed = dedupProducts(raw.filter((it) => it.kind === "sealed").map(mapSealed));
+  const version = artVersion(data.artVersion);
+  const singles = dedup(raw.filter((it) => !it.kind).map((it) => mapItem(it, version)));
+  const sealed = dedupProducts(
+    raw.filter((it) => it.kind === "sealed").map((it) => mapSealed(it, version)),
+  );
   const accessories = dedupProducts(
-    raw.filter((it) => it.kind === "accessory").map(mapAccessory),
+    raw.filter((it) => it.kind === "accessory").map((it) => mapAccessory(it, version)),
   );
   return {
     singles,
