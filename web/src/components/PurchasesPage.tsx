@@ -43,6 +43,7 @@ import {
 import { brl2, dayLabel } from "../format";
 import CardArt from "./CardArt";
 import EmptyState from "./EmptyState";
+import { PhotoButton, PhotoStrip, PhotoViewer, photosOf } from "./ItemPhotos";
 import { Chip, Kpi } from "./PortfolioPage";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -210,7 +211,7 @@ export default function PurchasesPage() {
   const [games, setGames] = useState<GameInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"orders" | "loose">("orders");
+  const [tab, setTab] = useState<"orders" | "items" | "loose">("orders");
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<string>("all");
   const [creating, setCreating] = useState(false);
@@ -245,6 +246,22 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Compras também muda por fora (baixa de venda, cadastro por script), então a
+  // tela recarrega ao voltar o foco em vez de ficar parada no que abriu.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") {
+        load();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [load]);
 
   useEffect(() => {
@@ -288,6 +305,10 @@ export default function PurchasesPage() {
     [orders, keep, q, gameFilter, kinds, transitOnly],
   );
   const visibleLoose = useMemo(() => loose.filter(keep), [loose, keep]);
+  // A aba Itens é o estoque inteiro numa lista só, venha o item de um pedido ou
+  // não — é a visão que o Portfólio dava e que some quando tudo vira compra.
+  const allItems = useMemo(() => [...orders.flatMap((o) => o.items), ...loose], [orders, loose]);
+  const visibleAll = useMemo(() => allItems.filter(keep), [allItems, keep]);
 
   const totals = useMemo(() => {
     let spent = 0;
@@ -360,6 +381,9 @@ export default function PurchasesPage() {
         <Chip active={tab === "orders"} onClick={() => setTab("orders")}>
           Compras · {orders.length}
         </Chip>
+        <Chip active={tab === "items"} onClick={() => setTab("items")}>
+          Itens · {allItems.length}
+        </Chip>
         <Chip active={tab === "loose"} onClick={() => setTab("loose")}>
           Avulsos · {loose.length}
         </Chip>
@@ -425,7 +449,15 @@ export default function PurchasesPage() {
         />
       )}
 
-      {tab === "orders" ? (
+      {tab === "items" ? (
+        <ItemsList
+          items={visibleAll}
+          orders={orders}
+          total={allItems.length}
+          onChanged={load}
+          empty="Nada em estoque ainda — lance a primeira compra."
+        />
+      ) : tab === "orders" ? (
         visibleOrders.length === 0 ? (
           <EmptyState hint={orders.length > 0 ? "ajuste a busca ou o jogo" : "clique em Nova compra"}>
             {orders.length > 0 ? "Nenhuma compra bate com o filtro." : "Nenhuma compra registrada ainda."}
@@ -446,7 +478,7 @@ export default function PurchasesPage() {
           </div>
         )
       ) : (
-        <LooseItems items={visibleLoose} orders={orders} total={loose.length} onChanged={load} />
+        <ItemsList items={visibleLoose} orders={orders} total={loose.length} onChanged={load} />
       )}
     </div>
   );
@@ -805,6 +837,8 @@ function ItemRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [panel, setPanel] = useState<"none" | "move" | "edit" | "sell">("none");
+  const [viewing, setViewing] = useState(false);
+  const photos = photosOf(item);
   const unit = item.qty > 0 ? item.buyBRL : 0;
   const others = orders.filter((o) => o.id !== item.purchaseID);
   const columns = onSelect ? 8 : 7;
@@ -839,6 +873,7 @@ function ItemRow({
             <EditItemForm
               item={item}
               onCancel={() => setPanel("none")}
+              onReload={onChanged}
               onSaved={async () => {
                 setPanel("none");
                 await onChanged();
@@ -869,15 +904,31 @@ function ItemRow({
       )}
       <TableCell>
         <div className="flex items-center gap-2">
-          <CardArt
-            set={item.set}
-            number={item.number}
-            name={item.name}
-            game={item.game}
-            imageURL={item.imageURL}
-            productID={productIDFromTcgURL(item.tcgUrl)}
-            className="h-12 w-[34px] shrink-0 rounded"
-          />
+          <button
+            type="button"
+            disabled={photos.length === 0}
+            onClick={() => setViewing(true)}
+            title={photos.length > 0 ? `Ver ${photos.length === 1 ? "a foto" : `as ${photos.length} fotos`}` : undefined}
+            className="relative shrink-0 disabled:cursor-default"
+          >
+            <CardArt
+              set={item.set}
+              number={item.number}
+              name={item.name}
+              game={item.game}
+              imageURL={item.imageURL}
+              productID={productIDFromTcgURL(item.tcgUrl)}
+              className="h-12 w-[34px] rounded"
+            />
+            {photos.length > 1 && (
+              <span className="absolute -bottom-1 -right-1 rounded-full bg-brand px-1 text-[9px] font-bold text-white">
+                {photos.length}
+              </span>
+            )}
+          </button>
+          {viewing && (
+            <PhotoViewer item={item} game={tradeGame(item)} onClose={() => setViewing(false)} onChanged={onChanged} />
+          )}
           <div className="min-w-0">
             <div className="truncate text-slate-100">{item.name}</div>
             <div className="truncate text-[10px] text-slate-500">
@@ -915,6 +966,7 @@ function ItemRow({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
+          <PhotoButton item={item} game={tradeGame(item)} onChanged={onChanged} />
           {!item.realized && (
             <>
               <Button
@@ -1064,10 +1116,12 @@ function DeliveryToggle({ item, onChanged }: { item: PurchaseItem; onChanged: ()
 function EditItemForm({
   item,
   onCancel,
+  onReload,
   onSaved,
 }: {
   item: PurchaseItem;
   onCancel: () => void;
+  onReload: () => Promise<void> | void;
   onSaved: () => Promise<void> | void;
 }) {
   const single = kindOf(item) === "single";
@@ -1085,6 +1139,10 @@ function EditItemForm({
   const [notes, setNotes] = useState(item.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+
+  useEffect(() => {
+    setImageURL(item.imageURL ?? "");
+  }, [item.imageURL]);
 
   const submit = async () => {
     setSaving(true);
@@ -1161,6 +1219,7 @@ function EditItemForm({
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
       </div>
+      <PhotoStrip item={item} game={tradeGame(item)} onChanged={onReload} onFailed={setFailed} />
       {failed && <p className="text-[11px] text-rose-300">{failed}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
@@ -1575,16 +1634,21 @@ function AddItemForm({
   );
 }
 
-function LooseItems({
+// ItemsList is the flat stock list: every item of a filter, grouped by category,
+// with the same row actions as inside a purchase. It serves both the Itens tab
+// (everything) and the Avulsos tab (what belongs to no order).
+function ItemsList({
   items,
   orders,
   total,
   onChanged,
+  empty,
 }: {
   items: PurchaseItem[];
   orders: PurchaseView[];
   total: number;
   onChanged: () => Promise<void> | void;
+  empty?: string;
 }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [target, setTarget] = useState("");
@@ -1592,6 +1656,9 @@ function LooseItems({
   const [failed, setFailed] = useState<string | null>(null);
   const [sort, onSort] = useSort({ key: "date", dir: "desc" });
   const [collapsed, setCollapsed] = useState<Set<ItemKind>>(new Set());
+  // Milhares de linhas com arte travam a tela, então cada categoria começa
+  // cortada e cresce sob demanda em vez de esconder o resto atrás da busca.
+  const [limit, setLimit] = useState(LOOSE_LIMIT);
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -1652,10 +1719,10 @@ function LooseItems({
   };
 
   if (total === 0) {
-    return <EmptyState>Todo item lançado está dentro de uma compra.</EmptyState>;
+    return <EmptyState>{empty ?? "Todo item lançado está dentro de uma compra."}</EmptyState>;
   }
   if (items.length === 0) {
-    return <EmptyState hint="ajuste a busca ou o jogo">Nenhum item avulso bate com o filtro.</EmptyState>;
+    return <EmptyState hint="ajuste a busca ou os filtros">Nenhum item bate com o filtro.</EmptyState>;
   }
 
   // Anos de lançamentos avulsos são centenas de linhas, então cada categoria
@@ -1668,7 +1735,7 @@ function LooseItems({
     return {
       kind,
       total: all.length,
-      rows: all.slice(0, LOOSE_LIMIT),
+      rows: all.slice(0, limit),
       units: all.reduce((s, it) => s + it.qty, 0),
       cost: all.reduce((s, it) => s + it.costBRL, 0),
       open: !collapsed.has(kind),
@@ -1677,6 +1744,13 @@ function LooseItems({
 
   return (
     <div className="space-y-3">
+      <MergeBar
+        items={items.filter((it) => picked.has(it.id))}
+        onDone={async () => {
+          setPicked(new Set());
+          await onChanged();
+        }}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-slate-500">
           {picked.size > 0 ? `${picked.size} selecionados` : "Selecione itens para vincular a uma compra"}
@@ -1694,7 +1768,7 @@ function LooseItems({
           </div>
           <Button variant="primary" onClick={attach} disabled={busy || !target || picked.size === 0}>
             <Link2 className="h-4 w-4" />
-            Vincular
+            Mover p/ esta compra
           </Button>
         </div>
       </div>
@@ -1764,10 +1838,14 @@ function LooseItems({
         </Table>
       </div>
       {groups.some((g) => g.total > g.rows.length) && (
-        <p className="text-[11px] text-slate-500">
-          Cada categoria mostra até {LOOSE_LIMIT} itens — use a busca ou o filtro de jogo para chegar no
-          resto.
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setLimit((n) => n + LOOSE_LIMIT)}>
+            Mostrar mais {LOOSE_LIMIT}
+          </Button>
+          <span className="text-[11px] text-slate-500">
+            Cada categoria mostra até {limit} itens — a busca e os filtros alcançam o resto na hora.
+          </span>
+        </div>
       )}
     </div>
   );

@@ -32,9 +32,13 @@ type storefrontItem struct {
 }
 
 type storefrontResponse struct {
-	FXRate float64          `json:"fxRate"`
-	Count  int              `json:"count"`
-	Items  []storefrontItem `json:"items"`
+	FXRate float64 `json:"fxRate"`
+	Count  int     `json:"count"`
+	// ArtVersion changes whenever any game's image cache is rewritten, so the
+	// storefront can stamp its proxied art URLs and drop its day-long copies of
+	// an image the moment a corrected one lands.
+	ArtVersion string           `json:"artVersion"`
+	Items      []storefrontItem `json:"items"`
 }
 
 // Accessories are stocked for no game in particular, so the catalog publishes
@@ -50,8 +54,14 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 	resp := storefrontResponse{Items: []storefrontItem{}}
 	fx := s.storefrontFX()
 	resp.FXRate = fx
+	var artVersion int64
 	for _, id := range s.orderedGameIDs() {
 		gs := s.games[id]
+		if gs.Cardimg != nil {
+			if v := gs.Cardimg.Version(); v > artVersion {
+				artVersion = v
+			}
+		}
 		if gs.Trades == nil {
 			continue
 		}
@@ -78,6 +88,13 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	base := publicBase(r)
+	for i := range resp.Items {
+		if strings.HasPrefix(resp.Items[i].ImageURL, "/") {
+			resp.Items[i].ImageURL = base + resp.Items[i].ImageURL
+		}
+	}
+	resp.ArtVersion = strconv.FormatInt(artVersion, 10)
 	resp.Count = len(resp.Items)
 	writeJSON(w, resp)
 }

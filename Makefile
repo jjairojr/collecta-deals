@@ -19,7 +19,7 @@ AIR_ARGS := $(if $(MYP),-build.args_bin "-web= $(MYP)")
 ARGS     ?=
 
 .DEFAULT_GOAL := dev
-.PHONY: dev server web cli build web-build test tidy clean ensure-air help
+.PHONY: dev server web cli build web-build cfgate cfgate-once test tidy clean ensure-air help
 
 ## dev: Go server (air) + Vite web dev, together; Ctrl-C stops both.
 dev: web/node_modules ensure-air
@@ -47,6 +47,16 @@ cli:
 build: web-build
 	go build -o ./bin/server ./cmd/server
 	go build -o ./bin/opdeals ./cmd/opdeals
+	go build -o ./bin/cfgate ./cmd/cfgate
+
+## cfgate: host-side Cloudflare gateway — IPv6 CONNECT proxy + clearance refresh.
+cfgate:
+	go build -o ./bin/cfgate ./cmd/cfgate
+	./bin/cfgate
+
+## cfgate-once: refresh the clearance cookies now and exit.
+cfgate-once:
+	go run ./cmd/cfgate -once
 
 web-build: web/node_modules
 	cd web && npm run build

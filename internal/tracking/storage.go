@@ -121,6 +121,32 @@ func (s *Store) LatestDay(set string) (DaySnapshot, bool, error) {
 	return s.LoadDay(set, dates[len(dates)-1])
 }
 
+func (s *Store) LatestDayWithDepth(set string, maxBack int) (DaySnapshot, bool, error) {
+	dates, err := s.ListDates(set)
+	if err != nil {
+		return DaySnapshot{}, false, err
+	}
+	for i := len(dates) - 1; i >= 0 && len(dates)-i <= maxBack; i-- {
+		d, ok, err := s.LoadDay(set, dates[i])
+		if err != nil {
+			return DaySnapshot{}, false, err
+		}
+		if ok && HasDepth(d) {
+			return d, true, nil
+		}
+	}
+	return DaySnapshot{}, false, nil
+}
+
+func HasDepth(d DaySnapshot) bool {
+	for _, c := range d.Cards {
+		if len(c.Stores) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Store) LatestSnapshot() (DaySnapshot, bool, error) {
 	sets, err := s.ListSets()
 	if err != nil {

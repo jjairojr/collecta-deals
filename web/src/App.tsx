@@ -8,13 +8,14 @@ import {
   type GameInfo,
   type Status,
 } from "./api";
-import { brandFor, isView, ligaLabels, navItems, scopeOf, type View } from "./brand";
+import { brandFor, iconOf, isView, ligaLabels, scopeOf, type View } from "./brand";
 import DealsPage from "./components/DealsPage";
 import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
 import AllPortfolioPage from "./components/AllPortfolioPage";
 import LigaSalesPage from "./components/LigaSalesPage";
 import PurchasesPage from "./components/PurchasesPage";
+import ImportsPage from "./components/ImportsPage";
 import FinanceiroPage from "./components/FinanceiroPage";
 import StockPage from "./components/StockPage";
 import ExpensesPage from "./components/ExpensesPage";
@@ -56,12 +57,17 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     description: "Portfólio somado de todos os jogos.",
   },
   vendas: {
-    title: "Vendas da Liga",
-    description: "Pedidos já vendidos — receita, custo e lucro de cada pacote, em todos os jogos.",
+    title: "Vendas",
+    description: "O que já vendeu, da mais recente para a mais antiga — receita, custo e lucro de cada item.",
   },
   compras: {
     title: "Compras",
     description: "Cada pedido de compra com seus itens — de todos os jogos, no mesmo lugar.",
+  },
+  importar: {
+    title: "Importar / Exportar",
+    description:
+      "Piso em inglês da Liga contra o anúncio ao vivo da TCGplayer, nos dois sentidos — o que trazer dos EUA e o que mandar pra lá.",
   },
   financeiro: {
     title: "Financeiro",
@@ -97,13 +103,9 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   },
 };
 
-// Compras lista item a item com muitas colunas — a largura de leitura das outras
-// telas espremia a tabela e sobrava tela vazia dos dois lados.
-const wideViews = new Set<View>(["compras"]);
-
-function iconFor(view: View) {
-  return navItems.find((item) => item.key === view)?.icon;
-}
+// As telas são tabelas item a item: a largura de leitura de texto espremia as
+// colunas e deixava tela vazia dos dois lados.
+const pageWidth = "max-w-[1800px]";
 
 export default function App() {
   const [view, setView] = useView();
@@ -167,7 +169,7 @@ export default function App() {
 
   const activeView: View = view === "deals" && !dealsEnabled ? "tracking" : view;
   const meta = pageMeta[activeView];
-  const ViewIcon = iconFor(activeView);
+  const ViewIcon = iconOf(activeView);
   const scopeBadge = (
     <span className="pill pill-sm bg-panel px-2.5 py-1 font-pixel text-[8px] uppercase text-brand-label">
       {scopeOf(activeView) === "global" ? "Todos os jogos" : brandFor(game).short}
@@ -191,9 +193,7 @@ export default function App() {
           <div key={game} className="bg-grid flex flex-1 flex-col">
             <main
               key={activeView}
-              className={`animate-fade-in mx-auto w-full flex-1 px-4 py-7 sm:px-6 lg:px-8 ${
-                wideViews.has(activeView) ? "max-w-[1800px]" : "max-w-7xl"
-              }`}
+              className={`animate-fade-in mx-auto w-full flex-1 px-4 py-7 sm:px-6 lg:px-8 ${pageWidth}`}
             >
               <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} badge={scopeBadge} />
 
@@ -233,6 +233,10 @@ export default function App() {
               ) : activeView === "compras" ? (
                 <div className="mt-6">
                   <PurchasesPage />
+                </div>
+              ) : activeView === "importar" ? (
+                <div className="mt-6">
+                  <ImportsPage />
                 </div>
               ) : activeView === "financeiro" ? (
                 <div className="mt-6">
@@ -307,7 +311,9 @@ function useView(): [View, (v: View) => void] {
 function Footer({ game, hasDeals }: { game: string; hasDeals: boolean }) {
   const liga = ligaLabels[game] ?? "Liga";
   return (
-    <footer className="mx-auto w-full max-w-7xl border-t-[3px] border-outline px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
+    <footer
+      className={`mx-auto w-full border-t-[3px] border-outline px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8 ${pageWidth}`}
+    >
       {hasDeals ? (
         <>
           A margem é a diferença bruta de preço já convertida pelo câmbio (menor anúncio atual na TCGplayer vs menor

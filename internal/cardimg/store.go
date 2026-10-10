@@ -56,6 +56,18 @@ func NewStore(path string, client Fetcher, log *logx.Logger, imgRe *regexp.Regex
 
 func key(set, number string) string { return set + "/" + number }
 
+// Version identifies the current state of the cache on disk, so a consumer that
+// caches the art it proxies can tell a corrected image apart from the one it
+// already holds. It is the file's modification time; a cache that was never
+// written reports 0.
+func (s *Store) Version() int64 {
+	info, err := os.Stat(s.path)
+	if err != nil {
+		return 0
+	}
+	return info.ModTime().Unix()
+}
+
 // numberOf extracts the card number from a "set/number" cache key. When a
 // game's card numbers are globally unique this backs a set-insensitive
 // fallback that survives set-code format drift (e.g. "OP-11" warmed by

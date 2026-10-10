@@ -299,3 +299,74 @@ func TestDealsDedupesSameNumberKeepingCheapestBR(t *testing.T) {
 		t.Fatalf("want cheapest BR price (27.00), got %v", deals[0].LowBRL)
 	}
 }
+
+func TestUSDGroupsKeepsEveryVariant(t *testing.T) {
+	prices := []model.USPrice{
+		{Number: "001/298", Name: "Jinx", SetCode: "OGN", LowUSD: 2, ProductID: 1},
+		{Number: "001/298", Name: "Jinx", SetCode: "OGN", LowUSD: 9, ProductID: 2},
+		{Number: "002/298", Name: "Vi", SetCode: "OGN", LowUSD: 0},
+	}
+	m := MatcherFor(game.Riftbound())
+	groups := USDGroups(prices, m)
+	got := groups[m.Key("001", "Jinx", "OGN")]
+	if len(got) != 2 {
+		t.Fatalf("want both Jinx printings, got %+v", got)
+	}
+	if _, ok := groups[m.Key("002", "Vi", "OGN")]; ok {
+		t.Errorf("zero-priced product must be dropped")
+	}
+	dear, ok := Dearest(got)
+	if !ok || dear.ProductID != 2 {
+		t.Errorf("dearest = %+v, want product 2", dear)
+	}
+}
+
+func TestImportCandidates(t *testing.T) {
+	listings := []model.BrazilListing{
+		{Number: "OP01-001", Name: "Big gap", LowBRL: 100},
+		{Number: "OP01-002", Name: "Small gap", LowBRL: 30},
+		{Number: "OP01-003", Name: "Export deal", LowBRL: 10},
+		{Number: "OP01-004", Name: "Too cheap", LowBRL: 50},
+	}
+	prices := []model.USPrice{
+		{Number: "OP01-001", Name: "Big gap", LowUSD: 4, ProductID: 1},
+		{Number: "OP01-001", Name: "Big gap", LowUSD: 8, ProductID: 2},
+		{Number: "OP01-002", Name: "Small gap", LowUSD: 5, ProductID: 3},
+		{Number: "OP01-003", Name: "Export deal", LowUSD: 50, ProductID: 4},
+		{Number: "OP01-004", Name: "Too cheap", LowUSD: 1, ProductID: 5},
+	}
+	got := ImportCandidates(listings, prices, 0.2, 3, 0, Matcher{})
+	ids := map[int]bool{}
+	for _, p := range got {
+		ids[p.ProductID] = true
+	}
+	if len(got) != 3 || !ids[1] || !ids[2] || !ids[3] {
+		t.Fatalf("want products 1,2,3 (both Big gap variants + Small gap), got %+v", got)
+	}
+	capped := ImportCandidates(listings, prices, 0.2, 3, 1, Matcher{})
+	if len(capped) != 2 || capped[0].Number != "OP01-001" {
+		t.Fatalf("cap=1 must keep only the biggest gap with all its variants, got %+v", capped)
+	}
+}
+
+func TestOnePieceSuffixCarriesVariantWhenNameLacksIt(t *testing.T) {
+	op := MatcherFor(game.OnePiece())
+	if op.Key("OP02-013-PAR", "Portgas.D.Ace", "") == op.Key("OP02-013", "Portgas.D.Ace", "") {
+		t.Fatal("Liga -PAR suffix must not join the base print")
+	}
+	if op.Key("OP02-013-PAR", "Portgas.D.Ace", "") != op.Key("OP02-013", "Portgas.D.Ace (Parallel)", "") {
+		t.Fatal("Liga -PAR suffix must join the TCG (Parallel) product")
+	}
+	if op.Key("OP09-009-P", "Benn.Beckman", "") != op.Key("OP09-009", "Benn.Beckman (Parallel)", "") {
+		t.Fatal("-P suffix is parallel too")
+	}
+	if op.Key("OP11-106-AA", "Zeus (Alternate Art)", "") != op.Key("OP11-106", "Zeus (Alternate Art)", "") {
+		t.Fatal("suffix and name tag for the same variant must not double up")
+	}
+	if op.Key("P-078-RP", "Adio", "") != op.Key("P-078", "Adio", "") {
+		t.Fatal("promo-pack suffixes carry no print info and keep joining the number")
+	}
+	if op.Key("OP05-119-SP-G", "Monkey.D.Luffy (119)", "") != op.Key("OP05-119", "Monkey.D.Luffy (119) (SP) (Gold)", "") {
+		t.Fatal("stacked suffixes map to every token")
+	}
+}

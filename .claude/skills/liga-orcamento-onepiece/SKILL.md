@@ -120,6 +120,18 @@ sozinho em ~8s; ritmo 7–10s entre navegações, máx. 2 páginas por batch),
 paginar com `&page=2`, conferir que o parse fecha com o total do site ao
 centavo, e cruzar as cartas de maior valor com o piso NM-EN do snapshot.
 
+## Variante C — carta fora do tracking (set novo), ao vivo via cfgate
+
+`bin/ligaprecos` (fonte `scripts/op17/main.go`, campo `set` por carta no JSON de
+entrada) busca a página da carta pelo cfgate e devolve piso NM-EN, lojas e
+cópias no piso. Antes, confira que o proxy responde (`curl -x
+http://127.0.0.1:8891 https://www.ligaonepiece.com.br/` → 403 é normal; 502 =
+reiniciar `bin/cfgate`). **O parâmetro `card` da URL precisa ser o nome EXATO
+da Liga** — `Monkey.D.Luffy (004) (ST31-004)` resolve, `Monkey.D.Luffy` devolve
+página vazia (0 ofertas, parece "sem estoque"). Nome e `ed` certos saem da busca
+`?view=cards/search&card=<número>` (links `view=cards/card&card=...&ed=...`).
+SPs de starter (ST31-004-SP) moram na edição OP-17.
+
 ---
 
 ## Armadilhas que já custaram análise errada

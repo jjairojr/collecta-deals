@@ -216,9 +216,16 @@ func buyoutKey(sortBy string) func(BuyoutCandidate) float64 {
 // known price) into distinct price levels sorted ascending, and reports the
 // total NM supply and seller count. Both Buyout and Snipe build on this ladder.
 func nmPriceLevels(c CardDay, langs []string) (levels []*priceLevel, supply, sellers int) {
+	return nmPriceLevelsExcluding(c, langs, 0)
+}
+
+func nmPriceLevelsExcluding(c CardDay, langs []string, excludeStore int) (levels []*priceLevel, supply, sellers int) {
 	byPrice := map[float64]*priceLevel{}
 	for _, s := range c.Stores {
 		if s.Condition != conditionNM || !langAllowed(s.Language, langs) || !s.PriceKnown || s.PriceBRL <= 0 || s.Quantity <= 0 {
+			continue
+		}
+		if excludeStore != 0 && s.StoreID == excludeStore {
 			continue
 		}
 		lv := byPrice[s.PriceBRL]

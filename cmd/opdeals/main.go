@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"opdeals/internal/clearance"
 	"opdeals/internal/compare"
 	"opdeals/internal/flaresolverr"
 	"opdeals/internal/game"
+	"opdeals/internal/liga"
 	"opdeals/internal/logx"
 	"opdeals/internal/pipeline"
 	"opdeals/internal/report"
@@ -40,6 +42,8 @@ func run() error {
 	quiet := flag.Bool("quiet", false, "suppress progress logs on stderr")
 	gameID := flag.String("game", "onepiece", "game to scan: onepiece, pokemon, riftbound, lorcana or gundam")
 	flaresolverrURL := flag.String("flaresolverr", "", "FlareSolverr endpoint URL (e.g. http://localhost:8191) for Cloudflare-challenged Liga hosts (empty = direct)")
+	cfClearance := flag.String("cf-clearance", "", "path to the Cloudflare clearance file written by cmd/cfgate (e.g. data/cf-clearance.json); takes precedence over -flaresolverr")
+	ligaProxy := flag.String("liga-proxy", "", "CONNECT proxy for Liga hosts, e.g. http://host.docker.internal:8891 — cmd/cfgate on the host, whose IPv6 egress Cloudflare accepts")
 	flag.Parse()
 
 	logWriter := io.Writer(os.Stderr)
@@ -50,24 +54,32 @@ func run() error {
 
 	g := game.ByID(*gameID)
 
-	var solver *flaresolverr.Client
-	if *flaresolverrURL != "" {
-		solver = flaresolverr.New(*flaresolverrURL)
+	var ligaFetcherFor liga.FetcherFor
+	switch {
+	case *cfClearance != "":
+		store, err := clearance.NewStore(*cfClearance).WithProxy(*ligaProxy)
+		if err != nil {
+			return err
+		}
+		ligaFetcherFor = store.FetcherFor()
+	case *flaresolverrURL != "":
+		solver := flaresolverr.New(*flaresolverrURL)
 		defer solver.Close(context.Background())
+		ligaFetcherFor = solver.FetcherFor()
 	}
 
 	start := time.Now()
 	logger.Printf("scan starting (%s, min-margin %.0f%%, min-price $%.2f)", g.ID, *minMargin, *minPrice)
 	snap, err := pipeline.Fetch(context.Background(), logger, pipeline.Options{
-		Game:         g,
-		Sets:         parseSets(*setsFlag),
-		FXOverride:   *fxOverride,
-		Concurrency:  *concurrency,
-		Timeout:      *timeout,
-		VerifyFloor:  *verifyFloor,
-		LivePrices:   *livePrices,
-		MyPCards:     *myPCards,
-		FlareSolverr: solver,
+		Game:        g,
+		Sets:        parseSets(*setsFlag),
+		FXOverride:  *fxOverride,
+		Concurrency: *concurrency,
+		Timeout:     *timeout,
+		VerifyFloor: *verifyFloor,
+		LivePrices:  *livePrices,
+		MyPCards:    *myPCards,
+		LigaFetcher: ligaFetcherFor,
 	})
 	if err != nil {
 		return err

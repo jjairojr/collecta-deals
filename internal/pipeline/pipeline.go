@@ -9,7 +9,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"opdeals/internal/compare"
-	"opdeals/internal/flaresolverr"
 	"opdeals/internal/fx"
 	"opdeals/internal/game"
 	"opdeals/internal/httpx"
@@ -30,14 +29,16 @@ type Options struct {
 	VerifyFloor float64
 	LivePrices  bool
 	MyPCards    bool
-	// FlareSolverr, when set, fetches Cloudflare-challenged Liga hosts through a
-	// headless browser. Nil means fetch every host directly. Optional.
-	FlareSolverr *flaresolverr.Client
+	// LigaFetcher, when set, decorates the Liga HTTP client with the process's
+	// Cloudflare transport. Nil means fetch every host directly. Optional.
+	LigaFetcher liga.FetcherFor
 	// HeldKeys returns the match keys of portfolio cards that should be
 	// live-priced on TCGplayer alongside candidate deals, so cards you already
 	// own get the same live floor instead of a stale TCGCSV baseline. Keys must
 	// be built with the same game's Matcher.LookupKey. Optional.
-	HeldKeys func() []string
+	HeldKeys     func() []string
+	ImportMinUSD float64
+	ImportMax    int
 }
 
 func Fetch(ctx context.Context, logger *logx.Logger, opts Options) (model.Snapshot, error) {
@@ -63,8 +64,8 @@ func Fetch(ctx context.Context, logger *logx.Logger, opts Options) (model.Snapsh
 	}
 	matcher := compare.MatcherFor(gm)
 	var ligaFetcher liga.Fetcher = ligaHTTP
-	if opts.FlareSolverr != nil && gm.Challenged {
-		ligaFetcher = flaresolverr.NewRouter(ligaHTTP, opts.FlareSolverr, gm.LigaHosts)
+	if opts.LigaFetcher != nil {
+		ligaFetcher = opts.LigaFetcher(ligaHTTP, gm)
 	}
 	sources := []model.BrazilSource{liga.New(ligaFetcher, logger, opts.Concurrency, opts.Sets, gm)}
 	if opts.MyPCards && gm.MyP != nil {
@@ -125,6 +126,11 @@ func Fetch(ctx context.Context, logger *logx.Logger, opts Options) (model.Snapsh
 		ids := withHeldProductIDs(candidateIDs, prices, opts.HeldKeys, matcher)
 		if len(ids) > len(candidateIDs) {
 			logger.Printf("US  portfolio: +%d held products to live-price", len(ids)-len(candidateIDs))
+		}
+		if opts.ImportMax > 0 {
+			before := len(ids)
+			ids = unionIDs(ids, uniqueProductIDs(compare.ImportCandidates(listings, prices, rate, opts.ImportMinUSD, opts.ImportMax, matcher)))
+			logger.Printf("US  imports: +%d reverse-direction products to live-price", len(ids)-before)
 		}
 
 		var (
@@ -243,6 +249,21 @@ func withHeldProductIDs(ids []int, prices []model.USPrice, heldKeys func() []str
 		}
 		seen[p.ProductID] = true
 		ids = append(ids, p.ProductID)
+	}
+	return ids
+}
+
+func unionIDs(ids, extra []int) []int {
+	seen := make(map[int]bool, len(ids)+len(extra))
+	for _, id := range ids {
+		seen[id] = true
+	}
+	for _, id := range extra {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
 	}
 	return ids
 }

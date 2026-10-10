@@ -54,9 +54,12 @@ type Server struct {
 	expenses *expenses.Store
 	// purchases is the single ledger of buy orders. One order mixes games, so its
 	// header lives here while the items stay in each game's trade ledger.
-	purchases  *purchases.Store
-	readOnly   bool
-	adminToken string
+	purchases      *purchases.Store
+	readOnly       bool
+	adminToken     string
+	OwnLigaStoreID int
+	PhotoDir       string
+	imports        *importsCache
 }
 
 // New builds the API server. readOnly gates every scrape-triggering endpoint
@@ -73,6 +76,7 @@ func New(webDir string, games map[string]*GameStack, defaultGame string, accesso
 		purchases:   purchaseStore,
 		readOnly:    readOnly,
 		adminToken:  adminToken,
+		imports:     newImportsCache(),
 	}
 }
 
@@ -127,6 +131,7 @@ type statusResponse struct {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/deals", s.handleDeals)
+	mux.HandleFunc("GET /api/imports", s.handleImports)
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
 	mux.HandleFunc("POST /api/refresh", s.handleRefresh)
@@ -152,6 +157,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/trades", s.handleTradesCreate)
 	mux.HandleFunc("PUT /api/trades/{id}", s.handleTradesUpdate)
 	mux.HandleFunc("POST /api/trades/{id}/sell", s.handleTradesSell)
+	mux.HandleFunc("POST /api/trades/{id}/photo", s.handleTradePhotoUpload)
+	mux.HandleFunc("DELETE /api/trades/{id}/photo", s.handleTradePhotoDelete)
+	mux.HandleFunc("GET /api/item-photos/{name}", s.handleItemPhoto)
 	mux.HandleFunc("DELETE /api/trades/{id}", s.handleTradesDelete)
 	mux.HandleFunc("GET /api/trades/quote", s.handleTradesQuote)
 	mux.HandleFunc("POST /api/trades/listings", s.handleTradesListings)
@@ -1030,42 +1038,33 @@ func (s *Server) handleCardImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	// A TCGplayer product id names the exact print (variants share a card number
-	// but not a product), so it resolves art the number-keyed Liga lookup can't —
-	// e.g. Riftbound's "GG EZ" treatments. Proxy it so a browser canvas draws it
-	// same-origin; fall through to the Liga page lookup when it's absent or fails.
+	set := q.Get("set")
+	number := model.NormalizeNumber(q.Get("number"))
+	if set != "" && number != "" {
+		pageURL := s.cardPageURL(gs, set, number)
+		if pageURL == "" {
+			if u := q.Get("url"); isLigaCardURL(gs.Game, u) {
+				pageURL = u
+			}
+		}
+		if pageURL != "" || gs.Cardimg.Cached(set, number) {
+			if body, err := gs.Cardimg.Fetch(r.Context(), set, number, pageURL); err == nil {
+				writeCardImage(w, body)
+				return
+			}
+		}
+	}
 	if id, err := strconv.Atoi(q.Get("productID")); err == nil && id > 0 {
 		url := fmt.Sprintf("https://product-images.tcgplayer.com/fit-in/400x559/%d.jpg", id)
 		if body, err := gs.Cardimg.FetchURL(r.Context(), url); err == nil {
-			w.Header().Set("Content-Type", "image/jpeg")
-			w.Header().Set("Cache-Control", "public, max-age=86400")
-			w.Write(body)
+			writeCardImage(w, body)
 			return
 		}
 	}
-	set := q.Get("set")
-	number := model.NormalizeNumber(q.Get("number"))
-	if set == "" || number == "" {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	pageURL := s.cardPageURL(gs, set, number)
-	if pageURL == "" {
-		if u := q.Get("url"); isLigaCardURL(gs.Game, u) {
-			pageURL = u
-		}
-	}
-	// A cached URL needs no page: Fetch resolves from the cache before ever
-	// touching pageURL, so seeded art (e.g. TCGplayer) serves without tracking.
-	if pageURL == "" && !gs.Cardimg.Cached(set, number) {
-		http.Error(w, "unknown card", http.StatusNotFound)
-		return
-	}
-	body, err := gs.Cardimg.Fetch(r.Context(), set, number, pageURL)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
-	}
+	http.Error(w, "unknown card", http.StatusNotFound)
+}
+
+func writeCardImage(w http.ResponseWriter, body []byte) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(body)
@@ -1298,7 +1297,7 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

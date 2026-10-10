@@ -49,6 +49,7 @@ type Matcher struct {
 	stripDenom     bool
 	stripZeros     bool
 	suffixVariants map[string]string
+	dashSuffixes   map[string]string
 	vocab          map[string]string
 	don            bool
 }
@@ -64,6 +65,7 @@ func MatcherFor(g game.Game) Matcher {
 		stripDenom:     m.StripDenominator,
 		stripZeros:     m.StripLeadingZeros,
 		suffixVariants: m.NumberSuffixVariants,
+		dashSuffixes:   m.DashSuffixVariants,
 		vocab:          m.VariantVocab,
 		don:            m.DON,
 	}
@@ -82,8 +84,8 @@ func (m Matcher) Key(number, name, set string) string {
 	if m.don && isDON(number, name) {
 		return "DON|" + strings.ToUpper(strings.TrimSpace(set)) + "|" + donName(name)
 	}
-	base, suffixTok := m.normalizeNumber(number)
-	key := base + "|" + m.variantToken(name, suffixTok)
+	base, suffixToks := m.normalizeNumber(number)
+	key := base + "|" + m.variantToken(name, suffixToks...)
 	if m.setScoped {
 		key = strings.ToUpper(strings.TrimSpace(set)) + "|" + key
 	}
@@ -102,7 +104,7 @@ func (m Matcher) LookupKey(number, name, set string) string {
 	return m.Key(number, name, "")
 }
 
-func (m Matcher) normalizeNumber(number string) (string, string) {
+func (m Matcher) normalizeNumber(number string) (string, []string) {
 	n := strings.ToUpper(strings.TrimSpace(number))
 	if m.stripDenom {
 		if i := strings.Index(n, "/"); i >= 0 {
@@ -112,16 +114,33 @@ func (m Matcher) normalizeNumber(number string) (string, string) {
 	if len(m.suffixVariants) > 0 && len(n) > 1 {
 		suffix := n[len(n)-1:]
 		if tok, ok := m.suffixVariants[suffix]; ok && isDigits(n[:len(n)-1]) {
-			return m.trimZeros(n[:len(n)-1]), tok
+			return m.trimZeros(n[:len(n)-1]), []string{tok}
 		}
 	}
 	if m.stripZeros && isDigits(n) {
-		return m.trimZeros(n), ""
+		return m.trimZeros(n), nil
 	}
 	if !m.setScoped {
-		return baseNumber(n), ""
+		base := baseNumber(n)
+		return base, m.dashSuffixTokens(strings.TrimPrefix(n[len(base):], "-"))
 	}
-	return n, ""
+	return n, nil
+}
+
+// dashSuffixTokens turns the letter segments Liga appends after the card number
+// ("PAR", "SP-G") into variant tokens; segments outside the map (promo packs
+// like WP/EP/RP) carry no print information and are dropped.
+func (m Matcher) dashSuffixTokens(suffix string) []string {
+	if suffix == "" || len(m.dashSuffixes) == 0 {
+		return nil
+	}
+	var out []string
+	for _, seg := range strings.Split(suffix, "-") {
+		if tok, ok := m.dashSuffixes[seg]; ok {
+			out = append(out, tok)
+		}
+	}
+	return out
 }
 
 func (m Matcher) trimZeros(n string) string {
@@ -221,6 +240,70 @@ func USDIndex(prices []model.USPrice, m Matcher) map[string]model.USPrice {
 // when present, otherwise the sane TCGCSV baseline.
 func EffectiveUSD(p model.USPrice) float64 {
 	return effectivePrice(p)
+}
+
+func USDGroups(prices []model.USPrice, m Matcher) map[string][]model.USPrice {
+	m = m.norm()
+	groups := make(map[string][]model.USPrice, len(prices))
+	for _, p := range prices {
+		if effectivePrice(p) <= 0 {
+			continue
+		}
+		key := m.Key(p.Number, p.Name, p.SetCode)
+		groups[key] = append(groups[key], p)
+	}
+	return groups
+}
+
+func Dearest(group []model.USPrice) (model.USPrice, bool) {
+	var best model.USPrice
+	found := false
+	for _, p := range group {
+		if !found || effectivePrice(p) > effectivePrice(best) {
+			best = p
+			found = true
+		}
+	}
+	return best, found
+}
+
+func ImportCandidates(listings []model.BrazilListing, prices []model.USPrice, fxRate, minUSD float64, max int, m Matcher) []model.USPrice {
+	m = m.norm()
+	groups := USDGroups(prices, m)
+	type gap struct {
+		key string
+		brl float64
+	}
+	gaps := make([]gap, 0)
+	for key, l := range cheapestListings(listings, false, m, "") {
+		dear, ok := Dearest(groups[key])
+		if !ok {
+			continue
+		}
+		cost := effectivePrice(dear)
+		if cost < minUSD || fxRate <= 0 {
+			continue
+		}
+		g := l.LowBRL - cost/fxRate
+		if g <= 0 {
+			continue
+		}
+		gaps = append(gaps, gap{key: key, brl: g})
+	}
+	sort.SliceStable(gaps, func(i, j int) bool {
+		if gaps[i].brl != gaps[j].brl {
+			return gaps[i].brl > gaps[j].brl
+		}
+		return gaps[i].key < gaps[j].key
+	})
+	if max > 0 && len(gaps) > max {
+		gaps = gaps[:max]
+	}
+	out := make([]model.USPrice, 0, len(gaps))
+	for _, g := range gaps {
+		out = append(out, groups[g.key]...)
+	}
+	return out
 }
 
 func indexPrices(prices []model.USPrice, m Matcher) map[string]model.USPrice {
@@ -436,12 +519,15 @@ func isAllLetters(s string) bool {
 	return true
 }
 
-func (m Matcher) variantToken(name, suffixTok string) string {
+func (m Matcher) variantToken(name string, suffixToks ...string) string {
 	var tokens []string
 	seen := make(map[string]bool)
-	if suffixTok != "" {
-		seen[suffixTok] = true
-		tokens = append(tokens, suffixTok)
+	for _, tok := range suffixToks {
+		if tok == "" || seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		tokens = append(tokens, tok)
 	}
 	for _, match := range parenRe.FindAllStringSubmatch(name, -1) {
 		v := wsRe.ReplaceAllString(strings.ToLower(strings.TrimSpace(match[1])), " ")
@@ -459,7 +545,7 @@ func (m Matcher) variantToken(name, suffixTok string) string {
 }
 
 func (m Matcher) displayVariant(p model.USPrice) string {
-	token := m.variantToken(p.Name, "")
+	token := m.variantToken(p.Name)
 	if token == "" {
 		return p.Variant
 	}

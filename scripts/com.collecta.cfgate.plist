@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.collecta.cfgate</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/jjairo/Documents/www/opdeals/bin/cfgate</string>
+        <string>-out</string>
+        <string>data/cf-clearance.json</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jjairo/Documents/www/opdeals</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jjairo/Documents/www/opdeals/data/cfgate.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/jjairo/Documents/www/opdeals/data/cfgate.log</string>
+</dict>
+</plist>

@@ -230,6 +230,12 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		if in.Status == "" {
 			in.Status = t.Status
 		}
+		if in.Photos == nil {
+			in.Photos = t.Photos
+		}
+		if in.ImageURL == "" && len(in.Photos) > 0 {
+			in.ImageURL = in.Photos[0]
+		}
 		*t = in
 	}
 	updated, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {

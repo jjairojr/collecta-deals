@@ -219,3 +219,33 @@ Herda tudo de `liga-singles-riftbound`; o que mais importa aqui:
   Defender) não são divergência.
 - **Import de CSV grande pode pular linha sem avisar** (1 de 75 ficou de fora —
   Solgaleo SUM 155). A conferência pós-import não é opcional.
+
+## Aprendizados 2026-09-13 (3 jogos, 376 flags reescritas)
+
+- Script reutilizável: `conferir.py <game> <tcg>` (ao lado deste SKILL.md) lê
+  `exp-<game>.csv` (export "Somente do Estoque", 3 exports em sequência com 6s
+  entre `requestSubmit(btExport)` caem em `~/Downloads/<tcg>_n_<hash>.csv`) e
+  `trades-<game>.json` de prod, imprime o relatório por veredito e grava
+  `flag-updates-<game>.json` pronto para `POST /api/trades/liga`.
+- Casamento que funcionou: One Piece pelo número-base (`OP06-081`) ignorando a
+  sigla (promos ficam em `PC-01`, EB04 dentro de `OP-14/OP-15`, reprints em
+  `PRB/PRB2`), desempate por nome normalizado (o sufixo `-AA/-PA/-RE/-WP…` da
+  Liga corresponde ao parêntese do nome no ledger), depois número completo,
+  depois preço. Pokémon/Riftbound por (sigla, número, idioma) com fallback
+  por número+preço e por nome+idioma+preço (`ask` ou `ligaPriceBRL`); um
+  fallback só por nome sem âncora de preço casou Bronzong PBL com ARTG TG11 —
+  usar apenas para holding sem preço e nome único.
+- Ordenar os holdings com `ligaListed` e preço primeiro: o ledger tem pares
+  duplicados (`AR (JP)` sem preço + `Foil JP` precificado) apontando para um
+  único anúncio, e sem isso o registro errado leva a flag e o certo vira
+  "sumiu". Uma linha da Liga só pode casar com um registro; o segundo vira
+  `dash_duplicado` (18 no Pokémon, 4 no Riftbound, 3 no One Piece).
+- Pokémon na Liga tem a MESMA carta JP cadastrada duas vezes, na edição JP e
+  na EN (Dhelmise `M5 088` + `PBL 091`, Silvally `M5 093` + `PBL 095`, Thievul
+  em 4 edições…) — unidades anunciadas que não existem, mesmo padrão do
+  OP01-070/-RE. E 131 linhas da Liga sem nenhum registro no ledger, várias
+  caras (Charmeleon MEW 169 R$989, Eevee TWM 188 R$849, Lillie's Clefairy ex
+  R$649, Deoxys-VSTAR GG46 ×2 R$599, Pikachu GG30 ×3 R$589).
+- "Reimportar" depois da conferência é divergência real dash×Liga: no
+  Riftbound 99 itens têm preço na Liga menor que o `askBRL` do dashboard
+  (reprecificações antigas feitas só na Liga).

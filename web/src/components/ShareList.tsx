@@ -863,7 +863,7 @@ interface PageInfo {
 // hosting card art send no CORS headers, so a canvas can't draw them directly.
 function imgSrc(t: TradeView): string | null {
   if (t.imageURL) {
-    return imageProxyURL(t.imageURL);
+    return t.imageURL.startsWith("/") ? t.imageURL : imageProxyURL(t.imageURL);
   }
   const pid = productIDFromTcgURL(t.tcgUrl);
   if (pid) {

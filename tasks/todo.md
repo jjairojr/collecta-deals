@@ -856,3 +856,111 @@ como mini-janela, Outfit.
 
 Verificado de novo: build limpo + Deals, Portfolio, All Games, Estoque e o modal
 de imagem. A vitrine continua intocada.
+
+## Importar EUA (2026-09-23) — deals EUA→BR
+
+Plano: ~/.claude/plans/steady-moseying-abelson.md
+
+- [x] tracking: `LatestDayWithDepth`, `imports.go` (ImportSupplyFor, ladder sem Collecta) + testes
+- [x] compare: `USDGroups`, `Dearest`, `ImportCandidates` + testes
+- [x] pipeline: live-price dos candidatos inversos (ImportMinUSD/ImportMax, flag `-import-live`)
+- [x] internal/imports: Build/Apply/Deal + testes
+- [x] api: GET /api/imports com cache por jogo (chave = data tracking + updatedAt + days); main: `-liga-store-id` (866280)
+- [x] web: api.ts, brand/App, ImportsPage (Negócio › Importar EUA)
+- [x] verificação: go build/vet/test verdes, `tsc && vite build` limpo, curl (80 linhas nos filtros padrão, 2,7 s frio / 10 ms cache), tela conferida no Chrome
+
+### Review
+
+- Ace OP16-118 (topo da lista) conferido à mão: piso EN NM R$ 198,90 (PK Center, tracking 16/08) e
+  US$ 16,51 no snapshot de 22/09. A conta bate; o que não bate é a data: tracking local está 5
+  semanas atrás do snapshot de deals. Rodar captura antes de comprar por essa lista.
+- Custo "tabela" em quase tudo de OP porque o snapshot atual ainda não passou pelo pipeline com
+  `ImportMax`; só o próximo refresh precifica ao vivo os candidatos inversos.
+- Riftbound: Normal e Foil do TCGCSV caem na mesma chave — custo sai pelo foil (conservador),
+  badge "ambíguo ×N" na tela. Separar por `extras` do tracking fica para uma v2.
+
+## Exportar BR (2026-09-23) — sentido BR→EUA na mesma página
+
+- [x] tracking: `FloorStores` no ImportSupply + teste
+- [x] internal/imports/export.go: BuildExport/ApplyExport (venda pela variante mais barata) + testes
+- [x] api: cache guarda o supply (chave data|days); `?direction=export`, `minUSListings`
+- [x] web: getExports, toggle EUA→BR / BR→EUA (`?dir=export`), tabela export com lojas no piso, lista de compra
+- [x] verificação: go build/vet/test verdes, `tsc && vite build` limpo, curl (100 linhas), Chrome nos dois sentidos
+
+### Review
+- Topo do BR→EUA: Teemo GG EZ (ROPP 197B) R$ 5.399 → US$ 1.430 ao vivo (8 anúncios), lucro US$ 376.
+  Exatamente o que a página Ofertas mostra, agora com a loja onde está a cópia (CHQ Cards ×1).
+- Container `:8080` ainda NÃO tem o sentido BR→EUA: rebuild só depois da captura em andamento
+  terminar (uma faixa só da Liga).
+
+## Sem giro (2026-09-23, pedido do dono)
+- Removida a inferência de vendas dos dois sentidos: sem janela, sem min giro, sem sugerido=1,5×giro, sem score por giro.
+  EUA→BR ordena por lucro/un (ou margem); BR→EUA mantém score = lucro × cópias no piso. Handler lê só a captura
+  mais recente com profundidade (sem LoadRange), cache por data.
+- Deploy: container local rebuildado e `railway up` feito; prod serve o bundle novo.
+
+## Reprecificação Liga 2026-09-23 (rft + pkm)
+- [x] bin/floors pkm+rft em paralelo (cfgate já rodando)
+- [x] análise piso−0,01 (scripts/liga-reprecificar/analyze.py)
+- [x] gravar no admin: rft 135/135, pkm 20/20 (verificado no reload)
+- [x] sync dashboard (listings + flag Liga): rft 135, pkm 20
+- [ ] PENDENTE gravar 2ª passada (custo unitário corrigido): rft 16 + pkm 3 — apply2-*.json no scratchpad; classificador barrou o browser_batch
+- [ ] dono decidir: 42 rft + 9 pkm abaixo do custo unitário; 14 rft + 17 pkm com folga para subir
+- [ ] 12 itens ligaListed sem oferta COLLECTA na Liga → liga-vendas/liga-conferir
+
+## 2026-10-03 — Estoque da Liga → dashboard (singles + selados)
+
+- [x] Exportar Liga (fetch in-page, clipboard): OP 182 linhas, PKM 603, RFT 354, Produtos 23; Lorcana/Gundam sem estoque
+- [x] Rodar conferir.py por jogo e classificar as linhas da Liga sem registro no dashboard
+- [x] Plano em scratchpad/plan.json: 121 criações (OP 4+1 selado, RFT 18, PKM 98), 92 flags, 10 askBRL, 55 pulos (gêmeos JP, R$0, GEM Pack)
+- [x] POST /api/trades (buyBRL 0, nota "Cadastrado a partir do estoque da LigaMagic 2026-10-03") e guardar ids
+- [x] PUT askBRL nos casados sem preço
+- [x] POST /api/trades/liga com as flags (inclui os criados)
+- [x] Verificar no GET e relatar
+
+Revisão: 121 registros criados (ids em tasks/liga-sync-2026-10-03/created.json), 213 flags gravadas, 10 askBRL preenchidos.
+Pulados (tasks/liga-sync-2026-10-03/skips.txt): 35 gêmeos JP no Pokémon (mesma carta cadastrada 2× na Liga), 18 linhas RFT q6 R$0 (Overnumbered/Signature VEN), GEM Pack Vol.4/Vol.6 (dashboard tem Vol.2/Vol.3).
+
+## 2026-10-07 — Foto por item nas Compras
+
+- [x] Backend: `POST/DELETE /api/trades/{id}/photo?game=` (multipart `photo`, 10 MB, jpeg/png/webp), `GET /api/item-photos/{name}`, flag `-item-photos` (default `data/item-photos`, no volume); upload grava `imageURL` relativo e apaga a foto anterior
+- [x] `/api/storefront` absolutiza `imageURL` relativo (vitrine na Vercel); `ShareList` usa foto própria sem proxy
+- [x] Frontend: botão de câmera na linha do item (Compras/Itens/Avulsos) e Enviar/Trocar/Remover foto no editar; `web/src/photo.ts` encolhe no browser (1600 px, jpeg 0.85)
+- [x] Testado: curl (upload/troca/415/404/delete/traversal) + Vite contra server de teste (thumb troca, remover limpa arquivo)
+- [x] Container local rebuildado
+- [ ] Publicar em prod (pendente, dono roda)
+
+Revisão: foto fica em `data/item-photos/<tradeID>-<rand>.jpg`; `imageURL` do trade = `/api/item-photos/...`. Limpar a URL pelo StockPage não apaga o arquivo.
+
+## 2026-10-09 — collectatcg.com.br servindo catálogo MOCK
+
+Causa: a recriação do ledger em 2026-10-07 (plan.py/post.py do liga-sync) gravou `askBRL` mas nunca `listed`.
+`/api/storefront` em prod responde `count:0` e a vitrine caía no mock (Umbreon VMAX, FOTO DA CARTA, preços falsos).
+
+- [x] `storefront/lib/catalog.ts`: mock só sem `STOREFRONT_API`; API vazia = catálogo vazio (`live:true`); erro/HTTP≠200 lança (Next mantém a última página boa)
+- [x] `app/page.tsx`: "Singles em destaque" some quando vazio (igual selados)
+- [x] tsc limpo; testado com backend local real (462 itens) e com backend fake vazio (hero + "Nenhuma carta encontrada", sem mock)
+- [ ] DADOS (dono roda, classificador bloqueou escrita em prod): `python3 scripts/storefront-list-all.py` — marca `listed:true` em todo holding com askBRL>0 (OP 192, PKM ~262, RFT ~245 + acessórios), preservando imageURL/featured
+- [ ] Deploy da vitrine (Vercel) com o catalog.ts novo
+
+### Imagens (2026-10-09, continuação)
+- [x] Script de listagem rodado pelo dono: `/api/storefront` count 664, site mostra estoque real
+- [x] cfgate estava preso num IPv6 que o host não tem mais (prefixo rotacionou; "bind: can't assign requested address") → reiniciado, pinou 2804:3d90:82b1:...
+- [x] 221 singles sem arte resolvidas localmente (105 via tracking, 116 via `url=` explícita). 35 prints erradas (Liga ignora `num` sem o sufixo "(#num/total)") corrigidas: 21 pelo padrão `cd/<setID>/<cardID>_<num>.jpg` do export, 13 refazendo com `Nome (#num/total)`, Caterpie sv2a + 2 GX (`.57.jpg`) à mão. Auditoria: sufixo da URL == número em 100% das pkm
+- [x] OP: `DON/DON-001` e `OP13/OP13-057-3A` semeadas no cache (atalho por número servia o DON do EB03)
+- [x] 23 produtos sem foto: 20 pela busca por nome na Liga (`cards/search&card=<nome> searchprod=1&category=products` cai na página do produto, imagem `up/prod/`), 3 promos JP pelo og:image do Mercado Livre → `tasks/storefront-images-2026-10-09/product-images.json`
+- [x] `scripts/sync-up.sh -i` (só images.json + reload) e `scripts/storefront-product-images.py`
+- [ ] DONO: `scripts/sync-up.sh -i` · `python3 scripts/storefront-product-images.py` · deploy Vercel
+- [x] 2026-10-10 auditoria 216/216 pkm contra o tile da Liga: 36 corrigidas (Eevee TWM 188 era a comum 135). Agora cache == imagem que a Liga mostra para a print exata
+- [x] Eevee ainda errada no site após o fix: backend prod já servia a certa; `/img` fica 24 h em 3 caches (data cache do Next sobrevive a deploy, CDN Vercel, browser). `catalog.ts` agora carimba `v=<VERCEL_DEPLOYMENT_ID>` nas URLs de arte → cada deploy renova. Precisa do deploy da vitrine
+
+## 2026-10-10 — Arte da vitrine/dashboard vinha do TCGplayer, não da Liga
+
+Chopper `OP01-015-RP` (Offline Regional 2024 Vol. 3, R$ 1.150) aparecia com a arte do Chopper comum (produto TCGplayer 454533). Causa: `/api/card-image` tentava o `productID` do TCGplayer ANTES da arte da Liga, e o matcher junta todas as impressões do mesmo número (18 singles OP com arte de outra impressão). Regra do dono: a Liga é a fonte de verdade da vitrine.
+
+- [x] `internal/api/api.go` `handleCardImage`: arte da Liga (cache/página) primeiro; TCGplayer só quando a Liga não tem nada; 404 só se nenhum dos dois
+- [x] `web/src/components/CardArt.tsx`: ordem das fontes = foto própria → card-image (Liga, com productID só como fallback no servidor) → CDN TCGplayer direto; `imgVersion` 2→3 (cache de 24 h no browser)
+- [x] Verificado local (:8099): OP01-015-RP com productID=454533 serve a arte Regionals da Liga; VEN sem arte na Liga cai no TCGplayer; card inexistente 404; go test api/cardimg ok; tsc limpo
+- [x] Cobertura em prod sem productID: OP 137/137, PKM, LOR, GND 100%; RFT 200 sem arte da Liga (156 VEN — set não está em `DefaultTrackSets`; 44 OGN/SFD/UNL/ROPP com página mas sem cache em prod → `scripts/sync-up.sh -i` após warm local)
+- [ ] DONO: `railway up` (backend + web/dist) e redeploy da vitrine na Vercel (o `/img` fica 24 h em cache; `ART_VERSION` renova por deploy)
+- [ ] Opcional: refUSD do dashboard ainda casa promo com a base (PrintKey existe em compare.go, priceLookup não usa) — só valuation, não afeta mais a arte

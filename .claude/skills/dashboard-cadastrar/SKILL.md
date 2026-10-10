@@ -37,7 +37,7 @@ https://tcgcsv.com/tcgplayer/3/{groupId}/prices        # linhas por (productId, 
 ## Passo 2 — custo em BRL
 
 - `buyUSD = base × (1 − desconto)`.
-- Frete/impostos: ratear proporcional ao valor — `frete_linha = total × (buyUSD×qty) / Σ(buyUSD×qty)`; dividir por `qty` para obter o `shippingBRL` unitário.
+- Frete/impostos: ratear proporcional ao valor — `frete_linha = total × (buyUSD×qty) / Σ(buyUSD×qty)`. **`shippingBRL` é o total da LINHA, não unitário** (`costBRL = qty×buyBRL + shippingBRL` em `trades/valuation.go`); não dividir por `qty`.
 - Câmbio: `GET $B/api/trades?game=onepiece` → `fxRate` (sentido **BRL→USD**; inverter: `USD→BRL = 1/fxRate`). O envelope do Pokémon retorna `fxRate=1` (jogo BR-only) — não usar.
 
 ## Passo 3 — cadastrar (um POST por linha)
@@ -56,7 +56,9 @@ Convenções (padrão do import PBL, já em prod):
 - `set`: código curto (`JTG`, `CRZ:GG`, `MCAP`).
 - Idioma vai na `variant` (não existe campo language): `"EN"`, ou `"Foil EN"` / `"Reverse Foil EN"`; vazio = PT normal. PT e EN da mesma carta são linhas separadas.
 - `condition`: `"NM"` salvo indicação.
-- `buyBRL`/`shippingBRL` são **unitários**.
+- `buyBRL` é **unitário**; `shippingBRL` é o **total da linha** (soma de todas as unidades).
+- Compra com pedido agrupado (aba Compras): `POST /api/purchases` cria o cabeçalho (`date`, `store`, `notes`), depois `POST /api/purchases/{id}/items?game=...` por item (mesmo payload de trade; `kind:"sealed"`, `set:"SEALED"`, `number:""` para selados). Câmbio JPY/outros: `https://api.frankfurter.app/latest?from=JPY&to=BRL` (seguir redirect, `-L`).
+- Foto do item: `curl -F photo=@foto.jpg "$B/api/trades/{id}/photo?game=..."` (jpeg/png/webp, 10 MB) seta `imageURL` para `/api/item-photos/<arquivo>`; `DELETE` no mesmo caminho remove.
 - Sem auth; só `/api/admin/reload` exige `X-Admin-Token`.
 - **NUNCA** sincronizar `trades*.json` por arquivo — prod é dono do ledger; tudo via API. Erros corrigem-se com `PUT /api/trades/{id}` (substitui o registro INTEIRO) ou `DELETE /api/trades/{id}`.
 

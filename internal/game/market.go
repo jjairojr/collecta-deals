@@ -7,6 +7,7 @@ type Market struct {
 	StripDenominator     bool
 	StripLeadingZeros    bool
 	NumberSuffixVariants map[string]string
+	DashSuffixVariants   map[string]string
 	VariantVocab         map[string]string
 	DON                  bool
 }
@@ -81,22 +82,41 @@ var onePieceVariants = map[string]string{
 	"box topper":       "Box Topper",
 }
 
+// onePieceSuffixVariants maps the letter suffix Liga appends to a One Piece card
+// number (OP02-013-PAR, OP11-106-AA) to the variant vocab token TCGplayer carries
+// in the product name. Liga does not always repeat the variant in the name
+// ("Portgas.D.Ace" for OP02-013-PAR), so the suffix is the only reliable marker
+// on that side; without it the parallel joins the base print's price and art.
+var onePieceSuffixVariants = map[string]string{
+	"AA":  "alternate art",
+	"PA":  "parallel",
+	"P":   "parallel",
+	"PAR": "parallel",
+	"SP":  "sp",
+	"MA":  "manga",
+	"FA":  "full art",
+	"RE":  "reprint",
+	"G":   "gold",
+	"DP":  "dash pack",
+}
+
 func onePieceMarket() *Market {
 	return &Market{
-		TCGCSVCategoryID: 68,
-		GroupSetCode:     onePieceGroupSet,
-		VariantVocab:     onePieceVariants,
-		DON:              true,
+		TCGCSVCategoryID:   68,
+		GroupSetCode:       onePieceGroupSet,
+		DashSuffixVariants: onePieceSuffixVariants,
+		VariantVocab:       onePieceVariants,
+		DON:                true,
 	}
 }
 
 func riftboundMarket() *Market {
 	return &Market{
-		TCGCSVCategoryID:     89,
-		GroupSetCode:         riftboundGroupSet,
-		SetScopedKey:         true,
-		StripDenominator:     true,
-		StripLeadingZeros:    true,
+		TCGCSVCategoryID:  89,
+		GroupSetCode:      riftboundGroupSet,
+		SetScopedKey:      true,
+		StripDenominator:  true,
+		StripLeadingZeros: true,
 		// Every source spells the signature printing differently: Liga "226S",
 		// TCGCSV "226*", MyP "226P". All three must collapse to the same token
 		// or signature cards silently fail to match.

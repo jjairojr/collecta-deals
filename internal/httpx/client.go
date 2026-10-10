@@ -42,8 +42,9 @@ type statusError struct {
 func (e *statusError) Error() string { return fmt.Sprintf("status %d", e.code) }
 
 type Client struct {
-	http    *http.Client
-	retries int
+	http      *http.Client
+	transport *http.Transport
+	retries   int
 
 	mu     sync.Mutex
 	nextAt time.Time
@@ -69,16 +70,45 @@ func newClient(timeout, minGap, jitter time.Duration) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cookiejar: %w", err)
 	}
+	transport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("default transport is not *http.Transport")
+	}
+	transport = transport.Clone()
 	return &Client{
-		http:    &http.Client{Timeout: timeout, Jar: jar},
-		retries: defaultRetries,
-		minGap:  minGap,
-		jitter:  jitter,
+		http:      &http.Client{Timeout: timeout, Jar: jar, Transport: transport},
+		transport: transport,
+		retries:   defaultRetries,
+		minGap:    minGap,
+		jitter:    jitter,
 	}, nil
+}
+
+// UseProxyFor routes requests whose host satisfies match through proxyURL,
+// leaving every other host on the direct route. Call it at wiring time, before
+// the first request: it mutates the transport in place.
+func (c *Client) UseProxyFor(proxyURL *url.URL, match func(host string) bool) {
+	if proxyURL == nil || match == nil {
+		return
+	}
+	c.transport.Proxy = func(req *http.Request) (*url.URL, error) {
+		if match(req.URL.Hostname()) {
+			return proxyURL, nil
+		}
+		return nil, nil
+	}
 }
 
 func (c *Client) Get(ctx context.Context, url string) ([]byte, error) {
 	return c.retry(ctx, http.MethodGet, url, nil, nil)
+}
+
+// GetWithHeaders is Get with per-request header overrides, layered on top of the
+// browser-shaped defaults. It exists so a Cloudflare clearance cookie can be
+// carried by the same throttled, retrying client as everything else, rather than
+// through a second HTTP path with its own pacing.
+func (c *Client) GetWithHeaders(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
+	return c.retry(ctx, http.MethodGet, url, nil, headers)
 }
 
 func (c *Client) PostJSON(ctx context.Context, url string, body []byte, headers map[string]string) ([]byte, error) {

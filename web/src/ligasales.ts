@@ -5,15 +5,16 @@ import type { SaleRow } from "./api";
 // done by hand in the dashboard often leaves the field empty, and those are Liga
 // sales too — they just lost their order number, hence a channel of their own
 // instead of being lumped with a named buyer.
-export type Channel = "liga" | "sem-marca" | "shopee" | "outros";
+export type Channel = "liga" | "sem-marca" | "shopee" | "outros" | "tcgplayer";
 
-export const channels: Channel[] = ["liga", "sem-marca", "shopee", "outros"];
+export const channels: Channel[] = ["liga", "sem-marca", "shopee", "outros", "tcgplayer"];
 
 export const channelLabels: Record<Channel, string> = {
   liga: "Liga",
   "sem-marca": "Sem marca",
   shopee: "Shopee",
   outros: "Outros",
+  tcgplayer: "TCGplayer (US$)",
 };
 
 export function channelOf(buyer: string | undefined): Channel {
@@ -50,9 +51,15 @@ export function isSymbolic(s: SaleRow): boolean {
   return s.valueBRL / units <= 1;
 }
 
-// Sales in USD are the TCGplayer side of the business, not the Liga store.
+// Sales in USD are the TCGplayer side of the business, not the Liga store — a
+// channel of their own instead of a hidden slice, so nothing disappears from the
+// page without saying so.
 export function isBRL(s: SaleRow): boolean {
   return s.sellCurrency !== "USD";
+}
+
+export function channelOfSale(s: SaleRow): Channel {
+  return s.sellCurrency === "USD" ? "tcgplayer" : channelOf(s.buyer);
 }
 
 export interface SalesPackage {

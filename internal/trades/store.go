@@ -384,6 +384,12 @@ func (s *Store) Merge(ids []string) (Trade, error) {
 			seenNotes[n] = true
 			notes = append(notes, n)
 		}
+		if t.ID != primary.ID {
+			merged.Photos = append(merged.Photos, t.Photos...)
+		}
+	}
+	if merged.ImageURL == "" && len(merged.Photos) > 0 {
+		merged.ImageURL = merged.Photos[0]
 	}
 
 	merged.ID = primary.ID

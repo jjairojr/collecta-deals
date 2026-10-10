@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"opdeals/internal/game"
 	"opdeals/internal/httpx"
+	"opdeals/internal/liga"
 )
 
 const (
@@ -141,6 +143,17 @@ func (c *Client) Close(ctx context.Context) {
 	}
 	_, _ = c.post(ctx, v1Request{Cmd: "sessions.destroy", Session: c.session})
 	c.session = ""
+}
+
+// FetcherFor adapts a Client to the transport factory the pipeline and tracking
+// stacks are wired with.
+func (c *Client) FetcherFor() liga.FetcherFor {
+	return func(direct *httpx.Client, g game.Game) liga.Fetcher {
+		if c == nil || !g.Challenged {
+			return direct
+		}
+		return NewRouter(direct, c, g.LigaHosts)
+	}
 }
 
 // Router sends requests to challenged hosts through FlareSolverr and everything

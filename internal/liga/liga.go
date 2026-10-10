@@ -30,11 +30,17 @@ const (
 )
 
 // Fetcher retrieves a Liga URL's bytes. It is satisfied by *httpx.Client for
-// direct fetches and by *flaresolverr.Router when a host sits behind Cloudflare's
-// Managed Challenge and must be fetched through a headless browser.
+// direct fetches and by the Cloudflare transports (*clearance.Fetcher,
+// *flaresolverr.Router) when a host sits behind the Managed Challenge.
 type Fetcher interface {
 	Get(ctx context.Context, url string) ([]byte, error)
 }
+
+// FetcherFor decorates a game's direct client with whatever Cloudflare transport
+// the process was configured with. Wiring one factory in main keeps the choice of
+// bypass (clearance cookie, FlareSolverr, none) out of the pipeline and tracking
+// code, which only ever sees a Fetcher.
+type FetcherFor func(direct *httpx.Client, g game.Game) Fetcher
 
 type Client struct {
 	http        Fetcher

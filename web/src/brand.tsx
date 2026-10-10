@@ -11,6 +11,7 @@ import {
   LineChart,
   Package,
   PiggyBank,
+  Plane,
   Receipt,
   ShoppingBag,
   ShoppingCart,
@@ -31,6 +32,7 @@ export type View =
   | "allportfolio"
   | "vendas"
   | "compras"
+  | "importar"
   | "financeiro"
   | "acessorios"
   | "despesas"
@@ -69,7 +71,6 @@ export const navGroups: NavGroup[] = [
       { key: "browse", label: "Catálogo", icon: LayoutGrid },
       { key: "tracking", label: "Mercado", icon: LineChart },
       { key: "sealed", label: "Selados", icon: Boxes },
-      { key: "portfolio", label: "Portfólio", icon: Wallet },
       { key: "estoque", label: "Estoque", icon: Store },
       { key: "orcamento", label: "Orçamento", icon: FileText },
       { key: "buyout", label: "Buyout", icon: HandCoins },
@@ -83,6 +84,7 @@ export const navGroups: NavGroup[] = [
       { key: "financeiro", label: "Financeiro", icon: PiggyBank },
       { key: "vendas", label: "Vendas", icon: ShoppingBag },
       { key: "compras", label: "Compras", icon: ShoppingCart },
+      { key: "importar", label: "Importar / Exportar", icon: Plane },
       { key: "despesas", label: "Despesas", icon: Receipt },
       { key: "acessorios", label: "Acessórios", icon: Package },
       { key: "allportfolio", label: "Todos os jogos", icon: Layers },
@@ -100,12 +102,29 @@ export const navGroups: NavGroup[] = [
 
 export const navItems: NavItem[] = navGroups.flatMap((group) => group.items);
 
+// Views that answer to a URL but are no longer in the menu. Portfólio was
+// replaced by Compras, which does the same per item; the old screen stays
+// reachable by link while the new one settles.
+const hiddenViews: { key: View; label: string; icon: Icon; scope: NavScope }[] = [
+  { key: "portfolio", label: "Portfólio", icon: Wallet, scope: "game" },
+];
+
 export function isView(value: string): value is View {
-  return navItems.some((item) => item.key === value);
+  return navItems.some((item) => item.key === value) || hiddenViews.some((v) => v.key === value);
+}
+
+export function iconOf(view: View): Icon | undefined {
+  return (
+    navItems.find((item) => item.key === view)?.icon ?? hiddenViews.find((v) => v.key === view)?.icon
+  );
 }
 
 export function scopeOf(view: View): NavScope {
-  return navGroups.find((group) => group.items.some((item) => item.key === view))?.scope ?? "game";
+  const group = navGroups.find((g) => g.items.some((item) => item.key === view));
+  if (group) {
+    return group.scope;
+  }
+  return hiddenViews.find((v) => v.key === view)?.scope ?? "game";
 }
 
 export interface Brand {

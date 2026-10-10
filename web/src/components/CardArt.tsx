@@ -23,11 +23,11 @@ export default function CardArt({
   if (imageURL) {
     sources.push(imageURL);
   }
+  if (set) {
+    sources.push(cardImageURL(set, number, productID, game));
+  }
   if (productID) {
     sources.push(tcgProductImageURL(productID));
-  }
-  if (set) {
-    sources.push(cardImageURL(set, number, undefined, game));
   }
   const [sourceIdx, setSourceIdx] = useState(0);
   // Reset to the first source whenever the inputs change (e.g. the seller edits

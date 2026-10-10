@@ -451,7 +451,7 @@ export function getCards(set: string): Promise<{ set: string; cards: TrackCard[]
 // imgVersion busts browser-cached card images (max-age=86400) when the server
 // side has re-resolved them — bumped after the poisoned set-insensitive cache
 // served wrong art for per-set-numbered games.
-const imgVersion = "2";
+const imgVersion = "3";
 
 // game overrides the switcher for screens that show several games at once (the
 // purchases page), where the active game would resolve another game's art.
@@ -577,6 +577,7 @@ export interface Trade {
   askBRL?: number;
   listed?: boolean;
   imageURL?: string;
+  photos?: string[];
   featured?: boolean;
   ligaListed?: boolean;
   ligaQty?: number;
@@ -718,6 +719,144 @@ export function getAllPortfolio(pct: number): Promise<AllPortfolioResponse> {
   return getJSON<AllPortfolioResponse>(`${base}/portfolio/all?pct=${pct}`);
 }
 
+export interface ImportDeal {
+  game: string;
+  set: string;
+  number: string;
+  name: string;
+  tcgName: string;
+  rarity: string;
+  variant: string;
+  ligaUrl: string;
+  tcgUrl: string;
+  productId: number;
+  costUSD: number;
+  costBRL: number;
+  floorBRL: number;
+  sellBRL: number;
+  profitBRL: number;
+  marginPct: number;
+  sellers: number;
+  floorCopies: number;
+  supply: number;
+  ownQty: number;
+  ownPriceBRL: number;
+  usListings: number;
+  usQty: number;
+  usVariants: number;
+  usLive: boolean;
+  trackingDate: string;
+}
+
+export interface ImportsGame {
+  game: GameInfo;
+  ready: boolean;
+  fxRate: number;
+  updatedAt: string;
+  trackingDate: string;
+  sets: number;
+}
+
+export interface ImportsResponse {
+  games: ImportsGame[];
+  count: number;
+  deals: ImportDeal[];
+}
+
+export type ImportSort = "profit" | "margin";
+
+export interface ImportFilters {
+  games: string[];
+  minSellers: number;
+  minUSD: number;
+  minProfit: number;
+  sort: ImportSort;
+  limit: number;
+}
+
+export interface FloorStore {
+  storeId: number;
+  storeName: string;
+  qty: number;
+}
+
+export interface ExportDeal {
+  game: string;
+  set: string;
+  number: string;
+  name: string;
+  tcgName: string;
+  rarity: string;
+  variant: string;
+  ligaUrl: string;
+  tcgUrl: string;
+  productId: number;
+  costBRL: number;
+  costUSD: number;
+  sellUSD: number;
+  sellBRL: number;
+  profitUSD: number;
+  profitBRL: number;
+  marginPct: number;
+  score: number;
+  floorCopies: number;
+  sellers: number;
+  supply: number;
+  ownQty: number;
+  ownPriceBRL: number;
+  floorStores: FloorStore[];
+  usListings: number;
+  usQty: number;
+  usVariants: number;
+  suggestedQty: number;
+  usLive: boolean;
+  trackingDate: string;
+}
+
+export interface ExportsResponse {
+  games: ImportsGame[];
+  count: number;
+  exports: ExportDeal[];
+}
+
+export type ExportSort = "score" | "profit" | "margin" | "copies";
+
+export interface ExportFilters {
+  games: string[];
+  minSellers: number;
+  minUSListings: number;
+  minUSD: number;
+  minProfit: number;
+  sort: ExportSort;
+  limit: number;
+}
+
+export function getExports(f: ExportFilters): Promise<ExportsResponse> {
+  const params = new URLSearchParams({
+    direction: "export",
+    games: f.games.join(","),
+    minSellers: String(f.minSellers),
+    minUSListings: String(f.minUSListings),
+    minUSD: String(f.minUSD),
+    minProfit: String(f.minProfit),
+    sort: f.sort,
+    limit: String(f.limit),
+  });
+  return getJSON<ExportsResponse>(`${base}/imports?${params.toString()}`);
+}
+
+export function getImports(f: ImportFilters): Promise<ImportsResponse> {
+  const params = new URLSearchParams({
+    games: f.games.join(","),
+    minSellers: String(f.minSellers),
+    minUSD: String(f.minUSD),
+    minProfit: String(f.minProfit),
+    sort: f.sort,
+    limit: String(f.limit),
+  });
+  return getJSON<ImportsResponse>(`${base}/imports?${params.toString()}`);
+}
+
 async function sendJSON<T>(url: string, method: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
@@ -822,6 +961,36 @@ export async function deleteTrade(id: string, game?: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`delete failed: ${res.status}`);
   }
+}
+
+export async function uploadTradePhotos(id: string, photos: Blob[], game?: string): Promise<Trade> {
+  const params = gp(new URLSearchParams());
+  if (game) {
+    params.set("game", game);
+  }
+  const form = new FormData();
+  for (const photo of photos) {
+    form.append("photo", photo, "photo.jpg");
+  }
+  const res = await fetch(`${base}/trades/${id}/photo?${params.toString()}`, { method: "POST", body: form });
+  if (!res.ok) {
+    throw new Error((await res.text()).trim() || `upload failed: ${res.status}`);
+  }
+  const trade: Trade = await res.json();
+  return trade;
+}
+
+export async function deleteTradePhoto(id: string, url: string, game?: string): Promise<Trade> {
+  const params = gp(new URLSearchParams({ url }));
+  if (game) {
+    params.set("game", game);
+  }
+  const res = await fetch(`${base}/trades/${id}/photo?${params.toString()}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`delete failed: ${res.status}`);
+  }
+  const trade: Trade = await res.json();
+  return trade;
 }
 
 // A buy order (compra) is business-wide: one order from a seller routinely mixes

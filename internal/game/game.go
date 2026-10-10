@@ -356,6 +356,11 @@ func Pokemon() Game {
 	}
 }
 
+// All returns every configured game.
+func All() []Game {
+	return []Game{OnePiece(), Pokemon(), Riftbound(), Lorcana(), Gundam()}
+}
+
 // ByID returns the configured game for an id, defaulting to One Piece.
 func ByID(id string) Game {
 	switch id {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"opdeals/internal/api"
 	"opdeals/internal/cardimg"
+	"opdeals/internal/clearance"
 	"opdeals/internal/compare"
 	"opdeals/internal/expenses"
 	"opdeals/internal/flaresolverr"
@@ -26,6 +28,8 @@ import (
 	"opdeals/internal/tracking"
 	"opdeals/internal/trades"
 )
+
+const importMinUSD = 3.0
 
 func main() {
 	if err := run(); err != nil {
@@ -43,6 +47,7 @@ func run() error {
 	quotesPath := flag.String("quotes", "data/quotes.json", "path to the saved buy quotes (orçamentos)")
 	expensesPath := flag.String("expenses", "data/expenses.json", "path to the business expense ledger (despesas — not tied to a game)")
 	purchasesPath := flag.String("purchases", "data/purchases.json", "path to the buy-order ledger (compras — one order mixes games)")
+	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
 	setsFlag := flag.String("sets", "", "comma-separated Liga set codes to limit (default all)")
 	fxOverride := flag.Float64("fx", 0, "BRL->USD rate override (0 = fetch live)")
 	concurrency := flag.Int("concurrency", 8, "max concurrent requests per source")
@@ -104,9 +109,14 @@ func run() error {
 	schedule := flag.Bool("schedule", false, "run all deals refreshes and tracking captures sequentially in one Liga lane (replaces -track-schedule and the per-store refresh tickers)")
 	scheduleInterval := flag.Duration("schedule-interval", 6*time.Hour, "target cadence of a full scheduler cycle (all games, deals + captures)")
 	scheduleGap := flag.Duration("schedule-gap", 2*time.Minute, "pause between scheduler jobs so rate-limit windows reset")
+	schedulerState := flag.String("schedule-state", "data/scheduler.json", "file recording when the last scheduler cycle ran, so a restart resumes the cadence instead of scraping again")
 	flaresolverrURL := flag.String("flaresolverr", "", "FlareSolverr endpoint URL, e.g. http://flaresolverr:8191, used to fetch Cloudflare-challenged Liga hosts (empty = direct)")
+	cfClearance := flag.String("cf-clearance", "", "path to the Cloudflare clearance file written by cmd/cfgate (e.g. data/cf-clearance.json); takes precedence over -flaresolverr")
+	ligaProxy := flag.String("liga-proxy", "", "CONNECT proxy for Liga hosts, e.g. http://host.docker.internal:8891 — cmd/cfgate on the host, whose IPv6 egress Cloudflare accepts")
 	serveOnly := flag.Bool("serve-only", false, "read-only mode for a prod instance fed by local scrapes: load snapshots and serve, never scrape (no schedulers, no background deals refresh, refresh/capture endpoints disabled)")
 	adminToken := flag.String("admin-token", os.Getenv("ADMIN_TOKEN"), "token for POST /api/admin/reload (reload deals snapshots from disk after a sync); empty disables the endpoint")
+	ligaStoreID := flag.Int("liga-store-id", 866280, "our own store id on Liga, excluded from the Brazil floor when ranking US->BR imports")
+	importMax := flag.Int("import-live", 150, "max US->BR import candidates per game to also live-price on TCGplayer during a deals refresh (0 = skip)")
 	flag.Parse()
 
 	if *serveOnly {
@@ -133,10 +143,19 @@ func run() error {
 	// Serve-only never scrapes, so it also only loads.
 	loadOnly := oneShot || *schedule || *serveOnly
 
-	var solver *flaresolverr.Client
-	if *flaresolverrURL != "" {
-		solver = flaresolverr.New(*flaresolverrURL)
+	var ligaFetcherFor liga.FetcherFor
+	switch {
+	case *cfClearance != "":
+		store, err := clearance.NewStore(*cfClearance).WithProxy(*ligaProxy)
+		if err != nil {
+			return err
+		}
+		ligaFetcherFor = store.FetcherFor()
+		logger.Printf("Cloudflare clearance cookies from %s for challenged Liga hosts (proxy %q)", *cfClearance, *ligaProxy)
+	case *flaresolverrURL != "":
+		solver := flaresolverr.New(*flaresolverrURL)
 		defer solver.Close(context.Background())
+		ligaFetcherFor = solver.FetcherFor()
 		logger.Printf("FlareSolverr enabled at %s for Cloudflare-challenged Liga hosts", *flaresolverrURL)
 	}
 
@@ -154,8 +173,10 @@ func run() error {
 		VerifyFloor:  *verifyFloor,
 		LivePrices:   *livePrices,
 		MyPCards:     *myPCards,
-		FlareSolverr: solver,
+		LigaFetcher:  ligaFetcherFor,
 		HeldKeys:     heldCardKeys(tradeStore, compare.MatcherFor(game.OnePiece())),
+		ImportMinUSD: importMinUSD,
+		ImportMax:    *importMax,
 	})
 	scheduleDealsRefresh(st, dealsLog, *refreshInterval, 0, loadOnly)
 
@@ -170,8 +191,10 @@ func run() error {
 			VerifyFloor:  *verifyFloor,
 			LivePrices:   *livePrices,
 			MyPCards:     *myPCards,
-			FlareSolverr: solver,
+			LigaFetcher:  ligaFetcherFor,
 			HeldKeys:     heldCardKeys(rftTrades, compare.MatcherFor(game.Riftbound())),
+			ImportMinUSD: importMinUSD,
+			ImportMax:    *importMax,
 		})
 		scheduleDealsRefresh(rftDealsStore, rftLog, *refreshInterval, 10*time.Minute, loadOnly)
 	}
@@ -180,14 +203,14 @@ func run() error {
 	if *lorDeals {
 		lorLog := logger.WithPrefix("LOR DEALS")
 		lorDealsStore = store.New(*lorCache, lorLog, pipeline.Options{
-			Game:         game.Lorcana(),
-			FXOverride:   *fxOverride,
-			Concurrency:  *concurrency,
-			Timeout:      *timeout,
-			VerifyFloor:  *verifyFloor,
-			LivePrices:   *livePrices,
-			FlareSolverr: solver,
-			HeldKeys:     heldCardKeys(lorTrades, compare.MatcherFor(game.Lorcana())),
+			Game:        game.Lorcana(),
+			FXOverride:  *fxOverride,
+			Concurrency: *concurrency,
+			Timeout:     *timeout,
+			VerifyFloor: *verifyFloor,
+			LivePrices:  *livePrices,
+			LigaFetcher: ligaFetcherFor,
+			HeldKeys:    heldCardKeys(lorTrades, compare.MatcherFor(game.Lorcana())),
 		})
 		scheduleDealsRefresh(lorDealsStore, lorLog, *refreshInterval, 20*time.Minute, loadOnly)
 	}
@@ -196,14 +219,14 @@ func run() error {
 	if *gndDeals {
 		gndLog := logger.WithPrefix("GND DEALS")
 		gndDealsStore = store.New(*gndCache, gndLog, pipeline.Options{
-			Game:         game.Gundam(),
-			FXOverride:   *fxOverride,
-			Concurrency:  *concurrency,
-			Timeout:      *timeout,
-			VerifyFloor:  *verifyFloor,
-			LivePrices:   *livePrices,
-			FlareSolverr: solver,
-			HeldKeys:     heldCardKeys(gndTrades, compare.MatcherFor(game.Gundam())),
+			Game:        game.Gundam(),
+			FXOverride:  *fxOverride,
+			Concurrency: *concurrency,
+			Timeout:     *timeout,
+			VerifyFloor: *verifyFloor,
+			LivePrices:  *livePrices,
+			LigaFetcher: ligaFetcherFor,
+			HeldKeys:    heldCardKeys(gndTrades, compare.MatcherFor(game.Gundam())),
 		})
 		scheduleDealsRefresh(gndDealsStore, gndLog, *refreshInterval, 30*time.Minute, loadOnly)
 	}
@@ -228,7 +251,7 @@ func run() error {
 		interval:    *trackInterval,
 		minPrice:    *trackMinPrice,
 		fxProvider:  func() float64 { return st.Snapshot().FXRate },
-		solver:      solver,
+		ligaFetcher: ligaFetcherFor,
 		log:         trackLog,
 	})
 	if err != nil {
@@ -251,7 +274,7 @@ func run() error {
 		interval:    *trackInterval,
 		minPrice:    *trackMinPrice,
 		fxProvider:  nil,
-		solver:      solver,
+		ligaFetcher: ligaFetcherFor,
 		log:         pkmLog,
 	})
 	if err != nil {
@@ -272,7 +295,7 @@ func run() error {
 		interval:    *trackInterval,
 		minPrice:    *trackMinPrice,
 		fxProvider:  dealsFX(rftDealsStore),
-		solver:      solver,
+		ligaFetcher: ligaFetcherFor,
 		log:         logger.WithPrefix("RIFTBOUND"),
 	})
 	if err != nil {
@@ -294,7 +317,7 @@ func run() error {
 		interval:    *trackInterval,
 		minPrice:    *trackMinPrice,
 		fxProvider:  dealsFX(lorDealsStore),
-		solver:      solver,
+		ligaFetcher: ligaFetcherFor,
 		log:         logger.WithPrefix("LORCANA"),
 	})
 	if err != nil {
@@ -316,7 +339,7 @@ func run() error {
 		interval:    *trackInterval,
 		minPrice:    *trackMinPrice,
 		fxProvider:  dealsFX(gndDealsStore),
-		solver:      solver,
+		ligaFetcher: ligaFetcherFor,
 		log:         logger.WithPrefix("GUNDAM"),
 	})
 	if err != nil {
@@ -413,7 +436,7 @@ func run() error {
 		}
 		jobs = append(jobs, captureJob("gundam capture", gndCapturer)...)
 		jobs = append(jobs, captureJob("pokemon capture", pkmCapturer)...)
-		go runUnifiedScheduler(jobs, *scheduleInterval, *scheduleGap, logger.WithPrefix("SCHED"))
+		go runUnifiedScheduler(jobs, *scheduleInterval, *scheduleGap, *schedulerState, logger.WithPrefix("SCHED"))
 	} else if *trackSchedule {
 		for _, c := range []*tracking.Capturer{opCapturer, pkmCapturer, rftCapturer, lorCapturer, gndCapturer} {
 			if c != nil {
@@ -425,6 +448,8 @@ func run() error {
 	}
 
 	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, expenseStore, purchaseStore, *serveOnly, *adminToken)
+	srv.OwnLigaStoreID = *ligaStoreID
+	srv.PhotoDir = *photoDir
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
 }
@@ -518,6 +543,34 @@ func dealsJob(name string, st *store.Store, maxAge time.Duration) schedulerJob {
 	}}
 }
 
+// readCycleTime reports when the last scheduler cycle started. A missing or
+// unreadable file simply means "no cycle on record".
+func readCycleTime(path string) (time.Time, bool) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return time.Time{}, false
+	}
+	var state struct {
+		LastCycle time.Time `json:"lastCycle"`
+	}
+	if err := json.Unmarshal(raw, &state); err != nil || state.LastCycle.IsZero() {
+		return time.Time{}, false
+	}
+	return state.LastCycle, true
+}
+
+func writeCycleTime(path string, at time.Time, log *logx.Logger) {
+	raw, err := json.MarshalIndent(struct {
+		LastCycle time.Time `json:"lastCycle"`
+	}{at}, "", "  ")
+	if err != nil {
+		return
+	}
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		log.Printf("scheduler state: %v", err)
+	}
+}
+
 // captureJob wraps a game's tracking capture; a nil capturer (tracking
 // disabled) contributes no job.
 func captureJob(name string, c *tracking.Capturer) []schedulerJob {
@@ -534,10 +587,22 @@ func captureJob(name string, c *tracking.Capturer) []schedulerJob {
 // competing with the other games' scans for Liga's shared rate limit. Each
 // cycle runs all jobs in order with a gap between them, then sleeps until
 // cycleStart+interval (an overrunning cycle starts the next immediately).
-func runUnifiedScheduler(jobs []schedulerJob, interval, gap time.Duration, log *logx.Logger) {
+func runUnifiedScheduler(jobs []schedulerJob, interval, gap time.Duration, statePath string, log *logx.Logger) {
 	log.Printf("unified scheduler: %d jobs per cycle, cadence %v, gap %v", len(jobs), interval, gap)
+
+	// The cadence is measured from the last cycle that actually ran, not from
+	// process start, so restarting (a rebuild, a crash, a config change) does not
+	// re-scrape Liga off-schedule.
+	if last, ok := readCycleTime(statePath); ok {
+		if wait := interval - time.Since(last); wait > 0 {
+			log.Printf("last cycle ran %v ago; next one in %v", time.Since(last).Round(time.Minute), wait.Round(time.Minute))
+			time.Sleep(wait)
+		}
+	}
+
 	for cycle := 1; ; cycle++ {
 		cycleStart := time.Now()
+		writeCycleTime(statePath, cycleStart, log)
 		for i, j := range jobs {
 			if i > 0 && gap > 0 {
 				time.Sleep(gap)
@@ -573,18 +638,17 @@ type stackParams struct {
 	interval    time.Duration
 	minPrice    float64
 	fxProvider  func() float64
-	solver      *flaresolverr.Client
+	ligaFetcher liga.FetcherFor
 	log         *logx.Logger
 }
 
-// ligaFetcher returns the transport a liga.Client should use: FlareSolverr-routed
-// when a solver is configured and the game's Liga host is behind Cloudflare's
-// Managed Challenge, otherwise the direct client unchanged.
-func ligaFetcher(direct *httpx.Client, solver *flaresolverr.Client, g game.Game) liga.Fetcher {
-	if solver == nil || !g.Challenged {
+// ligaFetcherOr returns the configured Cloudflare transport for a game, or the
+// direct client unchanged when the process was started without one.
+func ligaFetcherOr(factory liga.FetcherFor, direct *httpx.Client, g game.Game) liga.Fetcher {
+	if factory == nil {
 		return direct
 	}
-	return flaresolverr.NewRouter(direct, solver, g.LigaHosts)
+	return factory(direct, g)
 }
 
 // buildStack assembles one game's BR tracking state: its snapshot store, image
@@ -598,7 +662,7 @@ func buildStack(p stackParams) (*api.GameStack, *tracking.Capturer, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s image http client: %w", p.game.ID, err)
 	}
-	imgStore := cardimg.NewStore(filepath.Join(p.trackDir, "images.json"), ligaFetcher(imgHTTP, p.solver, p.game), p.log, p.game.ImageURLRe, p.game.UniqueCardNumbers)
+	imgStore := cardimg.NewStore(filepath.Join(p.trackDir, "images.json"), ligaFetcherOr(p.ligaFetcher, imgHTTP, p.game), p.log, p.game.ImageURLRe, p.game.UniqueCardNumbers)
 
 	tradeStore := p.tradeStore
 	if tradeStore == nil {
@@ -612,7 +676,7 @@ func buildStack(p stackParams) (*api.GameStack, *tracking.Capturer, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s tracking http client: %w", p.game.ID, err)
 		}
-		fetcher := ligaFetcher(httpClient, p.solver, p.game)
+		fetcher := ligaFetcherOr(p.ligaFetcher, httpClient, p.game)
 		ligaClient := liga.New(fetcher, p.log, p.concurrency, p.trackSets, p.game)
 		capturer = tracking.NewCapturer(p.log, ligaClient, trackStore, p.trackSets, p.minPrice, p.tz, p.interval, p.trackSealed, p.game.FloorLangs, p.fxProvider, imgStore)
 	}
