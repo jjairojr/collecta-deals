@@ -5,17 +5,32 @@
 # Tracking dirs are re-uploaded whole (railway volume files has no delta sync);
 # they're the bulk of the transfer. Snapshots are tiny and are what the portfolio
 # pricing needs fresh, so this always sends them. Pass -s / --snapshots-only to
-# push just the snapshots (fast) and skip the heavy tracking re-upload.
+# push just the snapshots (fast) and skip the heavy tracking re-upload, or
+# -i / --images-only to push only each tracking dir's images.json (card art
+# resolved locally for cards prod can't reach behind Cloudflare).
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 snapshots_only=0
+images_only=0
 case "${1:-}" in
 	-s|--snapshots-only) snapshots_only=1 ;;
+	-i|--images-only) images_only=1 ;;
 	"") ;;
-	*) echo "usage: sync-up.sh [-s|--snapshots-only]" >&2; exit 1 ;;
+	*) echo "usage: sync-up.sh [-s|--snapshots-only|-i|--images-only]" >&2; exit 1 ;;
 esac
 
 cd "$DATA_DIR"
+
+if [ "$images_only" -eq 1 ]; then
+	for d in tracking tracking-pkm tracking-rft tracking-lor tracking-gnd; do
+		[ -f "$d/images.json" ] || continue
+		echo ">> $d/images.json"
+		vf_upload "$d/images.json" "/$d/"
+	done
+	reload_prod
+	echo "sync-up done."
+	exit 0
+fi
 
 items=()
 for f in snapshot*.json; do

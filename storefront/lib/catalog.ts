@@ -70,6 +70,16 @@ function slugFor(it: RawItem): string {
   );
 }
 
+// Proxied art is cached for a day at every layer (Next data cache, Vercel CDN,
+// browser), and the Next data cache outlives deploys. Stamping the URL with the
+// deployment makes a corrected print show up on the next deploy instead of
+// whenever the caches happen to expire.
+const ART_VERSION = (
+  process.env.VERCEL_DEPLOYMENT_ID ??
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  "dev"
+).slice(0, 12);
+
 // Art URL: a seller-supplied photo when there is one, else a same-origin proxy
 // to the Go card-image endpoint (keeps the backend host off the client). The
 // productID goes along so the backend serves the exact print's TCGplayer art,
@@ -85,6 +95,7 @@ function resolveImage(it: RawItem): string | undefined {
   if (it.productID) {
     p.set("productID", String(it.productID));
   }
+  p.set("v", ART_VERSION);
   return `/img?${p.toString()}`;
 }
 
@@ -280,8 +291,10 @@ function dedupProducts<T extends { slug: string; qty: number; featured?: boolean
   return [...bySlug.values()];
 }
 
-// Mock fallback so the design still renders when the backend is unconfigured or
-// down. Uses the mock CATALOG + SEALED (which already carry slugs).
+// Mock catalog for design work with no backend configured. It never stands in
+// for a configured backend: a store page showing demo cards with demo prices
+// is worse than an empty shelf, and a failed revalidation throws so Next keeps
+// serving the last good page instead.
 function mockCatalog(): Catalog {
   const singles = CATALOG.map((s) => ({ ...s }));
   const sealed = SEALED.map((s) => ({ ...s }));
@@ -300,34 +313,27 @@ export async function loadCatalog(): Promise<Catalog> {
   if (!base) {
     return mockCatalog();
   }
-  try {
-    const res = await fetch(`${base}/api/storefront`, {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) {
-      return mockCatalog();
-    }
-    const data = (await res.json()) as RawResponse;
-    const raw = data.items ?? [];
-    const singles = dedup(raw.filter((it) => !it.kind).map(mapItem));
-    const sealed = dedupProducts(raw.filter((it) => it.kind === "sealed").map(mapSealed));
-    const accessories = dedupProducts(
-      raw.filter((it) => it.kind === "accessory").map(mapAccessory),
-    );
-    if (singles.length === 0 && sealed.length === 0 && accessories.length === 0) {
-      return mockCatalog();
-    }
-    return {
-      singles,
-      sealed,
-      accessories,
-      games: deriveGames(singles),
-      navGames: deriveGames([...singles, ...sealed]),
-      live: true,
-    };
-  } catch {
-    return mockCatalog();
+  const res = await fetch(`${base}/api/storefront`, {
+    next: { revalidate: 60 },
+  });
+  if (!res.ok) {
+    throw new Error(`storefront api ${res.status}`);
   }
+  const data = (await res.json()) as RawResponse;
+  const raw = data.items ?? [];
+  const singles = dedup(raw.filter((it) => !it.kind).map(mapItem));
+  const sealed = dedupProducts(raw.filter((it) => it.kind === "sealed").map(mapSealed));
+  const accessories = dedupProducts(
+    raw.filter((it) => it.kind === "accessory").map(mapAccessory),
+  );
+  return {
+    singles,
+    sealed,
+    accessories,
+    games: deriveGames(singles),
+    navGames: deriveGames([...singles, ...sealed]),
+    live: true,
+  };
 }
 
 // Product detail. Curated mock overrides only apply when the catalog itself is

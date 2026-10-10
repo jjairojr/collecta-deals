@@ -137,22 +137,24 @@ export default async function HomePage() {
       )}
 
       {/* Singles em destaque */}
-      <Container className="py-6">
-        <SectionHead
-          title="Singles em destaque"
-          action={{ label: "VER TODAS ›", href: "/singles" }}
-        />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
-          <TrackViewItemList
-            items={featured}
-            listId="home_destaques"
-            listName="Home · Singles em destaque"
+      {featured.length > 0 && (
+        <Container className="py-6">
+          <SectionHead
+            title="Singles em destaque"
+            action={{ label: "VER TODAS ›", href: "/singles" }}
           />
-          {featured.map((s) => (
-            <SingleCard key={s.slug} item={s} showLanguage />
-          ))}
-        </div>
-      </Container>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            <TrackViewItemList
+              items={featured}
+              listId="home_destaques"
+              listName="Home · Singles em destaque"
+            />
+            {featured.map((s) => (
+              <SingleCard key={s.slug} item={s} showLanguage />
+            ))}
+          </div>
+        </Container>
+      )}
 
       {/* Acessórios */}
       {featuredAccessories.length > 0 && (
