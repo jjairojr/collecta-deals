@@ -47,6 +47,7 @@ func run() error {
 	quotesPath := flag.String("quotes", "data/quotes.json", "path to the saved buy quotes (orçamentos)")
 	expensesPath := flag.String("expenses", "data/expenses.json", "path to the business expense ledger (despesas — not tied to a game)")
 	purchasesPath := flag.String("purchases", "data/purchases.json", "path to the buy-order ledger (compras — one order mixes games)")
+	ordersPath := flag.String("orders", "data/orders.json", "path to the storefront order ledger (pedidos pagos pelo site)")
 	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
 	setsFlag := flag.String("sets", "", "comma-separated Liga set codes to limit (default all)")
 	fxOverride := flag.Float64("fx", 0, "BRL->USD rate override (0 = fetch live)")
@@ -115,6 +116,7 @@ func run() error {
 	ligaProxy := flag.String("liga-proxy", "", "CONNECT proxy for Liga hosts, e.g. http://host.docker.internal:8891 — cmd/cfgate on the host, whose IPv6 egress Cloudflare accepts")
 	serveOnly := flag.Bool("serve-only", false, "read-only mode for a prod instance fed by local scrapes: load snapshots and serve, never scrape (no schedulers, no background deals refresh, refresh/capture endpoints disabled)")
 	adminToken := flag.String("admin-token", os.Getenv("ADMIN_TOKEN"), "token for POST /api/admin/reload (reload deals snapshots from disk after a sync); empty disables the endpoint")
+	storefrontToken := flag.String("storefront-token", os.Getenv("STOREFRONT_TOKEN"), "shared secret the storefront's server routes send on POST /api/orders and /api/shipping/quote; empty disables checkout")
 	ligaStoreID := flag.Int("liga-store-id", 866280, "our own store id on Liga, excluded from the Brazil floor when ranking US->BR imports")
 	importMax := flag.Int("import-live", 150, "max US->BR import candidates per game to also live-price on TCGplayer during a deals refresh (0 = skip)")
 	flag.Parse()
@@ -450,6 +452,11 @@ func run() error {
 	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, expenseStore, purchaseStore, *serveOnly, *adminToken)
 	srv.OwnLigaStoreID = *ligaStoreID
 	srv.PhotoDir = *photoDir
+	checkout, err := buildCheckout(*ordersPath, *storefrontToken, logger)
+	if err != nil {
+		return fmt.Errorf("checkout: %w", err)
+	}
+	srv.Checkout = checkout
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
 }

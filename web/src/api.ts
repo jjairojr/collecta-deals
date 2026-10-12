@@ -124,12 +124,20 @@ export function gameIsMultiLang(id: string): boolean {
   return info ? info.multiLang : id === "pokemon";
 }
 
-async function getJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+async function getJSON<T>(url: string, headers?: Record<string, string>): Promise<T> {
+  const res = await fetch(url, headers ? { headers } : undefined);
   if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
+    throw await requestError(res);
   }
   return (await res.json()) as T;
+}
+
+async function requestError(res: Response): Promise<Error> {
+  if (res.status === 401) {
+    return new Error("unauthorized");
+  }
+  const text = (await res.text()).trim();
+  return new Error(text || `request failed: ${res.status}`);
 }
 
 export function getStatus(): Promise<Status> {
@@ -857,14 +865,19 @@ export function getImports(f: ImportFilters): Promise<ImportsResponse> {
   return getJSON<ImportsResponse>(`${base}/imports?${params.toString()}`);
 }
 
-async function sendJSON<T>(url: string, method: string, body: unknown): Promise<T> {
+async function sendJSON<T>(
+  url: string,
+  method: string,
+  body: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
   const res = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
+    throw await requestError(res);
   }
   return (await res.json()) as T;
 }
@@ -1113,4 +1126,124 @@ export async function deleteExpense(id: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`delete failed: ${res.status}`);
   }
+}
+
+const adminTokenKey = "collecta.adminToken";
+
+export function getAdminToken(): string {
+  try {
+    return localStorage.getItem(adminTokenKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setAdminToken(token: string): void {
+  try {
+    if (token) {
+      localStorage.setItem(adminTokenKey, token);
+    } else {
+      localStorage.removeItem(adminTokenKey);
+    }
+  } catch {
+    return;
+  }
+}
+
+function adminHeaders(): Record<string, string> | undefined {
+  const token = getAdminToken();
+  return token ? { "X-Admin-Token": token } : undefined;
+}
+
+export type OrderStatus =
+  | "pending"
+  | "paid"
+  | "failed"
+  | "expired"
+  | "cancelled"
+  | "oversold"
+  | "shipped"
+  | "refunded";
+
+export interface OrderLine {
+  sku: string;
+  game: string;
+  kind?: string;
+  name: string;
+  meta?: string;
+  qty: number;
+  unitBRL: number;
+  tradeIDs?: string[];
+}
+
+export interface OrderBuyer {
+  name: string;
+  email: string;
+  phone: string;
+  cpf: string;
+}
+
+export interface OrderAddress {
+  cep: string;
+  street: string;
+  number: string;
+  complement?: string;
+  district: string;
+  city: string;
+  state: string;
+}
+
+export interface OrderShipping {
+  serviceID: number;
+  serviceName: string;
+  company: string;
+  priceBRL: number;
+  deliveryDays: number;
+}
+
+export interface OrderTotals {
+  itemsBRL: number;
+  shippingBRL: number;
+  totalBRL: number;
+}
+
+export interface OrderPayment {
+  preferenceID?: string;
+  initPoint?: string;
+  paymentID?: number;
+  status?: string;
+  method?: string;
+}
+
+export interface Order {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  lines: OrderLine[];
+  buyer: OrderBuyer;
+  address: OrderAddress;
+  shipping: OrderShipping;
+  totals: OrderTotals;
+  mp: OrderPayment;
+  trackingCode?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  paidAt: string;
+  shippedAt: string;
+}
+
+export interface OrderPatch {
+  status?: "shipped" | "cancelled";
+  trackingCode?: string;
+  notes?: string;
+}
+
+export function listOrders(): Promise<Order[]> {
+  return getJSON<Order[]>(`${base}/orders`, adminHeaders());
+}
+
+export function updateOrder(id: string, patch: OrderPatch): Promise<Order> {
+  return sendJSON<Order>(`${base}/orders/${id}`, "PATCH", patch, adminHeaders());
 }

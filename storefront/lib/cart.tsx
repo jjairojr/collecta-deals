@@ -11,7 +11,7 @@ import {
 } from "react";
 import type { CartLine } from "@/lib/types";
 
-const STORAGE_KEY = "collecta.cart.v1";
+const STORAGE_KEY = "collecta.cart.v2";
 
 // A line is identified by product + seller + condition, so the same card from
 // two sellers stays as two lines.
@@ -28,6 +28,8 @@ interface CartContext {
   setQty: (line: CartLine, qty: number) => void;
   remove: (line: CartLine) => void;
   clear: () => void;
+  reprice: (prices: Record<string, number>) => void;
+  cap: (stock: Record<string, number>) => void;
 }
 
 const Ctx = createContext<CartContext | null>(null);
@@ -100,11 +102,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clear = useCallback(() => setLines([]), []);
 
+  const reprice = useCallback((prices: Record<string, number>) => {
+    setLines((prev) =>
+      prev.map((l) => (l.sku in prices ? { ...l, price: prices[l.sku] } : l)),
+    );
+  }, []);
+
+  const cap = useCallback((stock: Record<string, number>) => {
+    setLines((prev) =>
+      prev
+        .map((l) =>
+          l.sku in stock
+            ? { ...l, stock: stock[l.sku], qty: Math.min(l.qty, stock[l.sku]) }
+            : l,
+        )
+        .filter((l) => l.qty > 0),
+    );
+  }, []);
+
   const value = useMemo<CartContext>(() => {
     const count = lines.reduce((n, l) => n + l.qty, 0);
     const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
-    return { lines, count, total, lastAdded, add, setQty, remove, clear };
-  }, [lines, lastAdded, add, setQty, remove, clear]);
+    return { lines, count, total, lastAdded, add, setQty, remove, clear, reprice, cap };
+  }, [lines, lastAdded, add, setQty, remove, clear, reprice, cap]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

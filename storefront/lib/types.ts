@@ -34,6 +34,7 @@ export interface Offer {
 export interface Single {
   kind: "single";
   slug: string;
+  sku: string;
   game: GameId;
   gameLabel: string;
   name: string;
@@ -66,6 +67,7 @@ export interface PricePoint {
 export interface Sealed {
   kind: "sealed";
   slug: string;
+  sku: string;
   game: GameId;
   gameLabel: string;
   name: string;
@@ -106,10 +108,11 @@ export interface HighScore {
   score: number;
 }
 
-// A line in the buyer's cart. Coupon/shipping are visual-only; checkout hands
-// off to WhatsApp.
+// A line in the buyer's cart. `sku` is the backend's stock key: checkout sends
+// it so the order resolves to real ledger rows.
 export interface CartLine {
   slug: string;
+  sku: string;
   kind: ProductKind;
   name: string;
   meta: string;

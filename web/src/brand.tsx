@@ -18,6 +18,7 @@ import {
   Sparkles,
   Store,
   Swords,
+  Truck,
   Upload,
   Wallet,
   Wand2,
@@ -31,6 +32,7 @@ export type View =
   | "portfolio"
   | "allportfolio"
   | "vendas"
+  | "pedidos"
   | "compras"
   | "importar"
   | "financeiro"
@@ -83,6 +85,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { key: "financeiro", label: "Financeiro", icon: PiggyBank },
       { key: "vendas", label: "Vendas", icon: ShoppingBag },
+      { key: "pedidos", label: "Pedidos", icon: Truck },
       { key: "compras", label: "Compras", icon: ShoppingCart },
       { key: "importar", label: "Importar / Exportar", icon: Plane },
       { key: "despesas", label: "Despesas", icon: Receipt },

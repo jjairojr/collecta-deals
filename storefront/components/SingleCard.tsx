@@ -11,6 +11,7 @@ import type { Single } from "@/lib/types";
 export function singleToCartLine(item: Single) {
   return {
     slug: item.slug,
+    sku: item.sku,
     kind: "single" as const,
     name: item.name,
     meta: [item.set, item.number, item.variant, item.condition]

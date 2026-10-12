@@ -35,6 +35,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
     add(
       {
         slug: item.slug,
+        sku: item.sku,
         kind: "single",
         name: item.name,
         meta: [item.set, item.number, item.variant, item.condition]

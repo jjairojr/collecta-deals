@@ -14,6 +14,7 @@ import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
 import AllPortfolioPage from "./components/AllPortfolioPage";
 import LigaSalesPage from "./components/LigaSalesPage";
+import PedidosPage from "./components/PedidosPage";
 import PurchasesPage from "./components/PurchasesPage";
 import ImportsPage from "./components/ImportsPage";
 import FinanceiroPage from "./components/FinanceiroPage";
@@ -59,6 +60,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   vendas: {
     title: "Vendas",
     description: "O que já vendeu, da mais recente para a mais antiga — receita, custo e lucro de cada item.",
+  },
+  pedidos: {
+    title: "Pedidos",
+    description: "Pedidos pagos pelo site — endereço, frete escolhido, rastreio e baixa automática no estoque.",
   },
   compras: {
     title: "Compras",
@@ -229,6 +234,10 @@ export default function App() {
               ) : activeView === "vendas" ? (
                 <div className="mt-6">
                   <LigaSalesPage />
+                </div>
+              ) : activeView === "pedidos" ? (
+                <div className="mt-6">
+                  <PedidosPage />
                 </div>
               ) : activeView === "compras" ? (
                 <div className="mt-6">

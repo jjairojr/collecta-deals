@@ -20,6 +20,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "charizard-ex-obsidian-flames",
+    sku: "mock|charizard-ex-obsidian-flames",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Charizard ex",
@@ -35,6 +36,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "pikachu-vmax-rainbow",
+    sku: "mock|pikachu-vmax-rainbow",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Pikachu VMAX",
@@ -49,6 +51,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "monkey-d-luffy-leader",
+    sku: "mock|monkey-d-luffy-leader",
     game: "onepiece",
     gameLabel: "One Piece",
     name: "Monkey D. Luffy",
@@ -62,6 +65,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "jinx-estopim-origins",
+    sku: "mock|jinx-estopim-origins",
     game: "riftbound",
     gameLabel: "Riftbound",
     name: "Jinx, Estopim",
@@ -75,6 +79,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "mewtwo-ex-alt-art",
+    sku: "mock|mewtwo-ex-alt-art",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Mewtwo ex",
@@ -88,6 +93,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "roronoa-zoro-alt",
+    sku: "mock|roronoa-zoro-alt",
     game: "onepiece",
     gameLabel: "One Piece",
     name: "Roronoa Zoro",
@@ -102,6 +108,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "ahri-spirit-blossom",
+    sku: "mock|ahri-spirit-blossom",
     game: "riftbound",
     gameLabel: "Riftbound",
     name: "Ahri, Flor de Alma",
@@ -116,6 +123,7 @@ export const FEATURED_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "gengar-vmax-fusion",
+    sku: "mock|gengar-vmax-fusion",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Gengar VMAX",
@@ -132,6 +140,7 @@ export const SEALED: Sealed[] = [
   {
     kind: "sealed",
     slug: "booster-box-op-09",
+    sku: "mock|booster-box-op-09",
     game: "onepiece",
     gameLabel: "One Piece",
     name: "Booster Box OP-09",
@@ -144,6 +153,7 @@ export const SEALED: Sealed[] = [
   {
     kind: "sealed",
     slug: "etb-obsidian-flames",
+    sku: "mock|etb-obsidian-flames",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Elite Trainer Box",
@@ -156,6 +166,7 @@ export const SEALED: Sealed[] = [
   {
     kind: "sealed",
     slug: "booster-box-origins",
+    sku: "mock|booster-box-origins",
     game: "riftbound",
     gameLabel: "Riftbound",
     name: "Booster Box Origins",
@@ -168,6 +179,7 @@ export const SEALED: Sealed[] = [
   {
     kind: "sealed",
     slug: "booster-box-151",
+    sku: "mock|booster-box-151",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Booster Box 151",
@@ -254,6 +266,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "umbreon-vmax-alt-art",
+    sku: "mock|umbreon-vmax-alt-art",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Umbreon VMAX",
@@ -268,6 +281,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "nami-parallel",
+    sku: "mock|nami-parallel",
     game: "onepiece",
     gameLabel: "One Piece",
     name: "Nami",
@@ -281,6 +295,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "charizard-vmax-shining",
+    sku: "mock|charizard-vmax-shining",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Charizard VMAX",
@@ -296,6 +311,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "trafalgar-law-leader",
+    sku: "mock|trafalgar-law-leader",
     game: "onepiece",
     gameLabel: "One Piece",
     name: "Trafalgar Law",
@@ -309,6 +325,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "yasuo-origins",
+    sku: "mock|yasuo-origins",
     game: "riftbound",
     gameLabel: "Riftbound",
     name: "Yasuo, o Imperdoável",
@@ -322,6 +339,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "rayquaza-vmax-alt",
+    sku: "mock|rayquaza-vmax-alt",
     game: "pokemon",
     gameLabel: "Pokémon",
     name: "Rayquaza VMAX",
@@ -335,6 +353,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "boa-hancock-alt",
+    sku: "mock|boa-hancock-alt",
     game: "onepiece",
     gameLabel: "One Piece",
     name: "Boa Hancock",
@@ -348,6 +367,7 @@ const MORE_SINGLES: Single[] = [
   {
     kind: "single",
     slug: "viktor-origins",
+    sku: "mock|viktor-origins",
     game: "riftbound",
     gameLabel: "Riftbound",
     name: "Viktor, o Arauto",
@@ -370,11 +390,6 @@ export const RARITY: Record<string, string> = {
   "charizard-vmax-shining": "Shiny Vault",
   "ahri-spirit-blossom": "Signature Illustration",
 };
-
-// Cart economics (visual-only; checkout still hands off to WhatsApp).
-export const FREE_SHIPPING = 25000; // R$ 250,00
-export const SHIPPING = 2800; // R$ 28,00
-export const COUPON = { code: "ARCADE10", pct: 10 };
 
 const OFFER_SELLERS: Seller[] = [
   { id: "dojo-sp", name: "DojoCards SP", rating: 98.7, sales: 1203, ships: "48h" },

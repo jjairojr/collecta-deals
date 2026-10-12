@@ -26,3 +26,6 @@
 
 # binário compilado (fonte em cmd/sellerquote)
 sellerquote
+
+# local secrets (checkout tests)
+.env.checkout.local

@@ -30,6 +30,7 @@ const PIXEL_EVENTS: Record<string, string> = {
   search: "Search",
   begin_checkout: "InitiateCheckout",
   generate_lead: "Lead",
+  purchase: "Purchase",
   whatsapp_contact: "Contact",
 };
 
@@ -189,11 +190,44 @@ export function trackBeginCheckout(
   });
 }
 
-export function trackGenerateLead(totalCents: number): void {
+export function trackGenerateLead(
+  totalCents: number,
+  source: "whatsapp_checkout" | "mercadopago" = "whatsapp_checkout",
+): void {
   send("generate_lead", {
     currency: CURRENCY,
     value: reais(totalCents),
-    lead_source: "whatsapp_checkout",
+    lead_source: source,
+  });
+}
+
+export interface PurchaseLine {
+  name: string;
+  kind: ProductKind;
+  meta?: string;
+  qty: number;
+  unitBRL: number;
+}
+
+export function trackPurchase(
+  orderId: string,
+  lines: PurchaseLine[],
+  totalBRL: number,
+  shippingBRL: number,
+): void {
+  send("purchase", {
+    transaction_id: orderId,
+    currency: CURRENCY,
+    value: totalBRL,
+    shipping: shippingBRL,
+    items: lines.map((l) => ({
+      item_id: l.name,
+      item_name: l.name,
+      item_category2: l.kind,
+      item_variant: l.meta,
+      price: l.unitBRL,
+      quantity: l.qty,
+    })),
   });
 }
 
@@ -206,14 +240,6 @@ export function trackAddToWishlist(item: GAItem): void {
     currency: CURRENCY,
     value: itemsValue([item]),
     items: [item],
-  });
-}
-
-export function trackApplyCoupon(code: string, discountCents: number): void {
-  send("apply_coupon", {
-    coupon: code,
-    currency: CURRENCY,
-    discount: reais(discountCents),
   });
 }
 

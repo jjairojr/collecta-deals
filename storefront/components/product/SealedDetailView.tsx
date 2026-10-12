@@ -38,6 +38,7 @@ export default function SealedDetailView({
     add(
       {
         slug: item.slug,
+        sku: item.sku,
         kind: item.kind,
         name: item.name,
         meta: subtitle,

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import Container from "@/components/ui/Container";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import {
-  trackApplyCoupon,
   trackBeginCheckout,
   trackGenerateLead,
   trackRemoveFromCart,
@@ -14,13 +13,10 @@ import {
 } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
-import { COUPON } from "@/lib/mock";
-import type { CartLine } from "@/lib/types";
+import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
 export default function CartView() {
-  const { lines, total: subtotal, setQty, remove } = useCart();
-  const [coupon, setCoupon] = useState("");
-  const [applied, setApplied] = useState(false);
+  const { lines, total, setQty, remove } = useCart();
   const viewed = useRef(false);
 
   useEffect(() => {
@@ -61,28 +57,12 @@ export default function CartView() {
     );
   }
 
-  const discount = applied ? Math.round((subtotal * COUPON.pct) / 100) : 0;
-  const total = subtotal - discount;
   const count = lines.reduce((n, l) => n + l.qty, 0);
 
-  const applyCoupon = () => {
-    if (coupon.trim().toUpperCase() === COUPON.code) {
-      if (!applied) {
-        trackApplyCoupon(COUPON.code, Math.round((subtotal * COUPON.pct) / 100));
-      }
-      setApplied(true);
-    }
-  };
-
-  const checkout = () => {
-    trackBeginCheckout(lines, total, applied ? COUPON.code : undefined);
+  const whatsapp = () => {
+    trackBeginCheckout(lines, total);
     trackGenerateLead(total);
-    const number = process.env.NEXT_PUBLIC_WHATSAPP ?? "";
-    const text = buildOrder(lines, total, applied ? COUPON.code : null);
-    const url = number
-      ? `https://wa.me/${number}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank", "noopener");
+    window.open(whatsappURL(buildOrder(lines, total)), "_blank", "noopener");
   };
 
   return (
@@ -160,15 +140,12 @@ export default function CartView() {
               className="h-11 w-11 shrink-0 rounded-full border-2 border-outline object-cover"
             />
             <p className="text-[15px] leading-snug text-white">
-              No momento aceitamos{" "}
+              Pague com{" "}
               <strong className="font-bold text-brand-soft">
-                pagamento somente via PIX
-              </strong>
-              . O meio de entrega é combinado{" "}
-              <strong className="font-bold text-brand-soft">
-                direto no WhatsApp
+                Pix ou cartão
               </strong>{" "}
-              na hora de fechar o pedido.
+              pelo Mercado Pago. O frete é calculado pelo seu CEP na próxima
+              etapa, e enviamos pelos Correios com código de rastreio.
             </p>
           </div>
         </div>
@@ -181,38 +158,9 @@ export default function CartView() {
           <div className="font-pixel text-[11px] text-brand-soft">RESUMO</div>
 
           <dl className="mt-5 space-y-3 text-[15px]">
-            <Row label="Subtotal" value={brl(subtotal)} />
-            <Row label="Frete" value="A combinar" />
-            {applied && (
-              <Row
-                label={`Cupom ${COUPON.code}`}
-                value={`−${brl(discount)}`}
-                pink
-              />
-            )}
+            <Row label="Subtotal" value={brl(total)} />
+            <Row label="Frete" value="Calculado no checkout" />
           </dl>
-
-          {!applied && (
-            <div
-              className="sticker mt-4 flex items-stretch overflow-hidden rounded-[10px] bg-white"
-              style={{ ["--sh" as string]: "0px", borderWidth: 3 }}
-            >
-              <input
-                value={coupon}
-                onChange={(e) => setCoupon(e.target.value)}
-                placeholder="Cupom"
-                aria-label="Cupom de desconto"
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-base text-outline outline-none placeholder:text-faint sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={applyCoupon}
-                className="border-l-[3px] border-outline bg-brand-soft px-3 font-pixel text-[9px] text-outline"
-              >
-                APLICAR
-              </button>
-            </div>
-          )}
 
           <div className="my-5 border-t-[3px] border-brand" />
 
@@ -223,22 +171,28 @@ export default function CartView() {
             </span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            no momento aceitamos pagamento{" "}
-            <strong className="font-bold text-brand">somente via PIX</strong>
+            sem o frete · Pix ou cartão em até 12x
           </p>
 
-          <button
-            type="button"
-            onClick={checkout}
-            className="mt-5 w-full rounded-[10px] border-4 border-white bg-brand px-6 py-3.5 font-pixel text-[11px] text-white transition-transform hover:-translate-y-0.5"
+          <Link
+            href="/checkout"
+            onClick={() => trackBeginCheckout(lines, total)}
+            className="mt-5 block w-full rounded-[10px] border-4 border-white bg-brand px-6 py-3.5 text-center font-pixel text-[11px] text-white transition-transform hover:-translate-y-0.5"
             style={{ boxShadow: "0 0 0 4px #0b0b0c" }}
           >
-            FECHAR PEDIDO NO WHATSAPP
+            FINALIZAR COMPRA
+          </Link>
+          <button
+            type="button"
+            onClick={whatsapp}
+            className="mt-4 block w-full rounded px-2 py-2 text-center text-xs text-muted underline-offset-4 hover:text-brand-soft hover:underline"
+          >
+            ou feche o pedido pelo WhatsApp
           </button>
-          <p className="mt-4 text-center font-pixel text-[8px] leading-relaxed text-faint">
-            VOCE SERA REDIRECIONADO AO WHATSAPP
+          <p className="mt-3 text-center font-pixel text-[8px] leading-relaxed text-faint">
+            PAGAMENTO SEGURO VIA MERCADO PAGO
             <br />
-            PAGAMENTO NO PIX E ENTREGA COMBINADOS LA
+            FRETE CALCULADO PELO SEU CEP
           </p>
         </div>
       </div>
@@ -246,41 +200,11 @@ export default function CartView() {
   );
 }
 
-function Row({
-  label,
-  value,
-  pink,
-}: {
-  label: string;
-  value: string;
-  pink?: boolean;
-}) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
       <dt className="text-[#c9c9d1]">{label}</dt>
-      <dd className={pink ? "font-semibold text-brand" : "text-white"}>
-        {value}
-      </dd>
+      <dd className="text-white">{value}</dd>
     </div>
   );
-}
-
-// buildOrder writes the WhatsApp handoff message (checkout stays on WhatsApp per
-// the product decision — coupon/shipping are shown but settled with us there).
-function buildOrder(
-  lines: CartLine[],
-  total: number,
-  coupon: string | null,
-): string {
-  const out: string[] = ["Olá! Quero fechar este pedido na Collecta:", ""];
-  for (const l of lines) {
-    out.push(`• ${l.name} (${l.meta}) — ${l.qty}x ${brl(l.price)}`);
-  }
-  out.push("");
-  if (coupon) {
-    out.push(`Cupom: ${coupon}`);
-  }
-  out.push(`Total: ${brl(total)}`);
-  out.push("Frete: a combinar");
-  return out.join("\n");
 }

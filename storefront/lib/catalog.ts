@@ -22,6 +22,7 @@ import type {
 // Shape of one item from the Go backend's GET /api/storefront (see
 // internal/api/storefront.go). Prices are in reais; there is no slug/language.
 interface RawItem {
+  sku?: string;
   game: string;
   gameLabel: string;
   kind?: string;
@@ -71,6 +72,13 @@ function slugFor(it: RawItem): string {
   );
 }
 
+// The stock key the backend sells by. A backend from before checkout sends
+// none; grouping by the URL slug then keeps the catalog whole (checkout itself
+// is off until that backend ships).
+function skuFor(it: RawItem): string {
+  return it.sku ?? `legacy|${slugFor(it)}`;
+}
+
 // Proxied art is cached for a day at every layer (Next data cache, Vercel CDN,
 // browser), and the Next data cache outlives deploys. Stamping the URL with the
 // backend's art version (its image cache's write time) and the deployment makes
@@ -110,6 +118,7 @@ function mapItem(it: RawItem, version: string): Single {
   return {
     kind: "single",
     slug: slugFor(it),
+    sku: skuFor(it),
     game: it.game,
     gameLabel: it.gameLabel,
     name: it.name,
@@ -206,6 +215,7 @@ function mapSealed(it: RawItem, version: string): Sealed {
   return {
     kind: "sealed",
     slug: slugFor(it),
+    sku: skuFor(it),
     game: it.game,
     gameLabel: it.gameLabel,
     name,
@@ -230,6 +240,7 @@ function mapAccessory(it: RawItem, version: string): Accessory {
   return {
     kind: "accessory",
     slug: slugFor(it),
+    sku: skuFor(it),
     game: it.game,
     gameLabel: it.gameLabel,
     name: it.name,
@@ -266,35 +277,24 @@ function deriveGames(items: { game: string; gameLabel: string }[]): Game[] {
     .sort((a, b) => b.count - a.count);
 }
 
-// Dedup identical listings (same slug), summing quantity.
-function dedup(items: Single[]): Single[] {
-  const bySlug = new Map<string, Single>();
+// Collapse the ledger rows behind one stock key (sku), summing quantity. The
+// backend sells the cheapest row first, so the group shows the lowest price —
+// the same number checkout will charge.
+function dedupProducts<
+  T extends { sku: string; qty: number; price: number; featured?: boolean },
+>(items: T[]): T[] {
+  const bySKU = new Map<string, T>();
   for (const s of items) {
-    const cur = bySlug.get(s.slug);
+    const cur = bySKU.get(s.sku);
     if (cur) {
       cur.qty += s.qty;
-    } else {
-      bySlug.set(s.slug, { ...s });
-    }
-  }
-  return [...bySlug.values()];
-}
-
-// Collapse duplicate slugs, summing quantity.
-function dedupProducts<T extends { slug: string; qty: number; featured?: boolean }>(
-  items: T[],
-): T[] {
-  const bySlug = new Map<string, T>();
-  for (const s of items) {
-    const cur = bySlug.get(s.slug);
-    if (cur) {
-      cur.qty += s.qty;
+      cur.price = Math.min(cur.price, s.price);
       cur.featured = cur.featured || s.featured;
     } else {
-      bySlug.set(s.slug, { ...s });
+      bySKU.set(s.sku, { ...s });
     }
   }
-  return [...bySlug.values()];
+  return [...bySKU.values()];
 }
 
 // Mock catalog for design work with no backend configured. It never stands in
@@ -328,7 +328,9 @@ export async function loadCatalog(): Promise<Catalog> {
   const data = (await res.json()) as RawResponse;
   const raw = data.items ?? [];
   const version = artVersion(data.artVersion);
-  const singles = dedup(raw.filter((it) => !it.kind).map((it) => mapItem(it, version)));
+  const singles = dedupProducts(
+    raw.filter((it) => !it.kind).map((it) => mapItem(it, version)),
+  );
   const sealed = dedupProducts(
     raw.filter((it) => it.kind === "sealed").map((it) => mapSealed(it, version)),
   );

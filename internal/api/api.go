@@ -59,6 +59,7 @@ type Server struct {
 	adminToken     string
 	OwnLigaStoreID int
 	PhotoDir       string
+	Checkout       Checkout
 	imports        *importsCache
 }
 
@@ -185,6 +186,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/quotes/{id}", s.handleQuotesDelete)
 	if s.adminToken != "" {
 		mux.HandleFunc("POST /api/admin/reload", s.handleAdminReload)
+	}
+	if s.Checkout.Orders != nil {
+		mux.HandleFunc("POST /api/shipping/quote", s.handleShippingQuote)
+		mux.HandleFunc("POST /api/orders", s.handleOrderCreate)
+		mux.HandleFunc("GET /api/orders", s.handleOrdersList)
+		mux.HandleFunc("GET /api/orders/{id}", s.handleOrderGet)
+		mux.HandleFunc("PATCH /api/orders/{id}", s.handleOrderPatch)
+		mux.HandleFunc("POST /api/orders/mp-webhook", s.handleMPWebhook)
 	}
 	if s.webDir != "" {
 		mux.Handle("/", s.spaHandler())
@@ -1297,8 +1306,8 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

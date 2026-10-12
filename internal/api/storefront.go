@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"opdeals/internal/trades"
 )
@@ -15,6 +16,7 @@ import (
 // NO cost basis, profit, or margin — only what a buyer needs to see. This is the
 // security boundary between the internal portfolio and the public catalog.
 type storefrontItem struct {
+	SKU       string  `json:"sku"`
 	Game      string  `json:"game"`
 	GameLabel string  `json:"gameLabel"`
 	Kind      string  `json:"kind,omitempty"` // "sealed" | "accessory" for manual products, empty for singles
@@ -88,6 +90,14 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if s.Checkout.Orders != nil {
+		reserved, err := s.Checkout.Orders.Reserved(time.Now())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Items = subtractReserved(resp.Items, reserved)
+	}
 	base := publicBase(r)
 	for i := range resp.Items {
 		if strings.HasPrefix(resp.Items[i].ImageURL, "/") {
@@ -111,6 +121,7 @@ func storefrontItemFor(t trades.Trade, gameID, gameLabel string, fx float64, loo
 		qty = 1
 	}
 	item := storefrontItem{
+		SKU:       trades.SKU(gameID, t),
 		Game:      gameID,
 		GameLabel: gameLabel,
 		Kind:      t.Kind,
@@ -141,6 +152,25 @@ func storefrontItemFor(t trades.Trade, gameID, gameLabel string, fx float64, loo
 		item.AskUSD = round2(t.AskBRL * fx)
 	}
 	return item, true
+}
+
+func subtractReserved(items []storefrontItem, reserved map[string]int) []storefrontItem {
+	out := items[:0]
+	for _, it := range items {
+		if held := reserved[it.SKU]; held > 0 {
+			take := held
+			if take > it.Qty {
+				take = it.Qty
+			}
+			it.Qty -= take
+			reserved[it.SKU] = held - take
+		}
+		if it.Qty <= 0 {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 // storefrontFX returns a single USD-per-BRL rate (from the first deals-enabled
