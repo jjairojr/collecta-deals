@@ -38,8 +38,8 @@ const (
 	JoinServiceID   = -2
 )
 
-func Pickup(city string) Service {
-	return Service{ID: PickupServiceID, Name: "Retirar em mãos", Company: city, PriceBRL: 0}
+func Pickup() Service {
+	return Service{ID: PickupServiceID, Name: "Retirar em mãos", Company: "Goiânia", PriceBRL: 0}
 }
 
 func Join() Service {

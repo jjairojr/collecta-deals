@@ -30,7 +30,6 @@ type Checkout struct {
 	APIURL          string
 	FromCEP         string
 	FreeShippingMin float64
-	PickupCity      string
 	Log             *logx.Logger
 }
 
@@ -215,10 +214,7 @@ func (s *Server) quoteShipping(ctx context.Context, cep string, lines []orders.L
 			services[0].PriceBRL = 0
 		}
 	}
-	if s.Checkout.PickupCity != "" {
-		services = append(services, shipping.Pickup(s.Checkout.PickupCity))
-	}
-	services = append(services, shipping.Join())
+	services = append(services, shipping.Pickup(), shipping.Join())
 	return services, nil
 }
 

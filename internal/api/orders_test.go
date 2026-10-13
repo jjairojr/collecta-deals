@@ -502,14 +502,13 @@ func TestShippingQuoteAppliesFreeShipping(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Services) != 3 || out.Services[0].PriceBRL != 0 || out.Services[1].PriceBRL != 35.1 || out.Services[2].ID != shipping.JoinServiceID {
+	if len(out.Services) != 4 || out.Services[0].PriceBRL != 0 || out.Services[1].PriceBRL != 35.1 || out.Services[2].ID != shipping.PickupServiceID || out.Services[3].ID != shipping.JoinServiceID {
 		t.Fatalf("services = %+v", out.Services)
 	}
 }
 
 func TestPickupOption(t *testing.T) {
 	f := checkoutServer(t)
-	f.s.Checkout.PickupCity = "Goiânia"
 	quote := func(cep string) []shipping.Service {
 		body := map[string]interface{}{"cep": cep, "lines": []map[string]interface{}{{"sku": teachSKU, "qty": 1, "unitCents": 25000}}}
 		rec := f.do(t, http.MethodPost, "/api/shipping/quote", body, storefrontHeaders())

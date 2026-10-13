@@ -22,7 +22,6 @@ func buildCheckout(ordersPath, storefrontToken string, logger *logx.Logger) (api
 		SiteURL:         os.Getenv("PUBLIC_SITE_URL"),
 		APIURL:          os.Getenv("PUBLIC_API_URL"),
 		FromCEP:         strings.TrimSpace(os.Getenv("SHIP_FROM_CEP")),
-		PickupCity:      strings.TrimSpace(os.Getenv("PICKUP_CITY")),
 		Log:             log,
 	}
 	if v := os.Getenv("FREE_SHIPPING_MIN_BRL"); v != "" {
