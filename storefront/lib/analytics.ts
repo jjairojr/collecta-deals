@@ -190,6 +190,14 @@ export function trackBeginCheckout(
   });
 }
 
+export function trackApplyCoupon(coupon: string, discountCents: number): void {
+  send("apply_coupon", {
+    currency: CURRENCY,
+    coupon,
+    discount: reais(discountCents),
+  });
+}
+
 export function trackGenerateLead(
   totalCents: number,
   source: "whatsapp_checkout" | "mercadopago" = "whatsapp_checkout",

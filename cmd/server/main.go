@@ -117,6 +117,8 @@ func run() error {
 	serveOnly := flag.Bool("serve-only", false, "read-only mode for a prod instance fed by local scrapes: load snapshots and serve, never scrape (no schedulers, no background deals refresh, refresh/capture endpoints disabled)")
 	adminToken := flag.String("admin-token", os.Getenv("ADMIN_TOKEN"), "token for POST /api/admin/reload (reload deals snapshots from disk after a sync); empty disables the endpoint")
 	storefrontToken := flag.String("storefront-token", os.Getenv("STOREFRONT_TOKEN"), "shared secret the storefront's server routes send on POST /api/orders and /api/shipping/quote; empty disables checkout")
+	collectaAPI := flag.String("collecta-api", os.Getenv("COLLECTA_API"), "base URL of the Collecta app API used to reserve and release referral coupons; empty disables coupons")
+	collectaStoreToken := flag.String("collecta-store-token", os.Getenv("COLLECTA_STORE_TOKEN"), "shared secret sent as X-Store-Token to the Collecta app API")
 	ligaStoreID := flag.Int("liga-store-id", 866280, "our own store id on Liga, excluded from the Brazil floor when ranking US->BR imports")
 	importMax := flag.Int("import-live", 150, "max US->BR import candidates per game to also live-price on TCGplayer during a deals refresh (0 = skip)")
 	flag.Parse()
@@ -452,11 +454,16 @@ func run() error {
 	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, expenseStore, purchaseStore, *serveOnly, *adminToken)
 	srv.OwnLigaStoreID = *ligaStoreID
 	srv.PhotoDir = *photoDir
-	checkout, err := buildCheckout(*ordersPath, *storefrontToken, logger)
+	checkout, err := buildCheckout(*ordersPath, *storefrontToken, *collectaAPI, *collectaStoreToken, logger)
 	if err != nil {
 		return fmt.Errorf("checkout: %w", err)
 	}
 	srv.Checkout = checkout
+	if checkout.Coupons != nil {
+		sweepCtx, stopSweep := context.WithCancel(context.Background())
+		defer stopSweep()
+		go srv.SweepCoupons(sweepCtx, time.Minute)
+	}
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())
 }

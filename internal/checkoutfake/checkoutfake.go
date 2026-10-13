@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"opdeals/internal/collecta"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/shipping"
 )
@@ -73,4 +74,18 @@ func (Quoter) Quote(_ context.Context, _, toCEP string, products []shipping.Prod
 		{ID: 1, Name: "PAC", Company: "Correios", PriceBRL: 21.9 + extra, DeliveryDays: 7},
 		{ID: 2, Name: "SEDEX", Company: "Correios", PriceBRL: 38.4 + extra, DeliveryDays: 3},
 	}, nil
+}
+
+type Coupons struct{}
+
+func (Coupons) Reserve(_ context.Context, _ string, couponIDs []string, _ int64) ([]collecta.Coupon, error) {
+	out := make([]collecta.Coupon, 0, len(couponIDs))
+	for _, id := range couponIDs {
+		out = append(out, collecta.Coupon{ID: id, Code: "IND-" + strings.ToUpper(id), ValueCents: 1000})
+	}
+	return out, nil
+}
+
+func (Coupons) Release(_ context.Context, _ []string) error {
+	return nil
 }

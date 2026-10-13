@@ -279,6 +279,15 @@ function OrderLines({ order }: { order: PublicOrder }) {
           </dt>
           <dd>{order.totals.shippingBRL === 0 ? "Grátis" : brl(cents(order.totals.shippingBRL))}</dd>
         </div>
+        {order.totals.discountBRL > 0 && (
+          <div className="flex justify-between text-[#c9c9d1]">
+            <dt className="truncate">
+              Cupom{order.coupons && order.coupons.length > 1 ? "s" : ""}
+              {order.coupons && order.coupons.length > 0 ? ` · ${order.coupons.map((c) => c.code).join(", ")}` : ""}
+            </dt>
+            <dd className="shrink-0 text-brand-soft">−{brl(cents(order.totals.discountBRL))}</dd>
+          </div>
+        )}
         <div className="flex justify-between">
           <dt className="font-pixel text-[10px] text-white">TOTAL</dt>
           <dd className="font-pixel text-[14px] text-brand">{brl(cents(order.totals.totalBRL))}</dd>

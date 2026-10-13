@@ -4,12 +4,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { User } from "lucide-react";
+import { useAccount } from "@/lib/account";
 import { trackSearch } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
+import { pixelText } from "@/lib/format";
 import Container from "@/components/ui/Container";
 
 export default function Header() {
   const { count } = useCart();
+  const { status, user } = useAccount();
   const router = useRouter();
   const [q, setQ] = useState("");
 
@@ -68,10 +72,23 @@ export default function Header() {
         </form>
 
         <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-5">
-          <div className="hidden text-right leading-tight sm:block">
-            <div className="font-pixel text-[8px] text-brand-soft">SALDO</div>
-            <div className="font-pixel text-[10px] text-white">R$ 0,00</div>
-          </div>
+          <Link
+            href={status === "ready" ? "/conta" : "/conta/entrar"}
+            aria-label={status === "ready" ? "Minha conta" : "Entrar"}
+            className="flex items-center gap-2 text-right leading-tight"
+          >
+            <span className="sticker grid h-10 w-10 place-items-center rounded-[10px] bg-white text-outline [--sh:3px]">
+              <User size={18} strokeWidth={2.5} aria-hidden />
+            </span>
+            <span className="hidden sm:block">
+              <span className="block font-pixel text-[8px] text-brand-soft">
+                {status === "ready" ? "PLAYER 1" : "CONTA"}
+              </span>
+              <span className="block max-w-[120px] truncate font-pixel text-[10px] text-white">
+                {status === "ready" && user ? pixelText((user.displayName || user.username).split(" ")[0]) : "ENTRAR"}
+              </span>
+            </span>
+          </Link>
           <Link
             href="/carrinho"
             className="arcade-press sticker relative flex items-center gap-2 rounded-[10px] bg-royal px-3.5 py-2.5 font-pixel text-[10px] text-white"

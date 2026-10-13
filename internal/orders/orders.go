@@ -71,7 +71,14 @@ type Shipping struct {
 type Totals struct {
 	ItemsBRL    float64 `json:"itemsBRL"`
 	ShippingBRL float64 `json:"shippingBRL"`
+	DiscountBRL float64 `json:"discountBRL"`
 	TotalBRL    float64 `json:"totalBRL"`
+}
+
+type Coupon struct {
+	ID       string  `json:"id"`
+	Code     string  `json:"code"`
+	ValueBRL float64 `json:"valueBRL"`
 }
 
 type MP struct {
@@ -93,6 +100,10 @@ type Order struct {
 	Shipping Shipping `json:"shipping"`
 	Totals   Totals   `json:"totals"`
 	MP       MP       `json:"mp"`
+
+	CollectaUserID    string    `json:"collectaUserId,omitempty"`
+	Coupons           []Coupon  `json:"coupons,omitempty"`
+	CouponsReleasedAt time.Time `json:"couponsReleasedAt,omitempty"`
 
 	TrackingCode string `json:"trackingCode,omitempty"`
 	Notes        string `json:"notes,omitempty"`
@@ -249,7 +260,8 @@ func (s *Store) CancelPending(match func(Order) bool, note string) ([]Order, err
 	now := time.Now()
 	cancelled := make([]Order, 0)
 	for i := range all {
-		if !all[i].Reserves(now) || !match(all[i]) {
+		status := EffectiveStatus(all[i], now)
+		if (status != StatusPending && status != StatusFailed) || !match(all[i]) {
 			continue
 		}
 		all[i].Status = StatusCancelled

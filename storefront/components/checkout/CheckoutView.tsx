@@ -5,7 +5,8 @@ import Link from "next/link";
 import Container from "@/components/ui/Container";
 import Field from "@/components/checkout/Field";
 import UFSelect from "@/components/checkout/UFSelect";
-import { trackBeginCheckout, trackGenerateLead } from "@/lib/analytics";
+import { useAccount } from "@/lib/account";
+import { trackApplyCoupon, trackBeginCheckout, trackGenerateLead } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import {
   cents,
@@ -25,6 +26,7 @@ import {
   type OrderLineInput,
   type ShippingOption,
 } from "@/lib/checkout";
+import { couponsApplicable, type CheckoutCoupon } from "@/lib/coupons";
 import { brl, pixelText } from "@/lib/format";
 import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
@@ -48,6 +50,15 @@ interface CreateResponse {
   initPoint: string;
 }
 
+async function loadCoupons(): Promise<CheckoutCoupon[]> {
+  const res = await fetch("/api/conta/cupons", { cache: "no-store" });
+  if (!res.ok) {
+    return [];
+  }
+  const data = (await res.json()) as { coupons?: CheckoutCoupon[] };
+  return data.coupons ?? [];
+}
+
 async function quote(cep: string, lines: OrderLineInput[]): Promise<ShippingOption[]> {
   const res = await fetch("/api/frete", {
     method: "POST",
@@ -63,7 +74,11 @@ async function quote(cep: string, lines: OrderLineInput[]): Promise<ShippingOpti
 
 export default function CheckoutView() {
   const { lines, total: itemsCents, reprice, cap } = useCart();
+  const { status: accountStatus, user } = useAccount();
   const [buyer, setBuyer] = useState<Buyer>(EMPTY_BUYER);
+  const [coupons, setCoupons] = useState<CheckoutCoupon[] | null>(null);
+  const [selectedCoupons, setSelectedCoupons] = useState<string[]>([]);
+  const [couponsVersion, setCouponsVersion] = useState(0);
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS);
   const [buyerErrors, setBuyerErrors] = useState<BuyerErrors>({});
   const [addressErrors, setAddressErrors] = useState<AddressErrors>({});
@@ -91,6 +106,42 @@ export default function CheckoutView() {
     document.body.classList.add("no-scanlines");
     return () => document.body.classList.remove("no-scanlines");
   }, []);
+
+  useEffect(() => {
+    if (accountStatus !== "ready" || !user) {
+      return;
+    }
+    setBuyer((b) => ({
+      ...b,
+      name: b.name || user.displayName,
+      email: b.email || (user.email ?? ""),
+      phone: b.phone || (user.whatsapp ? maskPhone(user.whatsapp) : ""),
+    }));
+  }, [accountStatus, user]);
+
+  useEffect(() => {
+    if (accountStatus !== "ready") {
+      setCoupons(null);
+      setSelectedCoupons([]);
+      return;
+    }
+    let cancelled = false;
+    loadCoupons()
+      .then((found) => {
+        if (!cancelled) {
+          setCoupons(found);
+          setSelectedCoupons((prev) => prev.filter((id) => found.some((c) => c.id === id)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCoupons([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountStatus, couponsVersion]);
 
   const cepDigits = digits(address.cep);
   const payloadLines = useMemo(() => orderLines(lines), [lines]);
@@ -162,7 +213,24 @@ export default function CheckoutView() {
         ? joinOption
         : (carriers?.find((s) => s.serviceID === carrierID) ?? null);
   const shippingCents = chosen ? cents(chosen.priceBRL) : 0;
-  const totalCents = itemsCents + shippingCents;
+  const minOrderCents = coupons?.[0]?.minOrderCents;
+  const applicable = couponsApplicable(coupons?.length ?? 0, itemsCents, minOrderCents);
+  const activeCoupons = (coupons ?? []).filter((c) => selectedCoupons.includes(c.id)).slice(0, applicable);
+  const discountCents = activeCoupons.reduce((sum, c) => sum + c.valueCents, 0);
+  const totalCents = Math.max(itemsCents + shippingCents - discountCents, 0);
+
+  const toggleCoupon = (c: CheckoutCoupon) => {
+    setSelectedCoupons((prev) => {
+      if (prev.includes(c.id)) {
+        return prev.filter((id) => id !== c.id);
+      }
+      if (prev.length >= applicable) {
+        return prev;
+      }
+      trackApplyCoupon(c.code, c.valueCents);
+      return [...prev, c.id];
+    });
+  };
 
   if (lines.length === 0) {
     return (
@@ -260,6 +328,7 @@ export default function CheckoutView() {
             priceBRL: chosen.priceBRL,
             joinOrder: mode === "join" ? Number(joinOrder) : 0,
           },
+          couponIds: activeCoupons.map((c) => c.id),
         }),
       });
       const data = (await res.json()) as CreateResponse & CheckoutError;
@@ -292,6 +361,13 @@ export default function CheckoutView() {
         setCarriers(found);
         setCarrierID(found[0]?.serviceID ?? null);
         setNotice("O valor do frete mudou. Escolha de novo a forma de envio.");
+      } else if (data.error === "coupon_invalid") {
+        setSelectedCoupons([]);
+        setCouponsVersion((n) => n + 1);
+        setNotice(data.message ?? "Esse cupom não pôde ser aplicado. Confira seus cupons e tente de novo.");
+      } else if (data.error === "login_required") {
+        setSelectedCoupons([]);
+        setNotice("Sua sessão expirou. Entre de novo para usar cupons.");
       } else {
         setNotice(data.error ?? "Não foi possível criar o pedido. Tente de novo em instantes.");
       }
@@ -304,7 +380,7 @@ export default function CheckoutView() {
 
   const whatsapp = () => {
     trackGenerateLead(itemsCents);
-    window.open(whatsappURL(buildOrder(lines, itemsCents)), "_blank", "noopener");
+    window.open(whatsappURL(buildOrder(lines, itemsCents, activeCoupons)), "_blank", "noopener");
   };
 
   const modes: { key: Mode; title: string; detail: string; price: string }[] = [
@@ -534,6 +610,65 @@ export default function CheckoutView() {
               </div>
             </Section>
           )}
+
+          <Section step={mode === "ship" ? "04" : "03"} title="Cupons">
+            {accountStatus === "anon" ? (
+              <p className="text-sm text-muted">
+                <Link
+                  href="/conta/entrar?next=/checkout"
+                  className="text-brand-soft underline-offset-4 hover:underline"
+                >
+                  Entre com sua conta Collecta
+                </Link>{" "}
+                para usar seus cupons de indicação.
+              </p>
+            ) : coupons === null ? (
+              <p className="font-pixel text-[9px] text-brand-soft animate-blink">CARREGANDO CUPONS...</p>
+            ) : coupons.length === 0 ? (
+              <p className="text-sm text-muted">
+                Você ainda não tem cupons liberados. Indique amigos no app e ganhe R$ 10 por indicação.
+              </p>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-muted">
+                  1 cupom a cada R$ 100 em itens
+                  {applicable < coupons.length ? ` · ${applicable} aplicável${applicable === 1 ? "" : "is"} neste pedido` : ""}
+                </p>
+                <div className="grid gap-3">
+                  {coupons.map((c) => {
+                    const selected = selectedCoupons.includes(c.id);
+                    const disabled = !selected && selectedCoupons.length >= applicable;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={selected}
+                        disabled={disabled}
+                        onClick={() => toggleCoupon(c)}
+                        className={`sticker flex w-full items-center justify-between gap-3 rounded-[10px] px-4 py-3 text-left transition-colors [--sh:3px] ${
+                          selected ? "bg-brand text-white" : "bg-outline text-[#c9c9d1] hover:text-white"
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-pixel text-[8px]">{c.code}</span>
+                          <span className={`block text-xs ${selected ? "text-white/90" : "text-muted"}`}>
+                            {selected ? "aplicado" : "toque para aplicar"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-pixel text-[11px]">−{brl(c.valueCents)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {activeCoupons.length > 0 && (
+                  <p className="mt-3 text-xs text-muted">
+                    Pelo WhatsApp o cupom é conferido manualmente na hora do pagamento.
+                  </p>
+                )}
+              </>
+            )}
+          </Section>
         </div>
 
         <div
@@ -567,6 +702,12 @@ export default function CheckoutView() {
               label={shippingLabel(mode, chosen, joinOrder)}
               value={chosen ? (shippingCents === 0 ? "Grátis" : brl(shippingCents)) : "—"}
             />
+            {discountCents > 0 && (
+              <Row
+                label={`Cupom${activeCoupons.length > 1 ? "s" : ""} · ${activeCoupons.map((c) => c.code).join(", ")}`}
+                value={`−${brl(discountCents)}`}
+              />
+            )}
           </dl>
 
           <div className="my-5 border-t-[3px] border-brand" />

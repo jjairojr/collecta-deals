@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Baloo_2, DM_Sans, Press_Start_2P } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
+import { AccountProvider } from "@/lib/account";
 import { CartProvider } from "@/lib/cart";
 import { loadCatalog } from "@/lib/catalog";
 import { organizationJsonLd, webSiteJsonLd } from "@/lib/seo";
@@ -80,6 +81,7 @@ export default async function RootLayout({
       <body>
         <JsonLd data={organizationJsonLd()} />
         <JsonLd data={webSiteJsonLd()} />
+        <AccountProvider>
         <CartProvider>
           <Scanlines />
           <AnnouncementBar />
@@ -89,6 +91,7 @@ export default async function RootLayout({
           <Footer />
           <CartToast />
         </CartProvider>
+        </AccountProvider>
         <MetaPixel />
       </body>
       {process.env.NEXT_PUBLIC_GA_ID && (

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"opdeals/internal/collecta"
 	"opdeals/internal/logx"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/orders"
@@ -24,6 +25,7 @@ type Checkout struct {
 	Orders          *orders.Store
 	Gateway         mercadopago.Gateway
 	Quoter          shipping.Quoter
+	Coupons         collecta.Client
 	StorefrontToken string
 	WebhookSecret   string
 	SiteURL         string
@@ -64,7 +66,9 @@ type orderCreateInput struct {
 		PriceBRL  float64 `json:"priceBRL"`
 		JoinOrder int     `json:"joinOrder"`
 	} `json:"shipping"`
-	BackURLBase string `json:"backURLBase"`
+	BackURLBase    string   `json:"backURLBase"`
+	CollectaUserID string   `json:"collectaUserId"`
+	CouponIDs      []string `json:"couponIds"`
 }
 
 type skuEntry struct {
@@ -334,6 +338,22 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": msg})
 		return
 	}
+	couponIDs, err := normalizeCouponIDs(in.CouponIDs)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	in.CollectaUserID = strings.TrimSpace(in.CollectaUserID)
+	if len(couponIDs) > 0 {
+		if in.CollectaUserID == "" {
+			writeError(w, http.StatusBadRequest, map[string]any{"error": "cupom exige login"})
+			return
+		}
+		if s.Checkout.Coupons == nil {
+			writeError(w, http.StatusConflict, map[string]any{"error": "coupon_invalid", "message": "cupons indisponíveis no momento"})
+			return
+		}
+	}
 	idx, err := s.buildSKUIndex()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -387,11 +407,15 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		in.Address = base.Address
 	}
 
-	if _, err := s.Checkout.Orders.CancelPending(func(o orders.Order) bool {
+	superseded, err := s.Checkout.Orders.CancelPending(func(o orders.Order) bool {
 		return o.Buyer.CPF == in.Buyer.CPF || o.Buyer.Email == in.Buyer.Email
-	}, "substituído por uma nova tentativa do mesmo comprador"); err != nil {
+	}, "substituído por uma nova tentativa do mesmo comprador")
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	for _, o := range superseded {
+		s.releaseLater(r.Context(), o)
 	}
 
 	var conflict map[string]any
@@ -414,11 +438,12 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		items := itemsTotal(res.lines)
 		return orders.Order{
-			Lines:    res.lines,
-			Buyer:    in.Buyer,
-			Address:  in.Address,
-			Shipping: ship,
-			Totals:   orders.Totals{ItemsBRL: items, ShippingBRL: ship.PriceBRL, TotalBRL: round2(items + ship.PriceBRL)},
+			Lines:          res.lines,
+			Buyer:          in.Buyer,
+			Address:        in.Address,
+			Shipping:       ship,
+			Totals:         orders.Totals{ItemsBRL: items, ShippingBRL: ship.PriceBRL, TotalBRL: round2(items + ship.PriceBRL)},
+			CollectaUserID: in.CollectaUserID,
 		}, nil
 	})
 	if err != nil {
@@ -428,6 +453,15 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
+	}
+	if len(couponIDs) > 0 {
+		var status int
+		var body map[string]any
+		order, status, body = s.reserveCoupons(r.Context(), order, couponIDs)
+		if status != 0 {
+			writeError(w, status, body)
+			return
+		}
 	}
 
 	site := strings.TrimRight(in.BackURLBase, "/")
@@ -444,10 +478,11 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:       order.ExpiresAt,
 	})
 	if err != nil {
-		s.Checkout.Orders.Update(order.ID, func(o *orders.Order) {
+		cancelled, _ := s.Checkout.Orders.Update(order.ID, func(o *orders.Order) {
 			o.Status = orders.StatusCancelled
 			o.Notes = appendNote(o.Notes, "preferência MP falhou: "+err.Error())
 		})
+		s.releaseLater(r.Context(), cancelled)
 		writeError(w, http.StatusBadGateway, map[string]any{"error": "pagamento indisponível no momento"})
 		return
 	}
@@ -468,17 +503,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func preferenceItems(o orders.Order) []mercadopago.Item {
-	items := make([]mercadopago.Item, 0, len(o.Lines)+1)
-	for _, l := range o.Lines {
-		title := l.Name
-		if l.Meta != "" {
-			title += " (" + l.Meta + ")"
-		}
-		if len(title) > 250 {
-			title = title[:250]
-		}
-		items = append(items, mercadopago.Item{ID: l.SKU, Title: title, Qty: l.Qty, UnitBRL: l.UnitBRL})
-	}
+	items := discountedItems(o.Lines, cents(o.Totals.DiscountBRL))
 	if o.Shipping.PriceBRL > 0 {
 		items = append(items, mercadopago.Item{
 			ID:      "frete",
@@ -577,6 +602,11 @@ type publicLine struct {
 	UnitBRL float64 `json:"unitBRL"`
 }
 
+type publicCoupon struct {
+	Code     string  `json:"code"`
+	ValueBRL float64 `json:"valueBRL"`
+}
+
 type publicOrder struct {
 	ID           string          `json:"id"`
 	Number       int             `json:"number"`
@@ -584,10 +614,12 @@ type publicOrder struct {
 	Lines        []publicLine    `json:"lines"`
 	Totals       orders.Totals   `json:"totals"`
 	Shipping     orders.Shipping `json:"shipping"`
+	Coupons      []publicCoupon  `json:"coupons,omitempty"`
 	TrackingCode string          `json:"trackingCode,omitempty"`
 	InitPoint    string          `json:"initPoint,omitempty"`
 	ExpiresAt    time.Time       `json:"expiresAt"`
 	FirstName    string          `json:"firstName"`
+	CreatedAt    time.Time       `json:"createdAt"`
 }
 
 func publicView(o orders.Order, now time.Time) publicOrder {
@@ -601,9 +633,13 @@ func publicView(o orders.Order, now time.Time) publicOrder {
 		Shipping:     o.Shipping,
 		TrackingCode: o.TrackingCode,
 		ExpiresAt:    o.ExpiresAt,
+		CreatedAt:    o.CreatedAt,
 	}
 	if parts := strings.Fields(o.Buyer.Name); len(parts) > 0 {
 		out.FirstName = parts[0]
+	}
+	for _, c := range o.Coupons {
+		out.Coupons = append(out.Coupons, publicCoupon{Code: c.Code, ValueBRL: c.ValueBRL})
 	}
 	for _, l := range o.Lines {
 		out.Lines = append(out.Lines, publicLine{Name: l.Name, Meta: l.Meta, Kind: l.Kind, Qty: l.Qty, UnitBRL: l.UnitBRL})
@@ -619,7 +655,7 @@ func (s *Server) handleOrderGet(w http.ResponseWriter, r *http.Request) {
 	if pid := r.URL.Query().Get("payment_id"); pid != "" && s.Checkout.Gateway != nil {
 		if n, err := strconv.ParseInt(pid, 10, 64); err == nil {
 			if pay, err := s.Checkout.Gateway.GetPayment(r.Context(), n); err == nil && pay.ExternalReference == id {
-				if err := s.applyPayment(pay); err != nil {
+				if err := s.applyPayment(r.Context(), pay); err != nil {
 					s.logCheckout("sync payment %d: %v", n, err)
 				}
 			}
@@ -694,7 +730,7 @@ func (s *Server) handleMPWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := s.applyPayment(pay); err != nil {
+	if err := s.applyPayment(r.Context(), pay); err != nil {
 		s.logCheckout("apply payment %d: %v", id, err)
 	} else {
 		s.logCheckout("webhook payment %d %s → order %s", pay.ID, pay.Status, pay.ExternalReference)
@@ -702,11 +738,11 @@ func (s *Server) handleMPWebhook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
-func (s *Server) applyPayment(pay mercadopago.Payment) error {
+func (s *Server) applyPayment(ctx context.Context, pay mercadopago.Payment) error {
 	if pay.ExternalReference == "" {
 		return nil
 	}
-	_, err := s.Checkout.Orders.Transact(pay.ExternalReference, func(o *orders.Order) error {
+	o, err := s.Checkout.Orders.Transact(pay.ExternalReference, func(o *orders.Order) error {
 		now := time.Now()
 		switch orders.EffectiveStatus(*o, now) {
 		case orders.StatusPaid, orders.StatusShipped:
@@ -744,7 +780,11 @@ func (s *Server) applyPayment(pay mercadopago.Payment) error {
 	if errors.Is(err, orders.ErrNotFound) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	s.releaseLater(ctx, o)
+	return nil
 }
 
 func (s *Server) settle(o *orders.Order, pay mercadopago.Payment, now time.Time) error {
@@ -794,6 +834,10 @@ func (s *Server) settle(o *orders.Order, pay mercadopago.Payment, now time.Time)
 			l.TradeIDs = append(l.TradeIDs, sold.ID)
 		}
 	}
+	if !o.CouponsReleasedAt.IsZero() {
+		o.Notes = appendNote(o.Notes, "cupons liberados antes do pagamento")
+		s.logCheckout("pedido #%d pago com cupons já liberados: %s", o.Number, strings.Join(codesOf(o.Coupons), ", "))
+	}
 	o.Status = orders.StatusPaid
 	o.PaidAt = now
 	return nil
@@ -810,6 +854,10 @@ func bySKU(all []trades.Trade, game, sku string) []trades.Trade {
 }
 
 func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
+	if uid := strings.TrimSpace(r.URL.Query().Get("collectaUserId")); uid != "" {
+		s.handleUserOrders(w, r, uid)
+		return
+	}
 	if !s.requireAdmin(w, r) {
 		return
 	}
@@ -823,6 +871,26 @@ func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 		all[i].Status = orders.EffectiveStatus(all[i], now)
 	}
 	writeJSON(w, all)
+}
+
+func (s *Server) handleUserOrders(w http.ResponseWriter, r *http.Request, uid string) {
+	if !s.requireStorefront(w, r) {
+		return
+	}
+	all, err := s.Checkout.Orders.List()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	now := time.Now()
+	out := make([]publicOrder, 0)
+	for _, o := range all {
+		if o.CollectaUserID == uid {
+			out = append(out, publicView(o, now))
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, out)
 }
 
 func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
@@ -884,6 +952,9 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if in.Status != nil {
+		s.releaseLater(r.Context(), o)
 	}
 	writeJSON(w, o)
 }

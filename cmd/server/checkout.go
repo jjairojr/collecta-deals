@@ -7,13 +7,14 @@ import (
 
 	"opdeals/internal/api"
 	"opdeals/internal/checkoutfake"
+	"opdeals/internal/collecta"
 	"opdeals/internal/logx"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/orders"
 	"opdeals/internal/shipping"
 )
 
-func buildCheckout(ordersPath, storefrontToken string, logger *logx.Logger) (api.Checkout, error) {
+func buildCheckout(ordersPath, storefrontToken, collectaAPI, collectaToken string, logger *logx.Logger) (api.Checkout, error) {
 	log := logger.WithPrefix("CHECKOUT")
 	c := api.Checkout{
 		Orders:          orders.NewStore(ordersPath, log),
@@ -55,6 +56,17 @@ func buildCheckout(ordersPath, storefrontToken string, logger *logx.Logger) (api
 		log.Printf("CHECKOUT_FAKE=1 without MELHORENVIO_TOKEN: freight is made up — never in production")
 	} else {
 		log.Printf("MELHORENVIO_TOKEN unset: shipping quotes disabled")
+	}
+	switch {
+	case collectaAPI != "" && collectaToken != "":
+		c.Coupons = collecta.New(collectaAPI, collectaToken)
+	case fake:
+		c.Coupons = checkoutfake.Coupons{}
+		log.Printf("CHECKOUT_FAKE=1 without COLLECTA_API: every coupon is accepted by a local stub — never in production")
+	case collectaAPI != "" || collectaToken != "":
+		log.Printf("COLLECTA_API and COLLECTA_STORE_TOKEN must both be set: coupons disabled")
+	default:
+		log.Printf("COLLECTA_API unset: coupons disabled")
 	}
 	if c.WebhookSecret == "" {
 		log.Printf("MP_WEBHOOK_SECRET unset: webhook notifications will be rejected")

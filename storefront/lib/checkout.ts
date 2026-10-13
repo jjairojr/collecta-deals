@@ -65,7 +65,8 @@ export interface PublicOrder {
   number: number;
   status: OrderStatus;
   lines: PublicOrderLine[];
-  totals: { itemsBRL: number; shippingBRL: number; totalBRL: number };
+  totals: { itemsBRL: number; shippingBRL: number; discountBRL: number; totalBRL: number };
+  coupons?: { code: string; valueBRL: number }[];
   shipping: {
     serviceID: number;
     serviceName: string;
@@ -77,6 +78,7 @@ export interface PublicOrder {
   initPoint?: string;
   expiresAt: string;
   firstName: string;
+  createdAt: string;
 }
 
 export interface LineProblem {
@@ -87,6 +89,7 @@ export interface LineProblem {
 
 export interface CheckoutError {
   error: string;
+  message?: string;
   lines?: LineProblem[];
   services?: ShippingOption[];
 }

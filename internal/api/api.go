@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -61,6 +62,7 @@ type Server struct {
 	PhotoDir       string
 	Checkout       Checkout
 	imports        *importsCache
+	releasing      sync.Map
 }
 
 // New builds the API server. readOnly gates every scrape-triggering endpoint
