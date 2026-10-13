@@ -239,6 +239,33 @@ func (s *Store) Create(build func(reserved map[string]int) (Order, error)) (Orde
 	return o, nil
 }
 
+func (s *Store) CancelPending(match func(Order) bool, note string) ([]Order, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	cancelled := make([]Order, 0)
+	for i := range all {
+		if !all[i].Reserves(now) || !match(all[i]) {
+			continue
+		}
+		all[i].Status = StatusCancelled
+		all[i].Notes = note
+		all[i].UpdatedAt = now
+		cancelled = append(cancelled, all[i])
+	}
+	if len(cancelled) == 0 {
+		return nil, nil
+	}
+	if err := s.persist(all); err != nil {
+		return nil, err
+	}
+	return cancelled, nil
+}
+
 func (s *Store) Update(id string, mut func(*Order)) (Order, error) {
 	return s.Transact(id, func(o *Order) error {
 		mut(o)

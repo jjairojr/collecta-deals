@@ -574,3 +574,41 @@ func TestJoinWithPaidOrder(t *testing.T) {
 		t.Fatalf("joined order must inherit the base address: %+v", joined.Address)
 	}
 }
+
+func TestRetrySupersedesPendingOrder(t *testing.T) {
+	f := checkoutServer(t)
+	first := f.createOrder(t)
+	rec := f.do(t, http.MethodPost, "/api/orders", validOrderBody(2, 25000), storefrontHeaders())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("retry must not hit its own reservation: %d %s", rec.Code, rec.Body.String())
+	}
+	got, _ := f.s.Checkout.Orders.Get(first.ID)
+	if got.Status != orders.StatusCancelled || !strings.Contains(got.Notes, "nova tentativa") {
+		t.Fatalf("first order = %+v", got)
+	}
+	reserved, _ := f.s.Checkout.Orders.Reserved(time.Now())
+	if reserved[teachSKU] != 2 {
+		t.Fatalf("reserved = %v want only the retry", reserved)
+	}
+	f.gw.payments[11] = mercadopago.Payment{ID: 11, Status: "approved", ExternalReference: first.ID, AmountBRL: 512, Method: "pix"}
+	f.webhook(t, "11", testWebhookSecret)
+	got, _ = f.s.Checkout.Orders.Get(first.ID)
+	if got.Status != orders.StatusPaid || len(f.soldTrades(t)) != 2 {
+		t.Fatalf("a cancelled order that gets paid must still settle: %+v", got)
+	}
+}
+
+func TestCancelPendingIgnoresOtherBuyers(t *testing.T) {
+	f := checkoutServer(t)
+	first := f.createOrder(t)
+	other := validOrderBody(2, 25000)
+	other["buyer"] = map[string]string{"name": "Bruno Lima", "email": "bruno@example.com", "phone": "11988887777", "cpf": "390.533.447-05"}
+	rec := f.do(t, http.MethodPost, "/api/orders", other, storefrontHeaders())
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("another buyer must still see the reservation: %d %s", rec.Code, rec.Body.String())
+	}
+	got, _ := f.s.Checkout.Orders.Get(first.ID)
+	if got.Status != orders.StatusPending {
+		t.Fatalf("first order = %+v", got)
+	}
+}

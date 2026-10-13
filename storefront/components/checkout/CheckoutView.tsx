@@ -177,6 +177,7 @@ export default function CheckoutView() {
           <p className="font-pixel text-[10px] leading-relaxed text-brand-soft">
             SEU CARRINHO ESTA VAZIO
           </p>
+          {notice && <p className="text-sm text-[#c9c9d1]">{notice}</p>}
           <Link
             href="/singles"
             className="arcade-press sticker rounded-[10px] bg-brand px-5 py-3 font-pixel text-[10px] text-white"

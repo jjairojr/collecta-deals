@@ -387,6 +387,13 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		in.Address = base.Address
 	}
 
+	if _, err := s.Checkout.Orders.CancelPending(func(o orders.Order) bool {
+		return o.Buyer.CPF == in.Buyer.CPF || o.Buyer.Email == in.Buyer.Email
+	}, "substituído por uma nova tentativa do mesmo comprador"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	var conflict map[string]any
 	order, err := s.Checkout.Orders.Create(func(reserved map[string]int) (orders.Order, error) {
 		idx, err := s.buildSKUIndex()
@@ -711,13 +718,17 @@ func (s *Server) applyPayment(pay mercadopago.Payment) error {
 				o.MP.Status = pay.Status
 			}
 			return nil
-		case orders.StatusCancelled, orders.StatusOversold, orders.StatusRefunded:
+		case orders.StatusOversold, orders.StatusRefunded:
 			if o.MP.PaymentID == 0 {
 				o.MP.PaymentID = pay.ID
 				o.MP.Status = pay.Status
 				o.MP.Method = pay.Method
 			}
 			return nil
+		case orders.StatusCancelled:
+			if pay.Status != "approved" {
+				return nil
+			}
 		}
 		o.MP.PaymentID = pay.ID
 		o.MP.Status = pay.Status
