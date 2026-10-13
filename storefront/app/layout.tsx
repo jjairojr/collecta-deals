@@ -5,7 +5,7 @@ import "./globals.css";
 import { AccountProvider } from "@/lib/account";
 import { CartProvider } from "@/lib/cart";
 import { loadCatalog } from "@/lib/catalog";
-import { organizationJsonLd, webSiteJsonLd } from "@/lib/seo";
+import { organizationJsonLd, storeJsonLd, webSiteJsonLd } from "@/lib/seo";
 import { siteURL } from "@/lib/site";
 import AnnouncementBar from "@/components/chrome/AnnouncementBar";
 import Header from "@/components/chrome/Header";
@@ -35,20 +35,20 @@ const pressStart = Press_Start_2P({
 export const metadata: Metadata = {
   metadataBase: new URL(siteURL),
   title: {
-    default: "Collecta — Cartas Pokémon, One Piece e Riftbound · Singles e Selados",
+    default: "Collecta — Loja de cartas Pokémon, One Piece e TCG em Goiânia · Singles e Selados",
     template: "%s — Collecta",
   },
   description:
-    "Loja de cartas TCG do Brasil: singles avulsas e produto selado de Pokémon, One Piece e Riftbound. Cartas conferidas uma a uma, pedido pelo WhatsApp e envio para todo o Brasil.",
+    "Loja de cartas TCG em Goiânia: singles avulsas e produto selado de Pokémon, One Piece, Riftbound, Lorcana e Gundam. Loja física no Setor Oeste aberta todos os dias das 12h às 22h, cartas conferidas uma a uma e envio para todo o Brasil.",
   applicationName: "Collecta",
   // Merchant Center verifies by reading the served HTML, so the tag has to be
   // rendered server-side — the GA snippet only appears after hydration and is
   // invisible to the verifier.
   verification: { google: "XoLIZnAr8k3IRTvhhH2xi3uSc1Rr3Z4GYa4VTPg5_2w" },
   openGraph: {
-    title: "Collecta — Loja de cartas TCG",
+    title: "Collecta — Loja de cartas TCG em Goiânia",
     description:
-      "Singles e selados de Pokémon, One Piece e Riftbound. Monte seu pedido e finalize no WhatsApp.",
+      "Singles e selados de Pokémon, One Piece, Riftbound, Lorcana e Gundam. Loja física no Setor Oeste e envio para todo o Brasil.",
     type: "website",
     locale: "pt_BR",
     siteName: "Collecta",
@@ -56,8 +56,6 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Collecta — Loja de cartas TCG",
-    description: "Singles e selados. Peça pelo WhatsApp.",
   },
 };
 
@@ -81,6 +79,7 @@ export default async function RootLayout({
       <body>
         <JsonLd data={organizationJsonLd()} />
         <JsonLd data={webSiteJsonLd()} />
+        <JsonLd data={storeJsonLd()} />
         <AccountProvider>
         <CartProvider>
           <Scanlines />
@@ -93,10 +92,10 @@ export default async function RootLayout({
         </CartProvider>
         </AccountProvider>
         <MetaPixel />
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+        )}
       </body>
-      {process.env.NEXT_PUBLIC_GA_ID && (
-        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
-      )}
     </html>
   );
 }

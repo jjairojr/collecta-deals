@@ -12,6 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteURL("/"), changeFrequency: "daily", priority: 1 },
     { url: absoluteURL("/singles"), changeFrequency: "daily", priority: 0.9 },
     { url: absoluteURL("/selado"), changeFrequency: "daily", priority: 0.9 },
+    { url: absoluteURL("/loja"), changeFrequency: "monthly", priority: 0.8 },
     {
       url: absoluteURL("/politica-de-devolucao"),
       changeFrequency: "yearly",

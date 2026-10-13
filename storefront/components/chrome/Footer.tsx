@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Container from "@/components/ui/Container";
 import WhatsAppLink from "@/components/chrome/WhatsAppLink";
+import { STORE, STORE_ADDRESS_LINE, STORE_MAPS_URL } from "@/lib/store";
 
 export default function Footer() {
   const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP;
@@ -8,17 +9,30 @@ export default function Footer() {
 
   return (
     <footer className="mt-16 border-t-[6px] border-outline bg-brand">
-      <Container className="flex flex-col items-start gap-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+      <Container className="flex flex-col items-start gap-6 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <span className="font-display logo-shadow text-3xl leading-none text-white">
             COLLECTA
           </span>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-white">
-            Loja de cartas do Brasil. Singles e selados — conferidos carta por
-            carta.
+            Loja de cartas TCG em Goiânia. Singles e selados conferidos carta por
+            carta, envio para todo o Brasil.
           </p>
+          <address className="mt-3 max-w-xs text-sm not-italic leading-relaxed text-white">
+            <a href={STORE_MAPS_URL} target="_blank" rel="noopener" className="underline-offset-4 hover:underline">
+              {STORE_ADDRESS_LINE}
+            </a>
+            <br />
+            Todos os dias, {STORE.opens} às {STORE.closes} · {STORE.phone}
+          </address>
         </div>
-        <nav className="flex flex-wrap items-center gap-x-7 gap-y-1">
+        <nav className="flex max-w-md flex-wrap items-center gap-x-7 gap-y-1">
+          <Link
+            href="/loja"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Loja física
+          </Link>
           <Link
             href="/singles"
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
@@ -32,11 +46,25 @@ export default function Footer() {
             Produto selado
           </Link>
           <Link
+            href="/acessorios"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Acessórios
+          </Link>
+          <Link
             href="/politica-de-devolucao"
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
           >
             Devoluções
           </Link>
+          <a
+            href={STORE.instagram}
+            target="_blank"
+            rel="noopener"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Instagram {STORE.instagramHandle}
+          </a>
           <WhatsAppLink
             href={whatsappHref}
             origin="footer"

@@ -8,7 +8,7 @@ import SealedDetailView from "@/components/product/SealedDetailView";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadCatalog, loadSealedDetail } from "@/lib/catalog";
 import { GAME_NAMES } from "@/lib/games";
-import { breadcrumbJsonLd, sealedProductJsonLd } from "@/lib/seo";
+import { breadcrumbJsonLd, productOpenGraph, sealedProductJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
 
 export const revalidate = 60;
@@ -45,10 +45,10 @@ export async function generateMetadata({
   const { item, live } = res;
   return {
     title: `${item.headline ?? item.name} · ${item.gameLabel}`,
-    description: `Comprar ${item.name} lacrado na Collecta: ${item.format ?? "produto selado"} de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, com lacre original, por ${brl(item.price)}. Pedido pelo WhatsApp e envio para todo o Brasil.`,
+    description: `Comprar ${item.name} lacrado na Collecta: ${item.format ?? "produto selado"} de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, com lacre original, por ${brl(item.price)}. Retire na loja em Goiânia ou receba em todo o Brasil.`,
     alternates: { canonical: `/selado/${slug}` },
     robots: live ? undefined : { index: false },
-    openGraph: item.imageURL ? { images: [item.imageURL] } : undefined,
+    openGraph: productOpenGraph(`/selado/${slug}`, item.imageURL),
   };
 }
 

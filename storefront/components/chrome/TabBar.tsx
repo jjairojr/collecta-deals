@@ -61,6 +61,7 @@ export default function TabBar({
               active={pathname.startsWith("/acessorio")}
             />
           )}
+          <TabLink href="/loja" label="A LOJA" active={pathname === "/loja"} />
         </div>
         {fade.left && (
           <div

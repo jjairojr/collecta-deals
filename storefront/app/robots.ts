@@ -12,8 +12,8 @@ export default function robots(): MetadataRoute.Robots {
     // group alone fails its check. A named group fully replaces the wildcard
     // for that crawler, so /carrinho has to be repeated rather than inherited.
     rules: [
-      { userAgent: "*", allow: "/", disallow: ["/carrinho", "/checkout", "/pedido", "/api"] },
-      { userAgent: "Googlebot", allow: "/", disallow: ["/carrinho", "/checkout", "/pedido", "/api"] },
+      { userAgent: "*", allow: "/", disallow: ["/carrinho", "/checkout", "/pedido", "/conta", "/api"] },
+      { userAgent: "Googlebot", allow: "/", disallow: ["/carrinho", "/checkout", "/pedido", "/conta", "/api"] },
       { userAgent: "Googlebot-Image", allow: "/" },
     ],
     sitemap: `${siteURL}/sitemap.xml`,

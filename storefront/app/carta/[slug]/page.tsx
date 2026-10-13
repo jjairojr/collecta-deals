@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import SingleDetailView from "@/components/product/SingleDetailView";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadCatalog, loadSingleDetail } from "@/lib/catalog";
-import { breadcrumbJsonLd, singleProductJsonLd } from "@/lib/seo";
+import { breadcrumbJsonLd, productOpenGraph, singleProductJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
 
 export const revalidate = 60;
@@ -28,11 +28,11 @@ export async function generateMetadata({
   }
   const { item, live } = res;
   return {
-    title: `${item.name} ${item.number}${item.variant ? ` ${item.variant}` : ""} · ${item.set}`,
-    description: `Carta ${item.name} (${item.number}) do set ${item.set}${item.variant ? `, versão ${item.variant}` : ""}, ${item.condition}, por ${brl(item.price)}. Conferida uma a uma na Collecta — pedido pelo WhatsApp, envio para todo o Brasil.`,
+    title: `${item.name} ${item.number}${item.variant ? ` ${item.variant}` : ""} · ${item.gameLabel} ${item.set}`,
+    description: `Carta ${item.name} (${item.number}) de ${item.gameLabel}, set ${item.set}${item.variant ? `, versão ${item.variant}` : ""}, ${item.condition}, por ${brl(item.price)}. Conferida uma a uma na Collecta: retire na loja em Goiânia ou receba em todo o Brasil.`,
     alternates: { canonical: `/carta/${slug}` },
     robots: live ? undefined : { index: false },
-    openGraph: item.imageURL ? { images: [item.imageURL] } : undefined,
+    openGraph: productOpenGraph(`/carta/${slug}`, item.imageURL),
   };
 }
 

@@ -9,6 +9,7 @@ import SealedCard from "@/components/SealedCard";
 import TrackViewItemList from "@/components/analytics/TrackViewItemList";
 import { loadCatalog } from "@/lib/catalog";
 import { pixelText } from "@/lib/format";
+import { STORE, STORE_ADDRESS_LINE } from "@/lib/store";
 
 export const revalidate = 60;
 
@@ -69,9 +70,9 @@ export default async function HomePage() {
             <p className="mt-6 max-w-md text-[17px] leading-relaxed text-brand-soft sm:text-[19px]">
               Singles avulsas e produto selado de{" "}
               <strong className="font-bold text-white">Pokémon</strong>,{" "}
-              <strong className="font-bold text-white">One Piece</strong> e{" "}
-              <strong className="font-bold text-white">Riftbound</strong>.
-              Conferido carta por carta, enviado do Brasil.
+              <strong className="font-bold text-white">One Piece</strong>,{" "}
+              <strong className="font-bold text-white">Riftbound</strong> e mais.
+              Loja física em Goiânia, conferido carta por carta, envio para todo o Brasil.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -187,14 +188,21 @@ export default async function HomePage() {
           style={{ ["--sh" as string]: "6px" }}
         >
           <h2 className="font-display text-3xl font-bold leading-none text-white">
-            Loja de cartas TCG do Brasil
+            Loja de cartas TCG em Goiânia
           </h2>
           <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-muted">
-            A Collecta vende cartas avulsas (singles) e produto selado de
-            trading card games. Cada carta é conferida uma a uma antes do
-            envio, com a condição descrita no anúncio. Você monta o carrinho no
-            site, finaliza o pedido direto no WhatsApp e recebe em todo o
-            Brasil.
+            A Collecta vende cartas avulsas (singles), produto selado e
+            acessórios de trading card games. Cada carta é conferida uma a uma,
+            com a condição descrita no anúncio. Você monta o carrinho no site,
+            paga por Pix ou cartão e retira na loja ou recebe em todo o Brasil.
+          </p>
+          <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
+            Loja física na {STORE_ADDRESS_LINE}, aberta todos os dias das{" "}
+            {STORE.opens} às {STORE.closes}.{" "}
+            <Link href="/loja" className="text-brand-soft underline-offset-4 hover:underline">
+              Veja como chegar
+            </Link>
+            .
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {games.map((g) => (
