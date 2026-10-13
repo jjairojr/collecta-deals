@@ -314,18 +314,31 @@ function mockCatalog(): Catalog {
   };
 }
 
+const RETRY_STATUSES = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [2000, 5000, 10000, 20000];
+
+async function fetchStorefront(base: string): Promise<RawResponse> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${base}/api/storefront`, {
+      next: { revalidate: 60 },
+    });
+    if (res.ok) {
+      return (await res.json()) as RawResponse;
+    }
+    const delay = RETRY_DELAYS_MS[attempt];
+    if (!RETRY_STATUSES.has(res.status) || delay === undefined) {
+      throw new Error(`storefront api ${res.status}`);
+    }
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
 export async function loadCatalog(): Promise<Catalog> {
   const base = process.env.STOREFRONT_API;
   if (!base) {
     return mockCatalog();
   }
-  const res = await fetch(`${base}/api/storefront`, {
-    next: { revalidate: 60 },
-  });
-  if (!res.ok) {
-    throw new Error(`storefront api ${res.status}`);
-  }
-  const data = (await res.json()) as RawResponse;
+  const data = await fetchStorefront(base);
   const raw = data.items ?? [];
   const version = artVersion(data.artVersion);
   const singles = dedupProducts(
@@ -350,6 +363,18 @@ export async function loadCatalog(): Promise<Catalog> {
 // Product detail. Curated mock overrides only apply when the catalog itself is
 // the mock fallback — a live catalog must never serve demo products. `live`
 // travels with the item so pages can noindex mock-derived content.
+export function findBySku(
+  catalog: Catalog,
+  sku: string,
+): Single | Sealed | Accessory | null {
+  return (
+    catalog.singles.find((c) => c.sku === sku) ??
+    catalog.sealed.find((c) => c.sku === sku) ??
+    catalog.accessories.find((c) => c.sku === sku) ??
+    null
+  );
+}
+
 export interface DetailResult<T> {
   item: T;
   live: boolean;

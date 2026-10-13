@@ -7,6 +7,7 @@ import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import { sealedItem, trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
+import { sealedToCartLine } from "@/lib/cart-lines";
 import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
 import type { AccessoryDetail, SealedDetail } from "@/lib/types";
@@ -35,20 +36,7 @@ export default function SealedDetailView({
   }, [item]);
 
   const addToCart = () => {
-    add(
-      {
-        slug: item.slug,
-        sku: item.sku,
-        kind: item.kind,
-        name: item.name,
-        meta: subtitle,
-        seller: "Collecta Oficial",
-        price: item.price,
-        stock: item.stockLeft,
-        imageURL: item.imageURL,
-      },
-      qty,
-    );
+    add(sealedToCartLine(item, item.stockLeft), qty);
     trackAddToCart(sealedItem(item, qty));
   };
 

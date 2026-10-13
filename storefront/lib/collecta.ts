@@ -150,3 +150,32 @@ export function referralMe(token: string): Promise<ReferralOverview> {
 export function referralCheck(code: string): Promise<CodeCheck> {
   return query<CodeCheck>("referral.check", { code });
 }
+
+export interface HandoffLine {
+  sku: string;
+  qty: number;
+}
+
+export interface HandoffResult {
+  token: string | null;
+  lines: HandoffLine[];
+}
+
+export async function exchangeHandoff(code: string): Promise<HandoffResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${base()}/store/handoff/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ code }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new CollectaError("conta indisponível no momento", 502);
+  }
+  const body = (await res.json()) as Partial<HandoffResult> & { message?: string };
+  if (!res.ok) {
+    throw new CollectaError(body.message ?? "link inválido", res.status);
+  }
+  return { token: body.token ?? null, lines: Array.isArray(body.lines) ? body.lines : [] };
+}

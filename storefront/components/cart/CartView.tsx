@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import Container from "@/components/ui/Container";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
@@ -11,13 +12,59 @@ import {
   trackRemoveFromCart,
   trackViewCart,
 } from "@/lib/analytics";
+import { useAccount } from "@/lib/account";
 import { useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
+import type { CartLine } from "@/lib/types";
 import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
+const HANDOFF_EXPIRED = "O link do app expirou. Volte ao app e toque em Pagar no site de novo.";
+
+function handoffNotice(count: number, missing: number): string {
+  const loaded = count === 0 ? "Nenhum item do app está disponível." : `Carrinho do app carregado: ${count} ${count === 1 ? "item" : "itens"}.`;
+  if (missing === 0) {
+    return loaded;
+  }
+  return `${loaded} ${missing} ${missing === 1 ? "item esgotou" : "itens esgotaram"} e ficou de fora.`;
+}
+
 export default function CartView() {
-  const { lines, total, setQty, remove } = useCart();
+  const { lines, total, setQty, remove, clear, add } = useCart();
+  const { refresh } = useAccount();
+  const router = useRouter();
+  const params = useSearchParams();
+  const fromApp = params.get("origem") === "app";
+  const handoffFailed = params.get("erro") === "1";
+  const [notice, setNotice] = useState<string | null>(null);
   const viewed = useRef(false);
+  const imported = useRef(false);
+
+  useEffect(() => {
+    if (!fromApp || imported.current) {
+      return;
+    }
+    imported.current = true;
+    if (handoffFailed) {
+      setNotice(HANDOFF_EXPIRED);
+      router.replace("/carrinho");
+      return;
+    }
+    fetch("/api/carrinho/app/linhas", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { lines: CartLine[]; missing: number }) => {
+        clear();
+        for (const line of data.lines) {
+          const { qty, ...rest } = line;
+          add(rest, qty);
+        }
+        setNotice(handoffNotice(data.lines.length, data.missing));
+      })
+      .catch(() => setNotice(HANDOFF_EXPIRED))
+      .finally(() => {
+        void refresh();
+        router.replace("/carrinho");
+      });
+  }, [fromApp, handoffFailed, clear, add, refresh, router]);
 
   useEffect(() => {
     if (!viewed.current && lines.length > 0) {
@@ -26,9 +73,19 @@ export default function CartView() {
     }
   }, [lines]);
 
+  const banner = notice ? (
+    <div
+      className="sticker mb-6 rounded-[12px] bg-royal px-5 py-4 text-[15px] leading-snug text-white"
+      style={{ ["--sh" as string]: "4px" }}
+    >
+      {notice}
+    </div>
+  ) : null;
+
   if (lines.length === 0) {
     return (
       <Container narrow className="py-16">
+        {banner}
         <div
           className="sticker sticker-5 mx-auto flex max-w-md flex-col items-center gap-5 rounded-[18px] border-brand bg-outline px-8 py-14 text-center"
           style={{ ["--sh" as string]: "8px" }}
@@ -73,6 +130,7 @@ export default function CartView() {
       <div className="mt-3 font-pixel text-[9px] text-brand">
         {count} {count === 1 ? "ITEM" : "ITENS"} · 1 FICHA PARA CONTINUAR
       </div>
+      {banner ? <div className="mt-6">{banner}</div> : null}
 
       <div className="mt-7 grid gap-7 lg:grid-cols-[1.4fr_.6fr] lg:items-start">
         {/* Line items */}

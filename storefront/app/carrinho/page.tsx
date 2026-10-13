@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import CartView from "@/components/cart/CartView";
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function CarrinhoPage() {
-  return <CartView />;
+  return (
+    <Suspense>
+      <CartView />
+    </Suspense>
+  );
 }

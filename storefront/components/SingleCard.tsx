@@ -6,23 +6,8 @@ import { useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
 import { gameArtHue } from "@/lib/games";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
+import { singleToCartLine } from "@/lib/cart-lines";
 import type { Single } from "@/lib/types";
-
-export function singleToCartLine(item: Single) {
-  return {
-    slug: item.slug,
-    sku: item.sku,
-    kind: "single" as const,
-    name: item.name,
-    meta: [item.set, item.number, item.variant, item.condition]
-      .filter(Boolean)
-      .join(" · "),
-    seller: "Collecta Oficial",
-    price: item.price,
-    stock: item.qty,
-    imageURL: item.imageURL,
-  };
-}
 
 // Grid item used across Home (featured) and Browse. The whole card links to the
 // product page; the + ADD chip adds to the cart without navigating.
