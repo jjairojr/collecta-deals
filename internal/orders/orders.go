@@ -65,6 +65,7 @@ type Shipping struct {
 	Company      string  `json:"company"`
 	PriceBRL     float64 `json:"priceBRL"`
 	DeliveryDays int     `json:"deliveryDays"`
+	JoinOrder    int     `json:"joinOrder,omitempty"`
 }
 
 type Totals struct {

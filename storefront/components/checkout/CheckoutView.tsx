@@ -10,6 +10,8 @@ import { useCart } from "@/lib/cart";
 import {
   cents,
   digits,
+  isJoin,
+  isPickup,
   lookupCEP,
   maskCEP,
   maskCPF,
@@ -20,6 +22,7 @@ import {
   type Address,
   type Buyer,
   type CheckoutError,
+  type OrderLineInput,
   type ShippingOption,
 } from "@/lib/checkout";
 import { brl, pixelText } from "@/lib/format";
@@ -36,12 +39,26 @@ const EMPTY_ADDRESS: Address = {
   state: "",
 };
 
+type Mode = "ship" | "pickup" | "join";
 type BuyerErrors = Partial<Record<keyof Buyer, string>>;
 type AddressErrors = Partial<Record<keyof Address, string>>;
 
 interface CreateResponse {
   id: string;
   initPoint: string;
+}
+
+async function quote(cep: string, lines: OrderLineInput[]): Promise<ShippingOption[]> {
+  const res = await fetch("/api/frete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cep, lines }),
+  });
+  const data = (await res.json()) as { services?: ShippingOption[]; error?: string };
+  if (!res.ok) {
+    throw new Error(data.error ?? "frete indisponível");
+  }
+  return data.services ?? [];
 }
 
 export default function CheckoutView() {
@@ -51,10 +68,14 @@ export default function CheckoutView() {
   const [buyerErrors, setBuyerErrors] = useState<BuyerErrors>({});
   const [addressErrors, setAddressErrors] = useState<AddressErrors>({});
   const [cepLoading, setCepLoading] = useState(false);
-  const [options, setOptions] = useState<ShippingOption[] | null>(null);
+  const [mode, setMode] = useState<Mode>("ship");
+  const [local, setLocal] = useState<ShippingOption[]>([]);
+  const [carriers, setCarriers] = useState<ShippingOption[] | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [serviceID, setServiceID] = useState<number | null>(null);
+  const [carrierID, setCarrierID] = useState<number | null>(null);
+  const [joinOrder, setJoinOrder] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const begun = useRef(false);
@@ -66,46 +87,60 @@ export default function CheckoutView() {
     }
   }, [lines, itemsCents]);
 
+  useEffect(() => {
+    document.body.classList.add("no-scanlines");
+    return () => document.body.classList.remove("no-scanlines");
+  }, []);
+
   const cepDigits = digits(address.cep);
   const payloadLines = useMemo(() => orderLines(lines), [lines]);
 
   useEffect(() => {
-    if (cepDigits.length !== 8 || payloadLines.length === 0) {
-      setOptions(null);
-      setServiceID(null);
+    if (payloadLines.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    quote("", payloadLines)
+      .then((services) => {
+        if (!cancelled) {
+          setLocal(services.filter((s) => s.serviceID < 0));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocal([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [payloadLines]);
+
+  useEffect(() => {
+    if (mode !== "ship" || cepDigits.length !== 8 || payloadLines.length === 0) {
+      setCarriers(null);
+      setCarrierID(null);
       return;
     }
     let cancelled = false;
     setQuoting(true);
     setQuoteError(null);
-    fetch("/api/frete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cep: cepDigits, lines: payloadLines }),
-    })
-      .then(async (res) => {
-        const data = (await res.json()) as { services?: ShippingOption[]; error?: string };
-        if (!res.ok) {
-          throw new Error(data.error ?? "frete indisponível");
-        }
-        return data.services ?? [];
-      })
+    quote(cepDigits, payloadLines)
       .then((services) => {
         if (cancelled) {
           return;
         }
-        setOptions(services);
-        setServiceID((prev) =>
-          services.some((s) => s.serviceID === prev)
-            ? prev
-            : (services[0]?.serviceID ?? null),
+        const found = services.filter((s) => s.serviceID >= 0);
+        setCarriers(found);
+        setCarrierID((prev) =>
+          found.some((s) => s.serviceID === prev) ? prev : (found[0]?.serviceID ?? null),
         );
       })
       .catch((err: unknown) => {
         if (cancelled) {
           return;
         }
-        setOptions([]);
+        setCarriers([]);
         setQuoteError(err instanceof Error ? err.message : "frete indisponível");
       })
       .finally(() => {
@@ -116,9 +151,16 @@ export default function CheckoutView() {
     return () => {
       cancelled = true;
     };
-  }, [cepDigits, payloadLines]);
+  }, [mode, cepDigits, payloadLines]);
 
-  const chosen = options?.find((s) => s.serviceID === serviceID) ?? null;
+  const pickupOption = local.find((s) => isPickup(s.serviceID)) ?? null;
+  const joinOption = local.find((s) => isJoin(s.serviceID)) ?? null;
+  const chosen: ShippingOption | null =
+    mode === "pickup"
+      ? pickupOption
+      : mode === "join"
+        ? joinOption
+        : (carriers?.find((s) => s.serviceID === carrierID) ?? null);
   const shippingCents = chosen ? cents(chosen.priceBRL) : 0;
   const totalCents = itemsCents + shippingCents;
 
@@ -186,7 +228,7 @@ export default function CheckoutView() {
 
   const submit = async () => {
     const be = validateBuyer(buyer);
-    const ae = validateAddress(address);
+    const ae = mode === "ship" ? validateAddress(address) : {};
     setBuyerErrors(be);
     setAddressErrors(ae);
     if (Object.keys(be).length > 0 || Object.keys(ae).length > 0) {
@@ -194,7 +236,12 @@ export default function CheckoutView() {
       return;
     }
     if (!chosen) {
-      setNotice("Escolha uma opção de frete.");
+      setNotice(mode === "ship" ? "Escolha uma opção de frete." : "Escolha como quer receber.");
+      return;
+    }
+    if (mode === "join" && !/^\d+$/.test(joinOrder.trim())) {
+      setJoinError("Número do pedido");
+      setNotice("Informe o número do pedido pago que vai junto.");
       return;
     }
     setSubmitting(true);
@@ -206,8 +253,12 @@ export default function CheckoutView() {
         body: JSON.stringify({
           lines: payloadLines,
           buyer,
-          address: { ...address, cep: cepDigits },
-          shipping: { serviceID: chosen.serviceID, priceBRL: chosen.priceBRL },
+          address: mode === "ship" ? { ...address, cep: cepDigits } : EMPTY_ADDRESS,
+          shipping: {
+            serviceID: chosen.serviceID,
+            priceBRL: chosen.priceBRL,
+            joinOrder: mode === "join" ? Number(joinOrder) : 0,
+          },
         }),
       });
       const data = (await res.json()) as CreateResponse & CheckoutError;
@@ -232,9 +283,13 @@ export default function CheckoutView() {
         }
         cap(stock);
         setNotice("Parte do estoque acabou enquanto você finalizava. Ajustamos as quantidades do carrinho.");
+      } else if (data.error === "join_not_found") {
+        setJoinError("Não encontrado");
+        setNotice("Não achamos um pedido pago com esse número no seu CPF ou e-mail, ou ele já foi enviado.");
       } else if (data.error === "shipping_changed" && data.services) {
-        setOptions(data.services);
-        setServiceID(data.services[0]?.serviceID ?? null);
+        const found = data.services.filter((s) => s.serviceID >= 0);
+        setCarriers(found);
+        setCarrierID(found[0]?.serviceID ?? null);
         setNotice("O valor do frete mudou. Escolha de novo a forma de envio.");
       } else {
         setNotice(data.error ?? "Não foi possível criar o pedido. Tente de novo em instantes.");
@@ -251,6 +306,26 @@ export default function CheckoutView() {
     window.open(whatsappURL(buildOrder(lines, itemsCents)), "_blank", "noopener");
   };
 
+  const modes: { key: Mode; title: string; detail: string; price: string }[] = [
+    { key: "ship", title: "Receber pelos Correios", detail: "frete calculado pelo seu CEP", price: "" },
+  ];
+  if (pickupOption) {
+    modes.push({
+      key: "pickup",
+      title: pickupOption.name,
+      detail: `${pickupOption.company} · combinar pelo WhatsApp`,
+      price: "GRATIS",
+    });
+  }
+  if (joinOption) {
+    modes.push({
+      key: "join",
+      title: joinOption.name,
+      detail: "na mesma encomenda de um pedido pago que ainda não saiu",
+      price: "GRATIS",
+    });
+  }
+
   return (
     <Container narrow className="py-9">
       <h1 className="font-display text-4xl font-bold leading-none text-white sm:text-[52px]">
@@ -260,12 +335,20 @@ export default function CheckoutView() {
         PLAYER 1 · PREENCHA E PAGUE
       </div>
 
-      <div className="mt-7 grid gap-7 lg:grid-cols-[1.4fr_.6fr] lg:items-start">
+      <form
+        className="mt-7 grid gap-7 lg:grid-cols-[1.4fr_.6fr] lg:items-start"
+        autoComplete="on"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
         <div className="min-w-0 space-y-5">
           <Section step="01" title="Seus dados">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Nome completo"
+                name="name"
                 value={buyer.name}
                 onChange={(v) => setBuyerField("name", v)}
                 error={buyerErrors.name}
@@ -274,6 +357,7 @@ export default function CheckoutView() {
               />
               <Field
                 label="E-mail"
+                name="email"
                 value={buyer.email}
                 onChange={(v) => setBuyerField("email", v)}
                 error={buyerErrors.email}
@@ -282,6 +366,7 @@ export default function CheckoutView() {
               />
               <Field
                 label="Celular / WhatsApp"
+                name="phone"
                 value={buyer.phone}
                 onChange={(v) => setBuyerField("phone", maskPhone(v))}
                 error={buyerErrors.phone}
@@ -291,6 +376,7 @@ export default function CheckoutView() {
               />
               <Field
                 label="CPF"
+                name="cpf"
                 value={buyer.cpf}
                 onChange={(v) => setBuyerField("cpf", maskCPF(v))}
                 error={buyerErrors.cpf}
@@ -300,97 +386,153 @@ export default function CheckoutView() {
             </div>
           </Section>
 
-          <Section step="02" title="Endereço de entrega">
-            <div className="grid gap-4 sm:grid-cols-6">
-              <Field
-                label={cepLoading ? "CEP · buscando" : "CEP"}
-                value={address.cep}
-                onChange={(v) => void onCEP(v)}
-                error={addressErrors.cep}
-                inputMode="numeric"
-                autoComplete="postal-code"
-                placeholder="00000-000"
-                className="sm:col-span-2"
-              />
-              <Field
-                label="Rua"
-                value={address.street}
-                onChange={(v) => setAddressField("street", v)}
-                error={addressErrors.street}
-                autoComplete="address-line1"
-                className="sm:col-span-4"
-              />
-              <Field
-                label="Número"
-                value={address.number}
-                onChange={(v) => setAddressField("number", v)}
-                error={addressErrors.number}
-                className="sm:col-span-2"
-              />
-              <Field
-                label="Complemento"
-                value={address.complement}
-                onChange={(v) => setAddressField("complement", v)}
-                placeholder="apto, bloco…"
-                className="sm:col-span-4"
-              />
-              <Field
-                label="Bairro"
-                value={address.district}
-                onChange={(v) => setAddressField("district", v)}
-                error={addressErrors.district}
-                className="sm:col-span-2"
-              />
-              <Field
-                label="Cidade"
-                value={address.city}
-                onChange={(v) => setAddressField("city", v)}
-                error={addressErrors.city}
-                autoComplete="address-level2"
-                className="sm:col-span-3"
-              />
-              <div className="sm:col-span-1">
-                <UFSelect
-                  value={address.state}
-                  onChange={(v) => setAddressField("state", v)}
-                  error={addressErrors.state}
+          <Section step="02" title="Como receber">
+            <div className="grid gap-3">
+              {modes.map((m) => (
+                <OptionChip
+                  key={m.key}
+                  title={m.title}
+                  detail={m.detail}
+                  price={m.price}
+                  selected={mode === m.key}
+                  onSelect={() => setMode(m.key)}
                 />
-              </div>
+              ))}
             </div>
-          </Section>
 
-          <Section step="03" title="Frete">
-            {cepDigits.length !== 8 ? (
-              <p className="text-sm text-muted">
-                Informe o CEP para ver as opções de envio.
+            {mode === "pickup" && (
+              <p className="mt-4 text-sm text-muted">
+                Depois do pagamento a gente combina dia e local da retirada pelo
+                WhatsApp. Sem endereço, sem frete.
               </p>
-            ) : quoting ? (
-              <p className="font-pixel text-[9px] text-brand-soft animate-blink">
-                CALCULANDO FRETE...
-              </p>
-            ) : quoteError ? (
-              <p className="text-sm text-brand">
-                Não conseguimos cotar o frete agora ({quoteError}). Tente de novo ou
-                feche pelo WhatsApp.
-              </p>
-            ) : options && options.length === 0 ? (
-              <p className="text-sm text-brand">
-                Nenhuma transportadora atende esse CEP com esse pacote. Fale com a
-                gente no WhatsApp.
-              </p>
-            ) : (
-              <div className="grid gap-3">
-                {options?.map((s) => (
-                  <FreightOption
-                    key={s.serviceID}
-                    option={s}
-                    selected={s.serviceID === serviceID}
-                    onSelect={() => setServiceID(s.serviceID)}
-                  />
-                ))}
+            )}
+
+            {mode === "join" && (
+              <div className="mt-4 grid gap-2 sm:max-w-xs">
+                <Field
+                  label="Número do pedido pago"
+                  name="joinOrder"
+                  value={joinOrder}
+                  onChange={(v) => {
+                    setJoinOrder(digits(v));
+                    setJoinError(null);
+                  }}
+                  error={joinError ?? undefined}
+                  inputMode="numeric"
+                  placeholder="ex. 12"
+                />
+                <p className="text-xs text-muted">
+                  Só vale para pedido já pago e ainda não enviado, no mesmo CPF ou
+                  e-mail. Vai para o mesmo endereço, numa encomenda só.
+                </p>
               </div>
             )}
           </Section>
+
+          {mode === "ship" && (
+            <Section step="03" title="Endereço de entrega">
+              <div className="grid gap-4 sm:grid-cols-6">
+                <Field
+                  label={cepLoading ? "CEP · buscando" : "CEP"}
+                  name="cep"
+                  value={address.cep}
+                  onChange={(v) => void onCEP(v)}
+                  error={addressErrors.cep}
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  placeholder="00000-000"
+                  className="sm:col-span-2"
+                />
+                <Field
+                  label="Rua"
+                  name="street"
+                  value={address.street}
+                  onChange={(v) => setAddressField("street", v)}
+                  error={addressErrors.street}
+                  autoComplete="address-line1"
+                  className="sm:col-span-4"
+                />
+                <Field
+                  label="Número"
+                  name="number"
+                  value={address.number}
+                  onChange={(v) => setAddressField("number", v)}
+                  error={addressErrors.number}
+                  autoComplete="address-line2"
+                  className="sm:col-span-2"
+                />
+                <Field
+                  label="Complemento"
+                  name="complement"
+                  value={address.complement}
+                  onChange={(v) => setAddressField("complement", v)}
+                  placeholder="apto, bloco…"
+                  className="sm:col-span-4"
+                />
+                <Field
+                  label="Bairro"
+                  name="district"
+                  value={address.district}
+                  onChange={(v) => setAddressField("district", v)}
+                  error={addressErrors.district}
+                  autoComplete="address-level3"
+                  className="sm:col-span-2"
+                />
+                <Field
+                  label="Cidade"
+                  name="city"
+                  value={address.city}
+                  onChange={(v) => setAddressField("city", v)}
+                  error={addressErrors.city}
+                  autoComplete="address-level2"
+                  className="sm:col-span-3"
+                />
+                <div className="sm:col-span-1">
+                  <UFSelect
+                    value={address.state}
+                    onChange={(v) => setAddressField("state", v)}
+                    error={addressErrors.state}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 border-t-[3px] border-outline pt-5">
+                <h3 className="mb-3 font-pixel text-[9px] text-brand-soft">FRETE</h3>
+                {cepDigits.length !== 8 ? (
+                  <p className="text-sm text-muted">
+                    Informe o CEP para ver as opções de envio.
+                  </p>
+                ) : quoting ? (
+                  <p className="font-pixel text-[9px] text-brand-soft animate-blink">
+                    CALCULANDO FRETE...
+                  </p>
+                ) : quoteError ? (
+                  <p className="text-sm text-brand">
+                    Não conseguimos cotar o frete agora ({quoteError}). Tente de novo
+                    ou feche pelo WhatsApp.
+                  </p>
+                ) : carriers && carriers.length === 0 ? (
+                  <p className="text-sm text-brand">
+                    Nenhuma transportadora atende esse CEP com esse pacote. Fale com a
+                    gente no WhatsApp.
+                  </p>
+                ) : (
+                  <div className="grid gap-3">
+                    {carriers?.map((s) => (
+                      <OptionChip
+                        key={s.serviceID}
+                        title={`${s.company} · ${s.name}`}
+                        detail={`até ${s.deliveryDays} ${s.deliveryDays === 1 ? "dia útil" : "dias úteis"}`}
+                        price={s.priceBRL === 0 ? "GRATIS" : brl(cents(s.priceBRL))}
+                        selected={s.serviceID === carrierID}
+                        onSelect={() => setCarrierID(s.serviceID)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
         </div>
 
         <div
@@ -421,7 +563,7 @@ export default function CheckoutView() {
           <dl className="mt-5 space-y-3 border-t-[3px] border-brand pt-5 text-[15px]">
             <Row label="Subtotal" value={brl(itemsCents)} />
             <Row
-              label={chosen ? `Frete · ${chosen.name}` : "Frete"}
+              label={shippingLabel(mode, chosen, joinOrder)}
               value={chosen ? (shippingCents === 0 ? "Grátis" : brl(shippingCents)) : "—"}
             />
           </dl>
@@ -446,8 +588,7 @@ export default function CheckoutView() {
           )}
 
           <button
-            type="button"
-            onClick={() => void submit()}
+            type="submit"
             disabled={submitting || quoting}
             className="mt-5 w-full rounded-[10px] border-4 border-white bg-brand px-6 py-3.5 font-pixel text-[11px] text-white transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
             style={{ boxShadow: "0 0 0 4px #0b0b0c" }}
@@ -467,9 +608,19 @@ export default function CheckoutView() {
             ESTOQUE RESERVADO POR 30 MINUTOS
           </p>
         </div>
-      </div>
+      </form>
     </Container>
   );
+}
+
+function shippingLabel(mode: Mode, chosen: ShippingOption | null, joinOrder: string): string {
+  if (mode === "pickup") {
+    return "Retirada em mãos";
+  }
+  if (mode === "join") {
+    return joinOrder ? `Junto com o pedido #${joinOrder}` : "Junto com outro pedido";
+  }
+  return chosen ? `Frete · ${chosen.name}` : "Frete";
 }
 
 function Section({
@@ -494,16 +645,19 @@ function Section({
   );
 }
 
-function FreightOption({
-  option,
+function OptionChip({
+  title,
+  detail,
+  price,
   selected,
   onSelect,
 }: {
-  option: ShippingOption;
+  title: string;
+  detail: string;
+  price: string;
   selected: boolean;
   onSelect: () => void;
 }) {
-  const price = option.priceBRL === 0 ? "GRATIS" : brl(cents(option.priceBRL));
   return (
     <button
       type="button"
@@ -515,14 +669,12 @@ function FreightOption({
       }`}
     >
       <span className="min-w-0">
-        <span className="block truncate font-pixel text-[8px]">
-          {pixelText(`${option.company} · ${option.name}`)}
-        </span>
+        <span className="block truncate font-pixel text-[8px]">{pixelText(title)}</span>
         <span className={`block text-xs ${selected ? "text-white/90" : "text-muted"}`}>
-          até {option.deliveryDays} {option.deliveryDays === 1 ? "dia útil" : "dias úteis"}
+          {detail}
         </span>
       </span>
-      <span className="shrink-0 font-pixel text-[11px]">{price}</span>
+      {price && <span className="shrink-0 font-pixel text-[11px]">{price}</span>}
     </button>
   );
 }

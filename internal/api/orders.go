@@ -30,6 +30,7 @@ type Checkout struct {
 	APIURL          string
 	FromCEP         string
 	FreeShippingMin float64
+	PickupCity      string
 	Log             *logx.Logger
 }
 
@@ -62,6 +63,7 @@ type orderCreateInput struct {
 	Shipping struct {
 		ServiceID int     `json:"serviceID"`
 		PriceBRL  float64 `json:"priceBRL"`
+		JoinOrder int     `json:"joinOrder"`
 	} `json:"shipping"`
 	BackURLBase string `json:"backURLBase"`
 }
@@ -198,21 +200,47 @@ func itemsTotal(lines []orders.Line) float64 {
 }
 
 func (s *Server) quoteShipping(ctx context.Context, cep string, lines []orders.Line) ([]shipping.Service, error) {
-	if s.Checkout.Quoter == nil || s.Checkout.FromCEP == "" {
-		return nil, errors.New("frete não configurado")
+	services := make([]shipping.Service, 0, 5)
+	if cep != "" && s.Checkout.Quoter != nil && s.Checkout.FromCEP != "" {
+		items := make([]shipping.Item, 0, len(lines))
+		for _, l := range lines {
+			items = append(items, shipping.Item{Kind: l.Kind, Name: l.Name, Qty: l.Qty, UnitBRL: l.UnitBRL})
+		}
+		quoted, err := s.Checkout.Quoter.Quote(ctx, s.Checkout.FromCEP, cep, shipping.Pack(items))
+		if err != nil {
+			s.logCheckout("frete %s: %v", cep, err)
+		}
+		services = append(services, quoted...)
+		if min := s.Checkout.FreeShippingMin; min > 0 && len(services) > 0 && itemsTotal(lines) >= min {
+			services[0].PriceBRL = 0
+		}
 	}
-	items := make([]shipping.Item, 0, len(lines))
-	for _, l := range lines {
-		items = append(items, shipping.Item{Kind: l.Kind, Name: l.Name, Qty: l.Qty, UnitBRL: l.UnitBRL})
+	if s.Checkout.PickupCity != "" {
+		services = append(services, shipping.Pickup(s.Checkout.PickupCity))
 	}
-	services, err := s.Checkout.Quoter.Quote(ctx, s.Checkout.FromCEP, cep, shipping.Pack(items))
-	if err != nil {
-		return nil, err
-	}
-	if min := s.Checkout.FreeShippingMin; min > 0 && len(services) > 0 && itemsTotal(lines) >= min {
-		services[0].PriceBRL = 0
-	}
+	services = append(services, shipping.Join())
 	return services, nil
+}
+
+func (s *Server) joinableOrder(number int, buyer orders.Buyer) (orders.Order, bool) {
+	all, err := s.Checkout.Orders.List()
+	if err != nil {
+		return orders.Order{}, false
+	}
+	now := time.Now()
+	for _, o := range all {
+		if o.Number != number {
+			continue
+		}
+		if orders.EffectiveStatus(o, now) != orders.StatusPaid {
+			return orders.Order{}, false
+		}
+		if o.Buyer.CPF != buyer.CPF && o.Buyer.Email != buyer.Email {
+			return orders.Order{}, false
+		}
+		return o, true
+	}
+	return orders.Order{}, false
 }
 
 func (s *Server) requireStorefront(w http.ResponseWriter, r *http.Request) bool {
@@ -260,7 +288,7 @@ func (s *Server) handleShippingQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cep := digits(in.CEP)
-	if len(cep) != 8 {
+	if cep != "" && len(cep) != 8 {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": "cep inválido"})
 		return
 	}
@@ -303,7 +331,10 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": msg})
 		return
 	}
-	if msg := validateAddress(&in.Address); msg != "" {
+	local := in.Shipping.ServiceID < 0
+	if local {
+		in.Address = orders.Address{}
+	} else if msg := validateAddress(&in.Address); msg != "" {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": msg})
 		return
 	}
@@ -347,6 +378,17 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		Company:      chosen.Company,
 		PriceBRL:     round2(chosen.PriceBRL),
 		DeliveryDays: chosen.DeliveryDays,
+	}
+	if chosen.ID == shipping.JoinServiceID {
+		base, ok := s.joinableOrder(in.Shipping.JoinOrder, in.Buyer)
+		if !ok {
+			writeError(w, http.StatusConflict, map[string]interface{}{"error": "join_not_found"})
+			return
+		}
+		ship.JoinOrder = base.Number
+		ship.Company = fmt.Sprintf("pedido #%d", base.Number)
+		ship.DeliveryDays = base.Shipping.DeliveryDays
+		in.Address = base.Address
 	}
 
 	var conflict map[string]any
@@ -651,6 +693,8 @@ func (s *Server) handleMPWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.applyPayment(pay); err != nil {
 		s.logCheckout("apply payment %d: %v", id, err)
+	} else {
+		s.logCheckout("webhook payment %d %s → order %s", pay.ID, pay.Status, pay.ExternalReference)
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }

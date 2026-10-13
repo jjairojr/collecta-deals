@@ -5,7 +5,7 @@ import Link from "next/link";
 import Container from "@/components/ui/Container";
 import { trackPurchase } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
-import { ORDER_STORAGE_PREFIX, cents, type PublicOrder } from "@/lib/checkout";
+import { ORDER_STORAGE_PREFIX, cents, isJoin, isPickup, type PublicOrder } from "@/lib/checkout";
 import { brl, pixelText } from "@/lib/format";
 
 const POLL_MS = 3000;
@@ -132,13 +132,26 @@ export default function OrderStatusView({
           eyebrow={pixelText(`PEDIDO ${number} · ${order.status === "shipped" ? "ENVIADO" : "PAGO"}`)}
           tone="win"
         >
-          <p className="text-sm text-[#c9c9d1]">
-            Recebemos seu pagamento. Vamos preparar o envio por{" "}
-            <strong className="text-white">
-              {order.shipping.company} {order.shipping.serviceName}
-            </strong>{" "}
-            e te avisamos pelo WhatsApp com o código de rastreio.
-          </p>
+          {isPickup(order.shipping.serviceID) ? (
+            <p className="text-sm text-[#c9c9d1]">
+              Recebemos seu pagamento. Vamos combinar a{" "}
+              <strong className="text-white">retirada em {order.shipping.company}</strong>{" "}
+              pelo WhatsApp.
+            </p>
+          ) : isJoin(order.shipping.serviceID) ? (
+            <p className="text-sm text-[#c9c9d1]">
+              Recebemos seu pagamento. Estes itens vão na mesma encomenda do{" "}
+              <strong className="text-white">{order.shipping.company}</strong>.
+            </p>
+          ) : (
+            <p className="text-sm text-[#c9c9d1]">
+              Recebemos seu pagamento. Vamos preparar o envio por{" "}
+              <strong className="text-white">
+                {order.shipping.company} {order.shipping.serviceName}
+              </strong>{" "}
+              e te avisamos pelo WhatsApp com o código de rastreio.
+            </p>
+          )}
           {order.trackingCode && (
             <p className="sticker mt-4 rounded-[10px] bg-brand-soft px-4 py-3 font-pixel text-[9px] text-outline [--sh:3px]">
               RASTREIO: {order.trackingCode}
@@ -257,7 +270,13 @@ function OrderLines({ order }: { order: PublicOrder }) {
       </ul>
       <dl className="mt-4 space-y-2 text-sm">
         <div className="flex justify-between text-[#c9c9d1]">
-          <dt>Frete · {order.shipping.serviceName}</dt>
+          <dt>
+            {isPickup(order.shipping.serviceID)
+              ? "Retirada em mãos"
+              : isJoin(order.shipping.serviceID)
+                ? `Junto com o ${order.shipping.company}`
+                : `Frete · ${order.shipping.serviceName}`}
+          </dt>
           <dd>{order.totals.shippingBRL === 0 ? "Grátis" : brl(cents(order.totals.shippingBRL))}</dd>
         </div>
         <div className="flex justify-between">

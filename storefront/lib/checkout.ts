@@ -10,6 +10,17 @@ export type OrderStatus =
   | "shipped"
   | "refunded";
 
+export const PICKUP_SERVICE_ID = -1;
+export const JOIN_SERVICE_ID = -2;
+
+export function isPickup(serviceID: number): boolean {
+  return serviceID === PICKUP_SERVICE_ID;
+}
+
+export function isJoin(serviceID: number): boolean {
+  return serviceID === JOIN_SERVICE_ID;
+}
+
 export interface ShippingOption {
   serviceID: number;
   name: string;

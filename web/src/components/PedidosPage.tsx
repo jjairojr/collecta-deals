@@ -106,6 +106,9 @@ function cpfLabel(cpf: string): string {
 
 function addressLabel(o: Order): string {
   const a = o.address;
+  if (!a.cep) {
+    return [o.buyer.name, `${o.shipping.serviceName} · ${o.shipping.company}`, `Tel ${phoneLabel(o.buyer.phone)}`].join("\n");
+  }
   const street = [a.street, a.number, a.complement].filter(Boolean).join(", ");
   return [
     o.buyer.name,
@@ -412,7 +415,7 @@ function OrderRow({
           <div className="min-w-0">
             <div className="truncate font-medium text-slate-100">{order.buyer.name}</div>
             <div className="truncate text-[10px] text-slate-500">
-              {order.address.city} - {order.address.state}
+              {order.address.city ? `${order.address.city} - ${order.address.state}` : order.shipping.serviceName}
             </div>
           </div>
         </TableCell>

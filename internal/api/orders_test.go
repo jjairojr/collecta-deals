@@ -502,7 +502,76 @@ func TestShippingQuoteAppliesFreeShipping(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Services) != 2 || out.Services[0].PriceBRL != 0 || out.Services[1].PriceBRL != 35.1 {
+	if len(out.Services) != 3 || out.Services[0].PriceBRL != 0 || out.Services[1].PriceBRL != 35.1 || out.Services[2].ID != shipping.JoinServiceID {
 		t.Fatalf("services = %+v", out.Services)
+	}
+}
+
+func TestPickupOption(t *testing.T) {
+	f := checkoutServer(t)
+	f.s.Checkout.PickupCity = "Goiânia"
+	quote := func(cep string) []shipping.Service {
+		body := map[string]interface{}{"cep": cep, "lines": []map[string]interface{}{{"sku": teachSKU, "qty": 1, "unitCents": 25000}}}
+		rec := f.do(t, http.MethodPost, "/api/shipping/quote", body, storefrontHeaders())
+		var out struct {
+			Services []shipping.Service `json:"services"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Services
+	}
+	local := quote("")
+	if len(local) != 2 || local[0].ID != shipping.PickupServiceID || local[0].Company != "Goiânia" || local[1].ID != shipping.JoinServiceID {
+		t.Fatalf("no-cep quote must list only local options: %+v", local)
+	}
+	full := quote("04538-132")
+	if len(full) != 4 || full[2].ID != shipping.PickupServiceID || full[2].PriceBRL != 0 {
+		t.Fatalf("services = %+v", full)
+	}
+	order := validOrderBody(1, 25000)
+	delete(order, "address")
+	order["shipping"] = map[string]interface{}{"serviceID": shipping.PickupServiceID, "priceBRL": 0}
+	rec := f.do(t, http.MethodPost, "/api/orders", order, storefrontHeaders())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	all, _ := f.s.Checkout.Orders.List()
+	if all[0].Totals.TotalBRL != 250 || all[0].Shipping.ServiceName != "Retirar em mãos" || all[0].Address.CEP != "" {
+		t.Fatalf("order = %+v", all[0])
+	}
+	if items := f.gw.prefs[len(f.gw.prefs)-1].Items; len(items) != 1 {
+		t.Fatalf("pickup must not add a freight item: %+v", items)
+	}
+}
+
+func TestJoinWithPaidOrder(t *testing.T) {
+	f := checkoutServer(t)
+	first := f.createOrder(t)
+	join := func(number int) *httptest.ResponseRecorder {
+		body := validOrderBody(1, 25000)
+		delete(body, "address")
+		body["shipping"] = map[string]interface{}{"serviceID": shipping.JoinServiceID, "priceBRL": 0, "joinOrder": number}
+		return f.do(t, http.MethodPost, "/api/orders", body, storefrontHeaders())
+	}
+	if rec := join(first.Number); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "join_not_found") {
+		t.Fatalf("joining a pending order: %d %s", rec.Code, rec.Body.String())
+	}
+	f.gw.payments[8] = mercadopago.Payment{ID: 8, Status: "approved", ExternalReference: first.ID, AmountBRL: 512}
+	f.webhook(t, "8", testWebhookSecret)
+	if rec := join(99); rec.Code != http.StatusConflict {
+		t.Fatalf("unknown number: %d", rec.Code)
+	}
+	rec := join(first.Number)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("join: %d %s", rec.Code, rec.Body.String())
+	}
+	all, _ := f.s.Checkout.Orders.List()
+	joined := all[0]
+	if joined.Shipping.JoinOrder != first.Number || joined.Shipping.Company != "pedido #1" || joined.Totals.TotalBRL != 250 {
+		t.Fatalf("joined = %+v", joined.Shipping)
+	}
+	if joined.Address != first.Address || joined.Address.CEP == "" {
+		t.Fatalf("joined order must inherit the base address: %+v", joined.Address)
 	}
 }

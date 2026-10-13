@@ -6,6 +6,7 @@ import { pixelText } from "@/lib/format";
 // quantity stepper), pink error line underneath.
 export default function Field({
   label,
+  name,
   value,
   onChange,
   onBlur,
@@ -17,6 +18,7 @@ export default function Field({
   className = "",
 }: {
   label: string;
+  name: string;
   value: string;
   onChange: (v: string) => void;
   onBlur?: () => void;
@@ -39,6 +41,7 @@ export default function Field({
         style={{ ["--sh" as string]: "0px", borderWidth: 3 }}
       >
         <input
+          name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}

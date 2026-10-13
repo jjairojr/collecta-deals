@@ -82,3 +82,7 @@ body {
     width: 24px;
   }
 }
+
+body.no-scanlines .scanlines {
+  display: none;
+}

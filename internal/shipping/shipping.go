@@ -34,6 +34,19 @@ type Quoter interface {
 }
 
 const (
+	PickupServiceID = -1
+	JoinServiceID   = -2
+)
+
+func Pickup(city string) Service {
+	return Service{ID: PickupServiceID, Name: "Retirar em mãos", Company: city, PriceBRL: 0}
+}
+
+func Join() Service {
+	return Service{ID: JoinServiceID, Name: "Juntar com outro pedido", Company: "Collecta", PriceBRL: 0}
+}
+
+const (
 	ProductionBase = "https://melhorenvio.com.br"
 	SandboxBase    = "https://sandbox.melhorenvio.com.br"
 	services       = "1,2,17,3"
