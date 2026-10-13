@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const { singles, live } = await loadCatalog();
   return {
     title: "Cartas avulsas (singles) de TCG",
-    description: `${singles.length} cartas avulsas de Pokémon, One Piece e Riftbound em estoque — conferidas uma a uma, com envio para todo o Brasil e pedido pelo WhatsApp.`,
+    description: `${singles.length} cartas avulsas de Pokémon, One Piece, Riftbound, Lorcana e Gundam em estoque, conferidas uma a uma. Pix ou cartão em até 12x e envio para todo o Brasil.`,
     alternates: { canonical: "/singles" },
     robots: live ? undefined : { index: false },
   };
@@ -48,6 +48,7 @@ export default async function SinglesPage({
       games={gameOpts}
       navGames={navOpts}
       query={q ?? ""}
+      basePath={q ? null : "/singles"}
     />
   );
 }

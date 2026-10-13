@@ -39,7 +39,7 @@ export async function generateMetadata({
   const count = games.find((g) => g.id === jogo)?.count ?? 0;
   return {
     title: `Cartas ${name} avulsas (singles) — página ${page}`,
-    description: `Página ${page} do catálogo de ${count} cartas ${name} avulsas em estoque na Collecta — conferidas uma a uma, com envio para todo o Brasil e pedido pelo WhatsApp.`,
+    description: `Página ${page} do catálogo de ${count} cartas ${name} avulsas em estoque na Collecta, conferidas uma a uma. Pix ou cartão e envio para todo o Brasil.`,
     alternates: { canonical: `/singles/${jogo}/pagina/${page}` },
     robots: live ? undefined : { index: false },
   };

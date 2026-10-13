@@ -60,6 +60,7 @@ export default function SinglesBrowse({
   games,
   navGames,
   initialGame = null,
+  initialSet = null,
   initialPage = 1,
   basePath = null,
   query = "",
@@ -69,6 +70,7 @@ export default function SinglesBrowse({
   games: { id: string; label: string }[];
   navGames: { id: string; label: string }[];
   initialGame?: string | null;
+  initialSet?: string | null;
   initialPage?: number;
   basePath?: string | null;
   query?: string;
@@ -165,10 +167,20 @@ export default function SinglesBrowse({
         .filter((v) => IDIOMA_OPTS.includes(v)),
     [urlParams],
   );
+  const defaultSet = useMemo(
+    () => (initialSet && catalog.some((c) => c.set === initialSet) ? [initialSet] : []),
+    [initialSet, catalog],
+  );
   const colecao = useMemo(() => {
     const v = urlParams.get("colecao");
-    return v ? [v] : [];
-  }, [urlParams]);
+    if (v === null) {
+      return defaultSet;
+    }
+    if (v === "todas") {
+      return [];
+    }
+    return [v];
+  }, [urlParams, defaultSet]);
 
   const urlSort = urlParams.get("ordem");
   const sort =
@@ -285,7 +297,9 @@ export default function SinglesBrowse({
     gameSel.length === 1
       ? navGames.find((g) => g.id === gameSel[0])?.label
       : undefined;
-  const title = selectedLabel ? `${selectedLabel} · Singles` : "Todos · Singles";
+  const setLabel = colecaoSel.length === 1 ? colecaoSel[0] : undefined;
+  const title = [selectedLabel ?? "Todos", setLabel, "Singles"].filter(Boolean).join(" · ");
+  const heading = current > 1 ? `${title} · página ${current}` : title;
 
   useEffect(() => {
     if (shown.length > 0) {
@@ -308,12 +322,16 @@ export default function SinglesBrowse({
     initialGame === null
       ? gameSel.length === 0
       : gameSel.length === 1 && gameSel[0] === initialGame;
+  const setMatchesURL =
+    initialSet === null
+      ? colecaoSel.length === 0
+      : colecaoSel.length === 1 && colecaoSel[0] === initialSet;
   const linkedBase =
     basePath &&
     gameMatchesURL &&
+    setMatchesURL &&
     estado.length === 0 &&
     idioma.length === 0 &&
-    colecaoSel.length === 0 &&
     sort === "relevancia" &&
     !q &&
     (!hasPriceRange || (priceMin === priceFloor && priceMax === priceCeil))
@@ -391,7 +409,11 @@ export default function SinglesBrowse({
             options={colecaoOpts}
             onChange={(v) => {
               trackFilterChange("colecao", v || "todas", Boolean(v));
-              patch({ colecao: v || null, pagina: null });
+              const sameAsDefault = v === (defaultSet[0] ?? "");
+              patch({
+                colecao: sameAsDefault ? null : v || "todas",
+                pagina: null,
+              });
             }}
           />
         </div>
@@ -506,7 +528,7 @@ export default function SinglesBrowse({
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-bold leading-none text-white sm:text-[38px]">
-              {title}
+              {heading}
             </h1>
             <div className="mt-2 font-pixel text-[9px] text-faint">
               {filtered.length.toLocaleString("pt-BR")}{" "}

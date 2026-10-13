@@ -16,6 +16,7 @@ import {
 import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gameArtHue, gamePixel } from "@/lib/games";
+import { setLabel, setPath } from "@/lib/sets";
 import type { SingleDetail } from "@/lib/types";
 
 export default function SingleDetailView({ item }: { item: SingleDetail }) {
@@ -59,7 +60,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             label: gamePixel(item.game, item.gameLabel),
             href: `/singles/${item.game}`,
           },
-          { label: pixelText(item.set) },
+          { label: pixelText(item.set), href: setPath(item.game, item.set) },
           { label: pixelText(item.name) },
         ]}
       />
@@ -81,7 +82,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                     : "FOTO REAL DA CARTA"
                 }
                 imageURL={item.imageURL}
-                alt={item.name}
+                alt={`${item.name} ${item.number} · ${item.set} · carta ${item.gameLabel}${item.variant ? ` ${item.variant}` : ""}`}
                 priority
               />
             </div>
@@ -181,11 +182,10 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
           </div>
 
           <p className="mt-6 text-[14px] leading-relaxed text-muted">
-            {item.name} ({item.number}) é uma carta de {item.gameLabel} do set{" "}
-            {item.set},{item.variant ? ` versão ${item.variant},` : ""} em
-            condição {item.condition}, conferida uma a uma antes do envio.
-            Adicione ao carrinho, finalize o pedido pelo WhatsApp e receba em
-            todo o Brasil.
+            {item.name} ({item.number}) é uma carta original de {item.gameLabel} da coleção{" "}
+            {setLabel(item.game, item.set)},{item.variant ? ` versão ${item.variant},` : ""} em
+            condição {item.condition}, conferida uma a uma antes do envio. Pague por Pix ou cartão em até 12x,
+            receba em todo o Brasil pelos Correios ou retire na loja em Goiânia.
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { loadCatalog } from "@/lib/catalog";
 import { pageCount } from "@/lib/paging";
+import { setsOf } from "@/lib/sets";
 import { absoluteURL } from "@/lib/site";
 
 export const revalidate = 3600;
@@ -29,12 +30,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!live) {
     return urls;
   }
+  for (let n = 2; n <= pageCount(singles.length); n += 1) {
+    urls.push({
+      url: absoluteURL(`/singles/pagina/${n}`),
+      changeFrequency: "daily",
+      priority: 0.6,
+    });
+  }
   for (const g of navGames) {
     urls.push({
       url: absoluteURL(`/jogo/${g.id}`),
       changeFrequency: "daily",
       priority: 0.8,
     });
+  }
+  for (const g of games) {
+    for (const s of setsOf(singles, g.id)) {
+      urls.push({
+        url: absoluteURL(`/singles/${g.id}/colecao/${s.slug}`),
+        changeFrequency: "daily",
+        priority: 0.7,
+      });
+      for (let n = 2; n <= pageCount(s.count); n += 1) {
+        urls.push({
+          url: absoluteURL(`/singles/${g.id}/colecao/${s.slug}/pagina/${n}`),
+          changeFrequency: "daily",
+          priority: 0.5,
+        });
+      }
+    }
   }
   for (const g of games) {
     urls.push({

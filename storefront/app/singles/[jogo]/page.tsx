@@ -24,9 +24,9 @@ export async function generateMetadata({
   const count = singles.filter((s) => s.game === jogo).length;
   return {
     title: `Cartas ${name} avulsas (singles)`,
-    description: `${count > 0 ? `${count} cartas` : "Cartas"} ${name} avulsas em estoque na Collecta — conferidas uma a uma, com envio para todo o Brasil e pedido pelo WhatsApp.`,
+    description: `${count > 0 ? `${count} cartas` : "Cartas"} ${name} avulsas em estoque na Collecta, conferidas uma a uma. Pix ou cartão em até 12x, envio para todo o Brasil ou retirada na loja.`,
     alternates: { canonical: `/singles/${jogo}` },
-    robots: live ? undefined : { index: false },
+    robots: live && count > 0 ? undefined : { index: false },
   };
 }
 

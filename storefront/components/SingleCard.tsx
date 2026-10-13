@@ -39,7 +39,7 @@ export default function SingleCard({
           angle="90"
           label="FOTO DA CARTA"
           imageURL={item.imageURL}
-          alt={item.name}
+          alt={`${item.name} ${item.number} · ${item.set} · carta ${item.gameLabel}`}
         />
         {item.grade && (
           <span className="absolute left-2 top-2 bg-outline px-1.5 py-1 font-pixel text-[8px] text-brand-soft">

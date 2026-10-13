@@ -35,20 +35,20 @@ const pressStart = Press_Start_2P({
 export const metadata: Metadata = {
   metadataBase: new URL(siteURL),
   title: {
-    default: "Collecta — Loja de cartas Pokémon, One Piece e TCG em Goiânia · Singles e Selados",
+    default: "Collecta — Loja de cartas Pokémon, One Piece e TCG · Singles e Selados · Envio para todo o Brasil",
     template: "%s — Collecta",
   },
   description:
-    "Loja de cartas TCG em Goiânia: singles avulsas e produto selado de Pokémon, One Piece, Riftbound, Lorcana e Gundam. Loja física no Setor Oeste aberta todos os dias das 12h às 22h, cartas conferidas uma a uma e envio para todo o Brasil.",
+    "Loja de cartas TCG: singles avulsas e produto selado de Pokémon, One Piece, Riftbound, Lorcana e Gundam, conferidos carta por carta. Pix ou cartão em até 12x, envio para todo o Brasil e retirada na loja em Goiânia.",
   applicationName: "Collecta",
   // Merchant Center verifies by reading the served HTML, so the tag has to be
   // rendered server-side — the GA snippet only appears after hydration and is
   // invisible to the verifier.
   verification: { google: "XoLIZnAr8k3IRTvhhH2xi3uSc1Rr3Z4GYa4VTPg5_2w" },
   openGraph: {
-    title: "Collecta — Loja de cartas TCG em Goiânia",
+    title: "Collecta — Loja de cartas TCG",
     description:
-      "Singles e selados de Pokémon, One Piece, Riftbound, Lorcana e Gundam. Loja física no Setor Oeste e envio para todo o Brasil.",
+      "Singles e selados de Pokémon, One Piece, Riftbound, Lorcana e Gundam. Conferido carta por carta, envio para todo o Brasil.",
     type: "website",
     locale: "pt_BR",
     siteName: "Collecta",
