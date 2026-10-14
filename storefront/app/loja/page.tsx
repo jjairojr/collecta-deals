@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import TrackPageEvent from "@/components/analytics/TrackPageEvent";
+import TrackedLink from "@/components/chrome/TrackedLink";
 import WhatsAppLink from "@/components/chrome/WhatsAppLink";
 import JsonLd from "@/components/seo/JsonLd";
 import Container from "@/components/ui/Container";
@@ -38,6 +40,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 export default function LojaPage() {
   return (
     <Container narrow className="py-9">
+      <TrackPageEvent event="view_store" />
       <JsonLd
         data={breadcrumbJsonLd([
           { name: "Collecta", path: "/" },
@@ -59,14 +62,13 @@ export default function LojaPage() {
               <p className="mt-1">Dentro da Galeria Badra, Loja 03, no Setor Oeste.</p>
             </address>
             <div className="flex flex-wrap gap-3 pt-1">
-              <a
+              <TrackedLink
                 href={STORE_MAPS_URL}
-                target="_blank"
-                rel="noopener"
+                track={{ kind: "directions", origin: "loja" }}
                 className="arcade-press sticker rounded-[10px] bg-brand px-4 py-2.5 font-pixel text-[9px] text-white [--sh:4px]"
               >
                 COMO CHEGAR
-              </a>
+              </TrackedLink>
               <WhatsAppLink
                 href={STORE_WHATSAPP_URL}
                 origin="loja"
@@ -74,14 +76,13 @@ export default function LojaPage() {
               >
                 WHATSAPP
               </WhatsAppLink>
-              <a
+              <TrackedLink
                 href={STORE.instagram}
-                target="_blank"
-                rel="noopener"
+                track={{ kind: "social", network: "instagram", origin: "loja" }}
                 className="arcade-press sticker rounded-[10px] bg-royal px-4 py-2.5 font-pixel text-[9px] text-white [--sh:4px]"
               >
                 INSTAGRAM
-              </a>
+              </TrackedLink>
             </div>
           </Panel>
 

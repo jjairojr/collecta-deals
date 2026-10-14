@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SingleDetailView from "@/components/product/SingleDetailView";
 import SingleCard from "@/components/SingleCard";
+import TrackViewItemList from "@/components/analytics/TrackViewItemList";
 import JsonLd from "@/components/seo/JsonLd";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
@@ -162,6 +163,7 @@ function RelatedGrid({
     <section className="mb-10">
       <SectionHead title={title} eyebrow={eyebrow} size="md" action={action} />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+        <TrackViewItemList items={items} listId={listId} listName={title} />
         {items.map((s) => (
           <SingleCard key={`${listId}-${s.slug}`} item={s} showLanguage />
         ))}

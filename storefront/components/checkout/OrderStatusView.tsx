@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Container from "@/components/ui/Container";
-import { trackPurchase } from "@/lib/analytics";
+import { trackPurchase, trackViewOrder, trackViewOrderArt } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { ORDER_STORAGE_PREFIX, cents, isJoin, isPickup, type PublicOrder } from "@/lib/checkout";
 import { brl, pixelText } from "@/lib/format";
@@ -25,6 +25,7 @@ export default function OrderStatusView({
   const [phase, setPhase] = useState<Phase>("loading");
   const [polls, setPolls] = useState(0);
   const settled = useRef(false);
+  const viewed = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +46,10 @@ export default function OrderStatusView({
         }
         setOrder(o);
         setPhase("ready");
+        if (!viewed.current) {
+          viewed.current = true;
+          trackViewOrder(o.status, o.totals.totalBRL, o.totals.discountBRL > 0);
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) {
@@ -259,7 +264,14 @@ function OrderLines({ order }: { order: PublicOrder }) {
         {order.lines.map((l, i) => (
           <li key={`${l.name}-${i}`} className="flex items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-4">
-              <LineArt src={l.imageURL} alt={l.name} onOpen={() => setViewing(l.imageURL ?? null)} />
+              <LineArt
+                src={l.imageURL}
+                alt={l.name}
+                onOpen={() => {
+                  trackViewOrderArt(l.name);
+                  setViewing(l.imageURL ?? null);
+                }}
+              />
               <span className="min-w-0">
                 <span className="block font-display text-lg font-bold leading-tight text-white">
                   {l.qty}× {l.name}

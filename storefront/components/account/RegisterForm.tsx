@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import Field from "@/components/checkout/Field";
 import { PasswordField } from "@/components/account/LoginForm";
 import { useAccount } from "@/lib/account";
+import { trackSignUp } from "@/lib/analytics";
 import { validEmail } from "@/lib/checkout";
 import { pixelText } from "@/lib/format";
 
@@ -88,6 +89,7 @@ export default function RegisterForm({ next, initialCode }: { next: string; init
         setNotice(data.error ?? "Não foi possível criar a conta.");
         return;
       }
+      trackSignUp(check.state === "ok");
       await refresh();
       router.push(next);
     } catch {

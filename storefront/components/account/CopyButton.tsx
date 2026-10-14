@@ -1,13 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { trackShareReferral } from "@/lib/analytics";
 
-export default function CopyButton({ text, label = "COPIAR" }: { text: string; label?: string }) {
+export default function CopyButton({
+  text,
+  label = "COPIAR",
+  share,
+}: {
+  text: string;
+  label?: string;
+  share?: "copy_code" | "copy_link";
+}) {
   const [done, setDone] = useState(false);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      if (share) {
+        trackShareReferral(share);
+      }
       setDone(true);
       setTimeout(() => setDone(false), 1500);
     } catch {

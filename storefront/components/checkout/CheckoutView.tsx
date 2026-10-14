@@ -6,7 +6,14 @@ import Container from "@/components/ui/Container";
 import Field from "@/components/checkout/Field";
 import UFSelect from "@/components/checkout/UFSelect";
 import { useAccount } from "@/lib/account";
-import { trackApplyCoupon, trackBeginCheckout, trackGenerateLead } from "@/lib/analytics";
+import {
+  trackApplyCoupon,
+  trackBeginCheckout,
+  trackCouponError,
+  trackGenerateLead,
+  trackLoginPrompt,
+  trackRemoveCoupon,
+} from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import {
   cents,
@@ -222,6 +229,7 @@ export default function CheckoutView() {
   const toggleCoupon = (c: CheckoutCoupon) => {
     setSelectedCoupons((prev) => {
       if (prev.includes(c.id)) {
+        trackRemoveCoupon(c.code);
         return prev.filter((id) => id !== c.id);
       }
       if (prev.length >= applicable) {
@@ -362,10 +370,12 @@ export default function CheckoutView() {
         setCarrierID(found[0]?.serviceID ?? null);
         setNotice("O valor do frete mudou. Escolha de novo a forma de envio.");
       } else if (data.error === "coupon_invalid") {
+        trackCouponError(data.message ?? "coupon_invalid");
         setSelectedCoupons([]);
         setCouponsVersion((n) => n + 1);
         setNotice(data.message ?? "Esse cupom não pôde ser aplicado. Confira seus cupons e tente de novo.");
       } else if (data.error === "login_required") {
+        trackCouponError("login_required");
         setSelectedCoupons([]);
         setNotice("Sua sessão expirou. Entre de novo para usar cupons.");
       } else {
@@ -616,6 +626,7 @@ export default function CheckoutView() {
               <p className="text-sm text-muted">
                 <Link
                   href="/conta/entrar?next=/checkout"
+                  onClick={() => trackLoginPrompt("checkout")}
                   className="text-brand-soft underline-offset-4 hover:underline"
                 >
                   Entre com sua conta Collecta

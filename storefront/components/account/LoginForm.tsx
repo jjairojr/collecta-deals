@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Field from "@/components/checkout/Field";
 import { useAccount } from "@/lib/account";
+import { trackLogin } from "@/lib/analytics";
 import { validEmail } from "@/lib/checkout";
 
 export default function LoginForm({ next }: { next: string }) {
@@ -41,6 +42,7 @@ export default function LoginForm({ next }: { next: string }) {
         setNotice(data.error ?? "Não foi possível entrar.");
         return;
       }
+      trackLogin();
       await refresh();
       router.push(next);
     } catch {

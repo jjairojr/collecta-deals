@@ -51,8 +51,22 @@ Itens carregam: `item_id` (slug), `item_name`, `item_category` (jogo), `item_cat
 |---|---|---|
 | `filter_change` | `filter_type` (jogo/colecao/estado/idioma), `filter_value`, `filter_active` | toggle de filtro no browse |
 | `sort_change` | `sort_id` | troca de ordenação |
-| `apply_coupon` | `coupon`, `discount` | cupom válido aplicado no carrinho |
-| `whatsapp_contact` | `origin` (footer) | clique em "Fale no WhatsApp" |
+| `apply_coupon` | `coupon`, `discount` | cupom de indicação marcado no checkout |
+| `remove_coupon` | `coupon` | cupom desmarcado no checkout |
+| `coupon_error` | `reason` | Go recusou o cupom (`coupon_invalid`) ou sessão caiu (`login_required`) |
+| `login_prompt` | `origin` (checkout) | clique em "Entre com sua conta Collecta" |
+| `login` | `method=collecta` | login com a conta do app em `/conta/entrar` |
+| `sign_up` | `method=collecta`, `referral` (bool) | conta criada em `/conta/criar` (pixel `CompleteRegistration`) |
+| `logout` | — | botão Sair |
+| `view_account` | `coupons_unlocked`, `coupons_locked`, `coupons_used`, `referrals` | abertura de `/conta` |
+| `view_orders` | `orders` | abertura de `/conta/pedidos` |
+| `view_order` | `order_status`, `value`, `with_coupon` | primeira carga de `/pedido/[id]` |
+| `view_order_art` | `item_name` | clique na arte da carta na página do pedido |
+| `share` | `method` (whatsapp/copy_code/copy_link), `content_type=referral` | compartilhar código de indicação em `/conta` |
+| `view_store` | — | abertura de `/loja` |
+| `get_directions` | `origin` (loja/footer) | clique no endereço / "Como chegar" |
+| `social_click` | `network` (instagram), `origin` (loja/footer) | clique no Instagram |
+| `whatsapp_contact` | `origin` (footer/loja/politica_devolucao) | clique em "Fale no WhatsApp" |
 
 ## Validação
 
@@ -61,8 +75,10 @@ Itens carregam: `item_id` (slug), `item_name`, `item_category` (jogo), `item_cat
 
 ## Notas
 
+- `send()` cria `window.dataLayer` antes de empurrar o evento: o gtag.js carrega depois da hidratação (`afterInteractive`), e sem isso todo evento disparado no mount em carga direta da página (`view_item`, `view_item_list`, `view_store`…) era descartado com o aviso "GA dataLayer does not exist". O gtag processa a fila quando carrega.
+
 - Sem banner de consentimento por decisão de produto (2026-07); se um dia entrar, implementar Google Consent Mode v2 antes da tag.
-- Checkout é handoff para WhatsApp — não existe `purchase` no site. A venda fechada vive no WhatsApp; `generate_lead`/`begin_checkout` são o fim do funil mensurável. Se quiser medir conversão real, registrar as vendas manualmente ou via Measurement Protocol depois.
+- Checkout principal é o Mercado Pago: `generate_lead` com `lead_source=mercadopago` no clique em pagar e `purchase` disparado uma vez em `/pedido/[id]` quando o pedido aparece pago (dedupe por localStorage). O caminho WhatsApp continua com `lead_source=whatsapp_checkout` e sem `purchase`.
 
 ## Meta Pixel (anúncios no Instagram/Facebook)
 
@@ -83,5 +99,6 @@ Mesmo padrão do GA: desligado até `NEXT_PUBLIC_META_PIXEL_ID` existir no ambie
 | `begin_checkout` | `InitiateCheckout` |
 | `generate_lead` | `Lead` (conversão principal: clique em "Fechar pedido no WhatsApp") |
 | `whatsapp_contact` | `Contact` |
+| `sign_up` | `CompleteRegistration` |
 
 Validação: extensão **Meta Pixel Helper** no Chrome, ou Gerenciador de Eventos → Conjuntos de dados → Testar eventos.

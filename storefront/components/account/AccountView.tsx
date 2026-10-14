@@ -1,6 +1,8 @@
 import Link from "next/link";
 import CopyButton from "@/components/account/CopyButton";
 import LogoutButton from "@/components/account/LogoutButton";
+import TrackPageEvent from "@/components/analytics/TrackPageEvent";
+import TrackedLink from "@/components/chrome/TrackedLink";
 import Container from "@/components/ui/Container";
 import type { Coupon, ReferralOverview, SessionUser } from "@/lib/collecta";
 import { brl, pixelText } from "@/lib/format";
@@ -16,6 +18,13 @@ export default function AccountView({ user, referral }: { user: SessionUser; ref
 
   return (
     <Container narrow className="py-9">
+      <TrackPageEvent
+        event="view_account"
+        unlocked={unlocked.length}
+        locked={locked.length}
+        used={used.length}
+        referrals={referral?.referrals.length ?? 0}
+      />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="font-pixel text-[9px] text-brand">PLAYER 1 · {pixelText(`@${user.username}`)}</div>
@@ -50,16 +59,15 @@ export default function AccountView({ user, referral }: { user: SessionUser; ref
               </div>
               <p className="mt-2 truncate text-center text-xs text-muted">{referral.link}</p>
               <div className="mt-4 flex flex-wrap justify-center gap-3">
-                <CopyButton text={referral.code} label="COPIAR CODIGO" />
-                <CopyButton text={referral.link} label="COPIAR LINK" />
-                <a
+                <CopyButton text={referral.code} label="COPIAR CODIGO" share="copy_code" />
+                <CopyButton text={referral.link} label="COPIAR LINK" share="copy_link" />
+                <TrackedLink
                   href={referralWhatsAppURL(referral.code, referral.link)}
-                  target="_blank"
-                  rel="noopener"
+                  track={{ kind: "share_referral" }}
                   className="arcade-press sticker rounded-[10px] bg-brand px-4 py-2.5 font-pixel text-[9px] text-white [--sh:4px]"
                 >
                   WHATSAPP
-                </a>
+                </TrackedLink>
               </div>
               <p className="mt-5 text-center font-pixel text-[8px] text-faint">
                 {pixelText(`${referral.referrals.length} DE ${referral.max} INDICACOES`)}

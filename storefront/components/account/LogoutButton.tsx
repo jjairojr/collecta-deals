@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAccount } from "@/lib/account";
+import { trackLogout } from "@/lib/analytics";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function LogoutButton() {
     setBusy(true);
     try {
       await fetch("/api/conta/sair", { method: "POST" });
+      trackLogout();
     } finally {
       await refresh();
       router.push("/");

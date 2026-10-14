@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import TrackPageEvent from "@/components/analytics/TrackPageEvent";
 import Container from "@/components/ui/Container";
 import { checkoutFetch } from "@/lib/backend";
 import { type OrderStatus, type PublicOrder, cents } from "@/lib/checkout";
@@ -38,6 +39,7 @@ export default async function PedidosPage() {
   const orders = await loadOrders(session.user.id);
   return (
     <Container narrow className="py-9">
+      <TrackPageEvent event="view_orders" count={orders?.length ?? 0} />
       <div className="font-pixel text-[9px] text-brand">PLAYER 1 · HISTORICO</div>
       <h1 className="mt-2 font-display text-4xl font-bold leading-none text-white sm:text-[52px]">Meus pedidos</h1>
       <Link href="/conta" className="mt-3 inline-block text-xs text-muted underline-offset-4 hover:text-brand-soft hover:underline">

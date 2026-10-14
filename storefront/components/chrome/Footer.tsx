@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Container from "@/components/ui/Container";
+import TrackedLink from "@/components/chrome/TrackedLink";
 import WhatsAppLink from "@/components/chrome/WhatsAppLink";
 import { STORE, STORE_ADDRESS_LINE, STORE_MAPS_URL } from "@/lib/store";
 
@@ -19,9 +20,13 @@ export default function Footer() {
             carta, envio para todo o Brasil.
           </p>
           <address className="mt-3 max-w-xs text-sm not-italic leading-relaxed text-white">
-            <a href={STORE_MAPS_URL} target="_blank" rel="noopener" className="underline-offset-4 hover:underline">
+            <TrackedLink
+              href={STORE_MAPS_URL}
+              track={{ kind: "directions", origin: "footer" }}
+              className="underline-offset-4 hover:underline"
+            >
               {STORE_ADDRESS_LINE}
-            </a>
+            </TrackedLink>
             <br />
             Todos os dias, {STORE.opens} às {STORE.closes} · {STORE.phone}
           </address>
@@ -57,14 +62,13 @@ export default function Footer() {
           >
             Devoluções
           </Link>
-          <a
+          <TrackedLink
             href={STORE.instagram}
-            target="_blank"
-            rel="noopener"
+            track={{ kind: "social", network: "instagram", origin: "footer" }}
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
           >
             Instagram {STORE.instagramHandle}
-          </a>
+          </TrackedLink>
           <WhatsAppLink
             href={whatsappHref}
             origin="footer"

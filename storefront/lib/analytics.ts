@@ -32,6 +32,7 @@ const PIXEL_EVENTS: Record<string, string> = {
   generate_lead: "Lead",
   purchase: "Purchase",
   whatsapp_contact: "Contact",
+  sign_up: "CompleteRegistration",
 };
 
 function pixelParams(params: GAParams): PixelParams {
@@ -64,6 +65,7 @@ function send(name: string, params: GAParams): void {
   if (!GA_ID) {
     return;
   }
+  window.dataLayer = window.dataLayer ?? [];
   if (process.env.NODE_ENV === "development") {
     sendGAEvent("event", name, { ...params, debug_mode: true });
     return;
@@ -269,4 +271,65 @@ export function trackSortChange(sortId: string): void {
 
 export function trackWhatsAppContact(origin: string): void {
   send("whatsapp_contact", { origin });
+}
+
+export function trackLogin(): void {
+  send("login", { method: "collecta" });
+}
+
+export function trackSignUp(withReferral: boolean): void {
+  send("sign_up", { method: "collecta", referral: withReferral });
+}
+
+export function trackLogout(): void {
+  send("logout", {});
+}
+
+export function trackLoginPrompt(origin: string): void {
+  send("login_prompt", { origin });
+}
+
+export function trackViewAccount(unlocked: number, locked: number, used: number, referrals: number): void {
+  send("view_account", {
+    coupons_unlocked: unlocked,
+    coupons_locked: locked,
+    coupons_used: used,
+    referrals,
+  });
+}
+
+export function trackViewOrders(count: number): void {
+  send("view_orders", { orders: count });
+}
+
+export function trackViewOrder(status: string, totalBRL: number, withCoupon: boolean): void {
+  send("view_order", { order_status: status, value: totalBRL, currency: CURRENCY, with_coupon: withCoupon });
+}
+
+export function trackShareReferral(method: "whatsapp" | "copy_code" | "copy_link"): void {
+  send("share", { method, content_type: "referral" });
+}
+
+export function trackRemoveCoupon(coupon: string): void {
+  send("remove_coupon", { coupon });
+}
+
+export function trackCouponError(reason: string): void {
+  send("coupon_error", { reason });
+}
+
+export function trackGetDirections(origin: string): void {
+  send("get_directions", { origin });
+}
+
+export function trackSocialClick(network: string, origin: string): void {
+  send("social_click", { network, origin });
+}
+
+export function trackViewStore(): void {
+  send("view_store", {});
+}
+
+export function trackViewOrderArt(name: string): void {
+  send("view_order_art", { item_name: name });
 }
