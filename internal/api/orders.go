@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -74,13 +75,14 @@ type orderCreateInput struct {
 type skuEntry struct {
 	game   string
 	trades []trades.Trade
+	lookup trades.PriceLookup
 }
 
 type skuIndex map[string]skuEntry
 
 func (s *Server) buildSKUIndex() (skuIndex, error) {
 	idx := make(skuIndex)
-	add := func(gameID string, all []trades.Trade) {
+	add := func(gameID string, all []trades.Trade, lookup trades.PriceLookup) {
 		for _, t := range all {
 			if t.Status != "holding" || !t.Listed || t.AskBRL <= 0 {
 				continue
@@ -88,6 +90,7 @@ func (s *Server) buildSKUIndex() (skuIndex, error) {
 			key := trades.SKU(gameID, t)
 			e := idx[key]
 			e.game = gameID
+			e.lookup = lookup
 			e.trades = append(e.trades, t)
 			idx[key] = e
 		}
@@ -101,16 +104,65 @@ func (s *Server) buildSKUIndex() (skuIndex, error) {
 		if err != nil {
 			return nil, err
 		}
-		add(gs.Game.ID, all)
+		lookup, _ := s.priceLookup(gs)
+		add(gs.Game.ID, all, lookup)
 	}
 	if s.accessories != nil {
 		all, err := s.accessories.List()
 		if err != nil {
 			return nil, err
 		}
-		add(accessoryGameID, all)
+		add(accessoryGameID, all, nil)
 	}
 	return idx, nil
+}
+
+const cardImagePath = "/api/card-image?"
+
+func lineImage(t trades.Trade, gameID string, lookup trades.PriceLookup) string {
+	if t.ImageURL != "" {
+		return t.ImageURL
+	}
+	if t.Kind != "" || t.Number == "" {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("game", gameID)
+	q.Set("set", t.Set)
+	q.Set("number", t.Number)
+	if lookup != nil {
+		if _, u, ok := lookup(t.Number, t.Name, t.Set); ok {
+			if id := productIDFromURL(u); id > 0 {
+				q.Set("productID", strconv.Itoa(id))
+			}
+		}
+	}
+	return cardImagePath + q.Encode()
+}
+
+func legacyLineImage(l orders.Line) string {
+	if l.ImageURL != "" {
+		return l.ImageURL
+	}
+	if l.Kind != "single" || l.Game == accessoryGameID {
+		return ""
+	}
+	parts := strings.Split(l.Meta, " · ")
+	if len(parts) < 2 {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("game", l.Game)
+	q.Set("set", parts[0])
+	q.Set("number", parts[1])
+	return cardImagePath + q.Encode()
+}
+
+func storefrontImage(raw string) string {
+	if strings.HasPrefix(raw, cardImagePath) {
+		return "/img?" + strings.TrimPrefix(raw, cardImagePath)
+	}
+	return raw
 }
 
 func (s *Server) ledgerForGame(game string) *trades.Store {
@@ -182,13 +234,14 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int) (r
 			kind = "single"
 		}
 		res.lines = append(res.lines, orders.Line{
-			SKU:     l.SKU,
-			Game:    e.game,
-			Kind:    kind,
-			Name:    first.Name,
-			Meta:    lineMeta(first),
-			Qty:     l.Qty,
-			UnitBRL: round2(unit),
+			SKU:      l.SKU,
+			Game:     e.game,
+			Kind:     kind,
+			Name:     first.Name,
+			Meta:     lineMeta(first),
+			Qty:      l.Qty,
+			UnitBRL:  round2(unit),
+			ImageURL: lineImage(first, e.game, e.lookup),
 		})
 	}
 	return res, nil
@@ -595,11 +648,12 @@ func appendNote(notes, add string) string {
 }
 
 type publicLine struct {
-	Name    string  `json:"name"`
-	Meta    string  `json:"meta,omitempty"`
-	Kind    string  `json:"kind"`
-	Qty     int     `json:"qty"`
-	UnitBRL float64 `json:"unitBRL"`
+	Name     string  `json:"name"`
+	Meta     string  `json:"meta,omitempty"`
+	Kind     string  `json:"kind"`
+	Qty      int     `json:"qty"`
+	UnitBRL  float64 `json:"unitBRL"`
+	ImageURL string  `json:"imageURL,omitempty"`
 }
 
 type publicCoupon struct {
@@ -642,7 +696,14 @@ func publicView(o orders.Order, now time.Time) publicOrder {
 		out.Coupons = append(out.Coupons, publicCoupon{Code: c.Code, ValueBRL: c.ValueBRL})
 	}
 	for _, l := range o.Lines {
-		out.Lines = append(out.Lines, publicLine{Name: l.Name, Meta: l.Meta, Kind: l.Kind, Qty: l.Qty, UnitBRL: l.UnitBRL})
+		out.Lines = append(out.Lines, publicLine{
+			Name:     l.Name,
+			Meta:     l.Meta,
+			Kind:     l.Kind,
+			Qty:      l.Qty,
+			UnitBRL:  l.UnitBRL,
+			ImageURL: storefrontImage(legacyLineImage(l)),
+		})
 	}
 	if status == orders.StatusPending || status == orders.StatusFailed {
 		out.InitPoint = o.MP.InitPoint
@@ -869,6 +930,9 @@ func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	for i := range all {
 		all[i].Status = orders.EffectiveStatus(all[i], now)
+		for j := range all[i].Lines {
+			all[i].Lines[j].ImageURL = legacyLineImage(all[i].Lines[j])
+		}
 	}
 	writeJSON(w, all)
 }

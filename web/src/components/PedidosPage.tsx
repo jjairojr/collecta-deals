@@ -133,7 +133,7 @@ export default function PedidosPage() {
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [showToken, setShowToken] = useState(false);
-  const [filter, setFilter] = useState<Filter>("paid");
+  const [filter, setFilter] = useState<Filter>("all");
   const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -448,6 +448,9 @@ function OrderRow({
                     <tbody>
                       {order.lines.map((l) => (
                         <tr key={l.sku} className="border-b-2 border-outline/15 last:border-0">
+                          <td className="w-12 px-3 py-2">
+                            <LineArt src={l.imageURL} alt={l.name} />
+                          </td>
                           <td className="px-3 py-2 tabular-nums text-slate-400">{l.qty}×</td>
                           <td className="px-3 py-2">
                             <div className="text-slate-100">{l.name}</div>
@@ -460,8 +463,9 @@ function OrderRow({
                         </tr>
                       ))}
                       <tr className="bg-raised/60">
-                        <td colSpan={3} className="px-3 py-2 text-right text-[11px] text-slate-500">
+                        <td colSpan={4} className="px-3 py-2 text-right text-[11px] text-slate-500">
                           itens {brl2(order.totals.itemsBRL)} + frete {brl2(order.totals.shippingBRL)}
+                          {order.totals.discountBRL ? ` − cupom ${brl2(order.totals.discountBRL)}` : ""}
                         </td>
                         <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-100">
                           {brl2(order.totals.totalBRL)}
@@ -578,6 +582,24 @@ function OrderRow({
         </TableRow>
       )}
     </>
+  );
+}
+
+function LineArt({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <div className="h-14 w-10 rounded-[4px] border-2 border-outline/30 bg-raised" aria-hidden />;
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={40}
+      height={56}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-14 w-10 rounded-[4px] border-2 border-outline/30 object-cover"
+    />
   );
 }
 

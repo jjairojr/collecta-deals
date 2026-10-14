@@ -255,12 +255,15 @@ function OrderLines({ order }: { order: PublicOrder }) {
     <div className="mt-5 border-t-[3px] border-brand pt-4">
       <ul className="space-y-2 text-sm">
         {order.lines.map((l, i) => (
-          <li key={`${l.name}-${i}`} className="flex items-start justify-between gap-3">
-            <span className="min-w-0">
-              <span className="block truncate text-white">
-                {l.qty}× {l.name}
+          <li key={`${l.name}-${i}`} className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-3">
+              <LineArt src={l.imageURL} alt={l.name} />
+              <span className="min-w-0">
+                <span className="block truncate text-white">
+                  {l.qty}× {l.name}
+                </span>
+                {l.meta && <span className="block truncate text-xs text-muted">{l.meta}</span>}
               </span>
-              {l.meta && <span className="block truncate text-xs text-muted">{l.meta}</span>}
             </span>
             <span className="shrink-0 font-pixel text-[10px] text-white">
               {brl(cents(l.unitBRL * l.qty))}
@@ -294,6 +297,24 @@ function OrderLines({ order }: { order: PublicOrder }) {
         </div>
       </dl>
     </div>
+  );
+}
+
+function LineArt({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <span className="block h-14 w-10 shrink-0 rounded-[6px] border-[3px] border-outline bg-royal" aria-hidden />;
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={40}
+      height={56}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-14 w-10 shrink-0 rounded-[6px] border-[3px] border-outline object-cover"
+    />
   );
 }
 

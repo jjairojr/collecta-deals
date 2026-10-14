@@ -58,6 +58,7 @@ export interface PublicOrderLine {
   kind: ProductKind;
   qty: number;
   unitBRL: number;
+  imageURL?: string;
 }
 
 export interface PublicOrder {

@@ -39,6 +39,7 @@ type Line struct {
 	Meta     string   `json:"meta,omitempty"`
 	Qty      int      `json:"qty"`
 	UnitBRL  float64  `json:"unitBRL"`
+	ImageURL string   `json:"imageURL,omitempty"`
 	TradeIDs []string `json:"tradeIDs,omitempty"`
 }
 

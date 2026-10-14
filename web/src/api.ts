@@ -1173,6 +1173,7 @@ export interface OrderLine {
   meta?: string;
   qty: number;
   unitBRL: number;
+  imageURL?: string;
   tradeIDs?: string[];
 }
 
@@ -1204,6 +1205,7 @@ export interface OrderShipping {
 export interface OrderTotals {
   itemsBRL: number;
   shippingBRL: number;
+  discountBRL?: number;
   totalBRL: number;
 }
 

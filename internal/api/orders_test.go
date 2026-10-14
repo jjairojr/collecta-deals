@@ -275,6 +275,18 @@ func TestOrderCreateBuildsPreference(t *testing.T) {
 	if o.Lines[0].UnitBRL != 250 || o.Lines[0].Meta != "OP16 · OP16-080" || o.Lines[0].Kind != "single" {
 		t.Fatalf("line = %+v", o.Lines[0])
 	}
+	if o.Lines[0].ImageURL != "/api/card-image?game=onepiece&number=OP16-080&set=OP16" {
+		t.Fatalf("line image = %q", o.Lines[0].ImageURL)
+	}
+	pub := publicView(o, time.Now())
+	if pub.Lines[0].ImageURL != "/img?game=onepiece&number=OP16-080&set=OP16" {
+		t.Fatalf("public image = %q", pub.Lines[0].ImageURL)
+	}
+	legacy := o.Lines[0]
+	legacy.ImageURL = ""
+	if legacyLineImage(legacy) != o.Lines[0].ImageURL {
+		t.Fatalf("legacy image = %q", legacyLineImage(legacy))
+	}
 	if o.Shipping.ServiceName != "Mini Envios" || o.MP.PreferenceID != "pref-"+o.ID {
 		t.Fatalf("shipping/mp = %+v %+v", o.Shipping, o.MP)
 	}

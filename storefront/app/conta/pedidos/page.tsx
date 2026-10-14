@@ -68,11 +68,25 @@ export default async function PedidosPage() {
                   )}
                 </div>
               </div>
-              <ul className="mt-3 space-y-1 text-sm text-[#c9c9d1]">
+              <ul className="mt-3 space-y-2 text-sm text-[#c9c9d1]">
                 {o.lines.map((l, i) => (
-                  <li key={`${l.name}-${i}`} className="truncate">
-                    {l.qty}× {l.name}
-                    {l.meta ? <span className="text-muted"> · {l.meta}</span> : null}
+                  <li key={`${l.name}-${i}`} className="flex items-center gap-3">
+                    {l.imageURL ? (
+                      <img
+                        src={l.imageURL}
+                        alt={l.name}
+                        width={32}
+                        height={45}
+                        loading="lazy"
+                        className="h-11 w-8 shrink-0 rounded-[4px] border-2 border-outline object-cover"
+                      />
+                    ) : (
+                      <span className="block h-11 w-8 shrink-0 rounded-[4px] border-2 border-outline bg-royal" aria-hidden />
+                    )}
+                    <span className="truncate">
+                      {l.qty}× {l.name}
+                      {l.meta ? <span className="text-muted"> · {l.meta}</span> : null}
+                    </span>
                   </li>
                 ))}
               </ul>
