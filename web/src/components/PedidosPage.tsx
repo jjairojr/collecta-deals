@@ -6,10 +6,12 @@ import {
   Coins,
   Copy,
   ExternalLink,
+  ImageOff,
   KeyRound,
   PackageCheck,
   RefreshCw,
   Truck,
+  X,
 } from "lucide-react";
 import {
   getAdminToken,
@@ -366,6 +368,7 @@ function OrderRow({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   useEffect(() => {
     setTracking(order.trackingCode ?? "");
@@ -448,13 +451,13 @@ function OrderRow({
                     <tbody>
                       {order.lines.map((l) => (
                         <tr key={l.sku} className="border-b-2 border-outline/15 last:border-0">
-                          <td className="w-12 px-3 py-2">
-                            <LineArt src={l.imageURL} alt={l.name} />
+                          <td className="w-32 px-3 py-3">
+                            <LineArt src={l.imageURL} alt={l.name} onOpen={() => setViewing(l.imageURL ?? null)} />
                           </td>
                           <td className="px-3 py-2 tabular-nums text-slate-400">{l.qty}×</td>
                           <td className="px-3 py-2">
-                            <div className="text-slate-100">{l.name}</div>
-                            {l.meta && <div className="text-[10px] text-slate-500">{l.meta}</div>}
+                            <div className="font-display text-base font-bold text-slate-100">{l.name}</div>
+                            {l.meta && <div className="text-xs text-slate-500">{l.meta}</div>}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-slate-400">{brl2(l.unitBRL)}</td>
                           <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-200">
@@ -578,6 +581,7 @@ function OrderRow({
               )}
             </div>
             {failed && <p className="mt-2 text-[11px] text-rose-300">{failed}</p>}
+            {viewing && <ArtViewer src={viewing} onClose={() => setViewing(null)} />}
           </TableCell>
         </TableRow>
       )}
@@ -585,21 +589,75 @@ function OrderRow({
   );
 }
 
-function LineArt({ src, alt }: { src?: string; alt: string }) {
+function LineArt({ src, alt, onOpen }: { src?: string; alt: string; onOpen: () => void }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
-    return <div className="h-14 w-10 rounded-[4px] border-2 border-outline/30 bg-raised" aria-hidden />;
+    return (
+      <div
+        className="relative flex h-40 w-28 flex-col items-center justify-center overflow-hidden rounded-[8px] border-2 border-outline/40 bg-panel"
+        aria-hidden
+      >
+        <div className="art-stripes-45 pointer-events-none absolute inset-0 opacity-70" />
+        <ImageOff className="relative h-8 w-8 text-brand-label/60" />
+      </div>
+    );
   }
   return (
-    <img
-      src={src}
-      alt={alt}
-      width={40}
-      height={56}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className="h-14 w-10 rounded-[4px] border-2 border-outline/30 object-cover"
-    />
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      className="sticker sticker-sm block overflow-hidden rounded-[8px] bg-panel transition-transform hover:-translate-y-0.5"
+      aria-label={`Ver ${alt} em tamanho grande`}
+    >
+      <img
+        src={src}
+        alt={alt}
+        width={112}
+        height={160}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="h-40 w-28 object-cover"
+      />
+    </button>
+  );
+}
+
+function ArtViewer({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Fechar"
+        className="absolute right-5 top-5 rounded-full border-2 border-outline bg-panel p-2 text-slate-200"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <img
+        src={src}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        className="sticker max-h-[90vh] max-w-[92vw] rounded-[12px] bg-panel object-contain"
+      />
+    </div>
   );
 }
 

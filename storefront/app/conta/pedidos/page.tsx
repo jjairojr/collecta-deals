@@ -75,13 +75,13 @@ export default async function PedidosPage() {
                       <img
                         src={l.imageURL}
                         alt={l.name}
-                        width={32}
-                        height={45}
+                        width={64}
+                        height={90}
                         loading="lazy"
-                        className="h-11 w-8 shrink-0 rounded-[4px] border-2 border-outline object-cover"
+                        className="h-[90px] w-16 shrink-0 rounded-[6px] border-[3px] border-outline object-cover"
                       />
                     ) : (
-                      <span className="block h-11 w-8 shrink-0 rounded-[4px] border-2 border-outline bg-royal" aria-hidden />
+                      <span className="art-stripes-90 block h-[90px] w-16 shrink-0 rounded-[6px] border-[3px] border-outline bg-royal" aria-hidden />
                     )}
                     <span className="truncate">
                       {l.qty}× {l.name}

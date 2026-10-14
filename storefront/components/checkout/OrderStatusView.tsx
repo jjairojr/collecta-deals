@@ -251,15 +251,17 @@ function Shell({
 }
 
 function OrderLines({ order }: { order: PublicOrder }) {
+  const [viewing, setViewing] = useState<string | null>(null);
   return (
     <div className="mt-5 border-t-[3px] border-brand pt-4">
-      <ul className="space-y-2 text-sm">
+      {viewing && <ArtViewer src={viewing} onClose={() => setViewing(null)} />}
+      <ul className="space-y-3 text-sm">
         {order.lines.map((l, i) => (
           <li key={`${l.name}-${i}`} className="flex items-center justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-3">
-              <LineArt src={l.imageURL} alt={l.name} />
+            <span className="flex min-w-0 items-center gap-4">
+              <LineArt src={l.imageURL} alt={l.name} onOpen={() => setViewing(l.imageURL ?? null)} />
               <span className="min-w-0">
-                <span className="block truncate text-white">
+                <span className="block font-display text-lg font-bold leading-tight text-white">
                   {l.qty}× {l.name}
                 </span>
                 {l.meta && <span className="block truncate text-xs text-muted">{l.meta}</span>}
@@ -300,21 +302,60 @@ function OrderLines({ order }: { order: PublicOrder }) {
   );
 }
 
-function LineArt({ src, alt }: { src?: string; alt: string }) {
+function LineArt({ src, alt, onOpen }: { src?: string; alt: string; onOpen: () => void }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
-    return <span className="block h-14 w-10 shrink-0 rounded-[6px] border-[3px] border-outline bg-royal" aria-hidden />;
+    return (
+      <span className="art-stripes-90 block h-32 w-[92px] shrink-0 rounded-[8px] border-[3px] border-outline bg-royal" aria-hidden />
+    );
   }
   return (
-    <img
-      src={src}
-      alt={alt}
-      width={40}
-      height={56}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className="h-14 w-10 shrink-0 rounded-[6px] border-[3px] border-outline object-cover"
-    />
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Ver ${alt} em tamanho grande`}
+      className="arcade-press sticker block shrink-0 overflow-hidden rounded-[8px] bg-royal [--sh:3px]"
+    >
+      <img
+        src={src}
+        alt={alt}
+        width={92}
+        height={128}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="h-32 w-[92px] object-cover"
+      />
+    </button>
+  );
+}
+
+function ArtViewer({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-outline/90 p-6" onClick={onClose}>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Fechar"
+        className="sticker absolute right-5 top-5 rounded-[10px] bg-brand px-3 py-2 font-pixel text-[9px] text-white [--sh:3px]"
+      >
+        FECHAR
+      </button>
+      <img
+        src={src}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        className="sticker sticker-5 max-h-[90vh] max-w-[92vw] rounded-[14px] bg-royal object-contain [--sh:8px]"
+      />
+    </div>
   );
 }
 
