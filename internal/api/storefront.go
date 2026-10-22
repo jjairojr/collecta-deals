@@ -31,6 +31,7 @@ type storefrontItem struct {
 	AskBRL    float64 `json:"askBRL"`
 	AskUSD    float64 `json:"askUSD,omitempty"`
 	Featured  bool    `json:"featured,omitempty"`
+	AddedAt   string  `json:"addedAt,omitempty"`
 }
 
 type storefrontResponse struct {
@@ -133,6 +134,9 @@ func storefrontItemFor(t trades.Trade, gameID, gameLabel string, fx float64, loo
 		Qty:       qty,
 		AskBRL:    round2(t.AskBRL),
 		Featured:  t.Featured,
+	}
+	if !t.CreatedAt.IsZero() {
+		item.AddedAt = t.CreatedAt.UTC().Format(time.RFC3339)
 	}
 	// A seller-supplied image wins over everything (the only art for products
 	// without TCG data, e.g. sealed starters). Otherwise the catalog resolves art

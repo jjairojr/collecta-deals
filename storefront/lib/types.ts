@@ -48,6 +48,7 @@ export interface Single {
   qty: number;
   grade?: string;
   imageURL?: string;
+  addedAt?: string;
 }
 
 export interface SingleDetail extends Single {

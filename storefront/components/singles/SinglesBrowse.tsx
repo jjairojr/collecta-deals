@@ -277,7 +277,9 @@ export default function SinglesBrowse({
     } else if (sort === "maior-preco") {
       list = [...list].sort((a, b) => b.price - a.price);
     } else if (sort === "novidades") {
-      list = [...list].reverse();
+      list = [...list].sort((a, b) =>
+        (b.addedAt ?? "").localeCompare(a.addedAt ?? ""),
+      );
     }
     return list;
   }, [catalog, gameSel, estado, idioma, colecaoSel, priceMin, priceMax, q, sort]);

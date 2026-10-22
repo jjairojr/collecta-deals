@@ -37,6 +37,7 @@ interface RawItem {
   askBRL: number;
   askUSD?: number;
   featured?: boolean;
+  addedAt?: string;
 }
 
 interface RawResponse {
@@ -131,6 +132,7 @@ function mapItem(it: RawItem, version: string): Single {
     qty: it.qty > 0 ? it.qty : 1,
     grade: /^PSA/i.test(condition) ? condition : undefined,
     imageURL: resolveImage(it, version),
+    addedAt: it.addedAt,
   };
 }
 
@@ -281,7 +283,13 @@ function deriveGames(items: { game: string; gameLabel: string }[]): Game[] {
 // backend sells the cheapest row first, so the group shows the lowest price —
 // the same number checkout will charge.
 function dedupProducts<
-  T extends { sku: string; qty: number; price: number; featured?: boolean },
+  T extends {
+    sku: string;
+    qty: number;
+    price: number;
+    featured?: boolean;
+    addedAt?: string;
+  },
 >(items: T[]): T[] {
   const bySKU = new Map<string, T>();
   for (const s of items) {
@@ -290,6 +298,9 @@ function dedupProducts<
       cur.qty += s.qty;
       cur.price = Math.min(cur.price, s.price);
       cur.featured = cur.featured || s.featured;
+      if (s.addedAt && (!cur.addedAt || s.addedAt > cur.addedAt)) {
+        cur.addedAt = s.addedAt;
+      }
     } else {
       bySKU.set(s.sku, { ...s });
     }
