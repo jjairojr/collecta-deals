@@ -214,6 +214,7 @@ var publicAPIPrefixes = []string{
 	"/api/orders",
 	"/api/shipping/",
 	"/api/admin/",
+	"/api/games",
 }
 
 func isPublicAPI(path string) bool {

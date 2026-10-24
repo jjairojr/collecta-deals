@@ -21,6 +21,7 @@ func TestGateRequiresAdminTokenOnPrivateRoutes(t *testing.T) {
 		{http.MethodPost, "/api/trades/x/sell?game=onepiece", "", http.StatusUnauthorized},
 		{http.MethodGet, "/api/tracking/card?game=onepiece", "", http.StatusUnauthorized},
 		{http.MethodGet, "/api/storefront", "", http.StatusOK},
+		{http.MethodGet, "/api/games", "", http.StatusOK},
 		{http.MethodOptions, "/api/trades", "", http.StatusNoContent},
 	}
 	for _, c := range cases {
