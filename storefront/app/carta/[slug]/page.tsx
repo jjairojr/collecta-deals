@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
+import MarketPrice from "@/components/product/MarketPrice";
 import SingleDetailView from "@/components/product/SingleDetailView";
 import SingleCard from "@/components/SingleCard";
 import TrackViewItemList from "@/components/analytics/TrackViewItemList";
@@ -10,6 +11,7 @@ import SectionHead from "@/components/ui/SectionHead";
 import { loadCatalog, loadSingleDetail } from "@/lib/catalog";
 import { breadcrumbJsonLd, productOpenGraph, singleProductJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
+import { loadMarket } from "@/lib/market";
 import { baseCardName, setLabel, setPath } from "@/lib/sets";
 import type { Single } from "@/lib/types";
 
@@ -30,13 +32,21 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const res = await loadSingleDetail(slug);
-  if (!res) {
+  if (!res || "redirect" in res) {
     return { title: "Carta não encontrada" };
   }
   const { item, live } = res;
+  const label = cardLabel(item);
+  const collection = setLabel(item.game, item.set);
   return {
-    title: `${item.name} ${item.number}${item.variant ? ` ${item.variant}` : ""} · ${item.gameLabel} ${setLabel(item.game, item.set)}`,
-    description: `Carta ${item.name} (${item.number}) de ${item.gameLabel}, coleção ${setLabel(item.game, item.set)}${item.variant ? `, versão ${item.variant}` : ""}, condição ${item.condition}, por ${brl(item.price)}. Original, conferida uma a uma na Collecta. Pix ou cartão em até 12x, envio para todo o Brasil.`,
+    title: {
+      absolute: item.soldOut
+        ? `${label} – Preço e disponibilidade | Collecta`
+        : `${label} – Preço ${brl(item.price)} | Collecta`,
+    },
+    description: item.soldOut
+      ? `${label} de ${item.gameLabel} (${collection}) está esgotada na Collecta. Último preço ${brl(item.price)}. Peça pelo WhatsApp e avisamos quando voltar ao estoque. Envio para todo o Brasil e retirada em Goiânia.`
+      : `${label} de ${item.gameLabel}, coleção ${collection}, condição ${item.condition}, por ${brl(item.price)}. Em estoque, conferida uma a uma. Envio para todo o Brasil, Pix ou cartão em até 12x.`,
     alternates: { canonical: `/carta/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: productOpenGraph(`/carta/${slug}`, item.imageURL),
@@ -53,8 +63,11 @@ export default async function CartaPage({
   if (!res) {
     notFound();
   }
+  if ("redirect" in res) {
+    permanentRedirect(res.redirect);
+  }
   const { item, live } = res;
-  const { singles } = await loadCatalog();
+  const [{ singles }, market] = await Promise.all([loadCatalog(), loadMarket(item)]);
   const others = singles.filter((s) => s.game === item.game && s.slug !== item.slug);
   const base = baseCardName(item.name);
   const versions = others.filter((s) => s.number === item.number);
@@ -75,12 +88,15 @@ export default async function CartaPage({
             { name: "Collecta", path: "/" },
             { name: item.gameLabel, path: `/singles/${item.game}` },
             { name: collection, path: setPath(item.game, item.set) },
-            { name: `${item.name} ${item.number}` },
+            { name: cardLabel(item) },
           ])}
         />
       )}
       <SingleDetailView item={item} />
       <Container className="pb-6">
+        <div className="-mt-4 mb-10 max-w-2xl lg:ml-auto lg:w-[55%]">
+          <MarketPrice rows={market} cardLabel={cardLabel(item)} />
+        </div>
         <RelatedGrid
           title={`Outras versões de ${base} ${item.number}`}
           eyebrow="MESMA CARTA, OUTRA VARIANTE OU CONDICAO"
@@ -141,6 +157,10 @@ export default async function CartaPage({
       </Container>
     </>
   );
+}
+
+function cardLabel(item: Single): string {
+  return `${item.name} ${item.number}${item.variant ? ` ${item.variant}` : ""}`;
 }
 
 function RelatedGrid({

@@ -964,3 +964,132 @@ Chopper `OP01-015-RP` (Offline Regional 2024 Vol. 3, R$ 1.150) aparecia com a ar
 - [x] Cobertura em prod sem productID: OP 137/137, PKM, LOR, GND 100%; RFT 200 sem arte da Liga (156 VEN — set não está em `DefaultTrackSets`; 44 OGN/SFD/UNL/ROPP com página mas sem cache em prod → `scripts/sync-up.sh -i` após warm local)
 - [ ] DONO: `railway up` (backend + web/dist) e redeploy da vitrine na Vercel (o `/img` fica 24 h em cache; `ART_VERSION` renova por deploy)
 - [ ] Opcional: refUSD do dashboard ainda casa promo com a base (PrintKey existe em compare.go, priceLookup não usa) — só valuation, não afeta mais a arte
+- [x] 2026-10-10: Railway deploya do GitHub (main). Backend acumulado commitado (f3ee96b): fotos, importar EUA, cfgate, Liga antes da TCGplayer, artVersion
+- [x] Riftbound 200/200 singles resolvidas pelo tile da Liga (num exato, ex. 112A, R06A); OP cobre tudo pelo cache+byNum; PKM 216/216 auditadas
+- [ ] DONO: `bash scripts/sync-up.sh -i` (sobe images.json pkm/op/rft + reload) e `python3 scripts/storefront-product-images.py` se ainda não rodou
+
+---
+
+# Gateway de pagamento na vitrine (Mercado Pago Checkout Pro + Melhor Envio) — 2026-10-12
+
+Plano completo: ~/.claude/plans/luminous-hopping-lemur.md
+
+## Plan
+- [x] 1. Identidade + ledger (Go): trades.SKU, internal/orders (store + allocate), sku e reserva no /api/storefront
+- [x] 2. Clientes externos (Go): internal/mercadopago, internal/shipping (Melhor Envio + embalagem), flags/env no main
+- [x] 3. Endpoints (Go): internal/api/orders.go (quote, create, get, webhook, list, patch) + testes com fakes
+- [x] 4. Vitrine: sku no catálogo/carrinho, rotas server, /checkout, /pedido/[id], CartView CTA, analytics purchase, robots
+- [x] 5. Dashboard: aba Pedidos
+- [ ] 6. Deploy/config (dono): envs Railway + Vercel, webhook MP, token ME, E2E sandbox
+
+## Review
+
+**Verificado:** `go vet ./...` + `go test ./...` verdes (21 testes novos: SKU, ledger de pedidos, alocação FIFO,
+embalagem/parse do Melhor Envio, create/webhook/idempotência/concorrência/oversold/auth/patch); `tsc` + `next build`
+da vitrine e `tsc` + `npm run build` do dashboard limpos. E2E local no Chrome com `CHECKOUT_FAKE=1`: carrinho →
+/checkout (ViaCEP preencheu, 3 fretes cotados, total atualizado) → pedido criado → /pedido/{id} PAGO via `?payment_id`
+→ carrinho zerado → `trades.json` com split vendido (`Ana Souza Teste — Site #1`, sellPrice 57) → vitrine com qty
+descontada → aba Pedidos listou, "Marcar enviado" gravou rastreio e a visão pública mostrou o código. Mobile 390px
+(iframe) ok no checkout e no carrinho.
+
+**Decisões fora do plano:** `sku` sem porte do slugify (chave normalizada própria; catálogo agrupa por sku, com
+fallback `legacy|slug` se o backend ainda não mandar); `CHECKOUT_FAKE=1` (`internal/checkoutfake`) para testar sem
+credenciais; `GET/PATCH /api/orders` liberados quando ADMIN_TOKEN está vazio (dev), exigidos quando existe;
+`MELHORENVIO_CONTACT` para o User-Agent que o Melhor Envio exige; cupom mock ARCADE10 removido do carrinho.
+
+**Pendente do dono:** credenciais MP + webhook (`${PUBLIC_API_URL}/api/orders/mp-webhook`, segredo em
+MP_WEBHOOK_SECRET), token Melhor Envio, envs na Railway (ver memória opdeals-checkout-mercadopago) e
+`STOREFRONT_TOKEN` na Vercel; deploy do Go antes da vitrine; teste com cartões de sandbox; nada commitado.
+
+---
+
+# Importar Japão — Card Rush × Liga JP/PT (2026-10-17)
+
+## Plano
+- [x] `internal/jpimport`: tabela de coleções JP→ocidental (Mega + Escarlate/Violeta), leitura do `data/cardrush-pkm.json`, cálculo (piso JP/PT/EN, par ocidental por nome no bloco IR/SIR, giro 14 dias, preço real = min(JP, PT)) + testes
+- [x] `tracking.Capturer.SetCardFilter` + capturador `pokemon jp import capture` (só cartas secretas, `data/jpimport-pkm`), flag `-pkm-jp-capture-once`, entra no scheduler
+- [x] `fx.RateJPY` (frankfurter JPY→BRL) com cache de 6 h na API
+- [x] `GET /api/jp-import` com cache por mtime da captura + data do tracking + câmbio
+- [x] Página "Importar Japão" (grupo Negócio): KPIs, filtros (era, coleção, AR/SAR, com/sem PT, × mínimo, busca, só com estoque), tabela ordenável, links CR/JP/PT
+- [x] `scripts/cardrush-capture.js` + `scripts/cardrush-import.py` + skill `cardrush-capturar`
+- [x] Primeira captura da Card Rush (766 AR/SAR) e da Liga das SV
+
+## Review
+- Números conferidos contra a análise manual: Gladion 2,8×, Wally 4,6×, Golisopod 8,5×, Lucario M1L→MEG 179, Pikachu 30C gêmeos 149/150.
+- O giro do tracking (`TopSoldCards`) ignora a loja que vende a última cópia; com 1–2 cópias por anúncio isso zerava tudo. `jpimport.SoldByLang` conta esse caso e pula capturas ocas.
+- Card Rush: as páginas por raridade não listam tudo; a busca `AR <coleção>` em `/product-list` é a fonte completa.
+- Prod (Railway) não recebe `data/cardrush-pkm.json` nem `data/jpimport-pkm` ainda — sincronizar se quiser a página lá.
+
+---
+
+# Baixa automática de vendas (Liga + MyP + Site → dashboard e canais) — 2026-10-23
+
+## Contexto levantado
+- `liga-vendas` já faz Liga → dashboard (dedup `Liga #N`) e, desde 20/10, tira o item vendido do MyP.
+- MyP: `/CollectaTCG/vendas` lista pedidos (Aguard. envio / Enviado / Outros Status); detalhe em
+  `/pedido/<id>` com cada item trazendo nome, edição, ga-id (`one_op15_eb04-007`), condição, qty, unitário.
+  Hoje a baixa do MyP é manual (1 único sold com buyer "MYP Cards"); pedido #660256 (23/10, 8 itens) ainda sem baixa.
+- Vendas do Site (`Site #N`) já entram no dashboard pelo webhook; falta só tirar da Liga e do MyP.
+- Mac precisa estar acordado, com o Chrome aberto e a extensão conectada; cloud routine não serve (sessões logadas, cf_clearance ligado ao IPv6).
+
+## Plano
+- [x] Skill `myp-vendas`: ler `/CollectaTCG/vendas` + `/pedido/<id>`, contar só pedido pago (Aguard. envio / Enviado / Concluído),
+      casar item pelo ga-id + nome + preço com o ledger, `POST /sell` com buyer `"<nick> — MyP #<pedido>"`, dedup por `MyP #N`
+      e checagem do sold manual "MYP Cards"; depois reduzir/remover o anúncio na Liga.
+- [x] Skill `baixa-vendas` (orquestradora): roda Liga → MyP → Site em sequência, cada venda nova vira baixa no dashboard
+      + propagação para os outros canais; modo `--auto` sem perguntas: ambiguidade/sem lastro só vai pro relatório.
+- [x] Relatório de cada execução em `data/baixa-vendas/<data-hora>.md` + push no ntfy com resumo e pendências.
+- [x] Lock (`data/baixa-vendas/.lock`) para não sobrepor execuções.
+- [x] `scripts/baixa-vendas.sh` chamando `claude -p "/baixa-vendas --auto" --chrome --allowedTools ...` (sem bypass total).
+- [ ] (dono instala — bloqueado pelo classificador) `~/Library/LaunchAgents/com.collecta.baixa-vendas.plist` com `StartCalendarInterval` nos horários escolhidos.
+- [ ] Verificação: rodar à mão em modo interativo com o pedido MyP #660256, conferir prod + MyP + Liga; depois uma
+      execução headless pelo script e conferir o relatório e o push.
+
+## Review
+- MyP #660256 baixado em prod (6 registros `zapiti — MyP #660256`, total R$ 353,64); Liga já estava zerada à mão
+  para os 5 itens esgotados e S-Snake em 3; `ligaQty` do lote restante de S-Snake 4 → 2. Nenhuma venda dupla nos
+  pedidos da Liga de 22–23/10.
+- Gravação de quantidade no admin da Liga (Fase 5 da myp-vendas) documentada mas ainda não exercitada — o caso real
+  não precisou.
+- Pendente na Liga: 5 pedidos pagos de 22–23/10 (#12297573, #12299752, #12301915, #12305730, #12305781) — primeira
+  rodada da baixa-vendas pega.
+- Falta: instalar o plist e rodar `scripts/baixa-vendas.sh` uma vez com o dono olhando (headless `-p --chrome`).
+
+# SEO collectatcg.com.br (2026-10-24)
+
+## Contexto levantado
+- Search Console 90d: 386 cliques, 10,8 mil impressões, CTR 3,6%, posição 7,1. 437 indexadas, 270 não (41 404, 137 rastreada-não-indexada, 88 detectada).
+- `/carta/pokemon-mega-darkrai-ex-101-084-nm` tinha ~60% das impressões (pos 3,4) e hoje é 404: esgotou e o slug mudou no recadastro de 07/10 (agora `...-101-nm`).
+- Listagens do comerciante: 8 válidas, todas sem `shippingDetails`. Merchant Center 5831736937 com feed de 614 itens + 4 placeholders do GBP sem preço; 2 blisters reprovados por overlay promocional.
+- `GET /api/trades` em prod sem autenticação expõe custo.
+- Frete grátis já existe via env `FREE_SHIPPING_MIN_BRL`. Tracking em prod parado em 23/09.
+
+## Plano
+### Fase 0 — segurança
+- [x] Token nos endpoints privados/escrita do Go; dashboard e scripts das skills mandam o token.
+### Fase 1 — recuperar ranking
+- [x] Página de esgotado (200, OutOfStock, outras versões, "Avise-me no WhatsApp" + evento), gerada das vendas do ledger; fora do feed.
+- [x] 301 de slugs antigos (404 do Search Console + backup prewipe) e slug congelado no primeiro cadastro.
+- [x] Título `{Nome} {nº} – Preço R$ X | Collecta`, descrição com preço/estoque/envio, H1 nome+número+variante.
+### Fase 2 — dados estruturados e Merchant Center
+- [x] `shippingDetails` (R$ 25, grátis acima de R$ 300, 1–2 + 2–10 dias), devolução na organização, `sku` único, marca = fabricante, Breadcrumb/ItemList nas categorias.
+- [ ] `FREE_SHIPPING_MIN_BRL=300` no Railway + faixa no AnnouncementBar.
+- [ ] Merchant Center: apagar 4 placeholders, políticas de frete/devolução; imagem limpa dos 2 blisters.
+- [x] Bing Webmaster: importar do Search Console + sitemap.
+### Fase 3 — categorias e conteúdo
+- [x] `/jogo/[g]` 301 → `/singles/[g]` com intro, coleções e FAQ; H1 de coleção com nome.
+- [x] Bloco "Preço de mercado no Brasil" (sem fonte, some com dado > 14 dias), só cartas do catálogo.
+- [ ] `sync-up.sh` diário dos snapshots no launchd.
+### Fase 4 — performance e confiança
+- [x] `/img` WebP redimensionado, catálogo fatiado no cliente, sitemap com lastModified + imagens.
+- [x] Privacidade, Termos, Frete, Sobre (razão social + CNPJ); remover HighScores mock, specs inventadas de selado, texto "finalize pelo WhatsApp".
+### Dono
+- Credenciamento de loja oficial de torneio; link do site em todos os perfis.
+
+## Review (2026-10-24)
+- Fase 0: gate de `X-Admin-Token` em toda `/api` privada (`internal/api/api.go` `gate`), públicas: storefront(+market), card-image, image, item-photos, orders, shipping, admin. Dashboard instala wrapper de fetch e pede o token num card quando recebe 401. Scripts Python, `cmd/floors` e 8 skills mandam o header (token de `scripts/deploy.env`). Teste local: sem token 401, com token 200, vitrine 200.
+- Fase 1: `Trade.Slug` congelado (Add grava, Update preserva), `/api/storefront` devolve `slug` + `soldOut` (vendidos listados e itens zerados por reserva). Vitrine: página de esgotado 200 + OutOfStock + "Avise-me no WhatsApp", 31 redirects 308 de slugs pré-wipe (`lib/legacy-slugs.json`, inclui o Darkrai) e 464 páginas de esgotado do backup pré-wipe (`lib/legacy-sold.json`; arte só quando não é variante, `noArt`). Gerador em `tasks/seo-2026-10-24/legacy.py`. Slug Go = slug JS nos 623 itens de prod.
+- Fase 2: JSON-LD com `shippingDetails` (R$ 25 / grátis ≥ R$ 300 / 1–2 + 2–10 dias), devolução também na Organization, `sku` = id do feed, marca = fabricante, legalName/taxID. Bing: sitemap enviado (site já existia). Merchant Center já tinha frete por peso e devolução 7 dias em 618 produtos; 611 aprovados, 140 cliques/28d.
+- Fase 3: `/jogo/:g` 308 → `/singles/:g` (next.config), nav sem "VER TUDO", intro + coleções + FAQ + Breadcrumb/ItemList em `/singles/[g]` e coleções, H1 de coleção com nome, só o jogo atual vai para o cliente. Endpoint público `/api/storefront/market` (piso NM por idioma sem a Collecta, mediana 30d, some > 14 dias, recusa número ambíguo) + bloco na carta. `sync-up.sh --recent N` + `scripts/com.collecta.sync-up.plist` (8h30).
+- Fase 4: `/img` em WebP ≤ 600px (sharp fixado), sitemap com lastModified/imagens/esgotados e sem /jogo, páginas /frete /privacidade /termos /sobre no rodapé, HighScores e specs inventadas removidos, título padrão curto, og sem herdar a home.
+- Pendente do dono: setar `FREE_SHIPPING_MIN_BRL=300` no Railway ANTES do deploy da vitrine; commit/push (backend sobe junto com mudanças antigas da árvore); instalar o plist; rodar captura local (tracking parado em 19/10) e um `sync-up.sh --recent 31`; depois do env, regra de frete grátis no Merchant Center. Não apagados: 4 "produtos" do Perfil da Empresa no MC (são a vitrine do GBP).

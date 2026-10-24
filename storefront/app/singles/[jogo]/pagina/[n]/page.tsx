@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
-import { loadCatalog } from "@/lib/catalog";
+import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { GAME_NAMES } from "@/lib/games";
 import { pageCount } from "@/lib/paging";
 
@@ -55,18 +55,16 @@ export default async function SinglesGamePagePage({
   if (!GAME_NAMES[jogo] || page === null) {
     notFound();
   }
-  const { singles, games, navGames } = await loadCatalog();
-  const count = games.find((g) => g.id === jogo)?.count ?? 0;
-  if (page > pageCount(count)) {
+  const scope = scopeToGame(await loadCatalog(), jogo);
+  if (page > pageCount(scope.singles.length)) {
     notFound();
   }
-  const gameOpts = games.map((g) => ({ id: g.id, label: g.name }));
-  const navOpts = navGames.map((g) => ({ id: g.id, label: g.name }));
   return (
     <SinglesBrowse
-      catalog={singles}
-      games={gameOpts}
-      navGames={navOpts}
+      catalog={scope.singles}
+      games={scope.games}
+      navGames={scope.navGames}
+      setLabels={scope.setLabels}
       initialGame={jogo}
       initialPage={page}
       basePath={`/singles/${jogo}`}

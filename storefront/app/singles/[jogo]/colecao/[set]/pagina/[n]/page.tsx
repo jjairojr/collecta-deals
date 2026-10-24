@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
-import { loadCatalog } from "@/lib/catalog";
+import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { GAME_NAMES } from "@/lib/games";
 import { pageCount } from "@/lib/paging";
 import { findSet, setsOf } from "@/lib/sets";
@@ -56,18 +56,17 @@ export default async function SetPagePage({
   if (!GAME_NAMES[jogo] || page === null) {
     notFound();
   }
-  const { singles, games, navGames } = await loadCatalog();
-  const found = findSet(singles, jogo, set);
+  const scope = scopeToGame(await loadCatalog(), jogo);
+  const found = findSet(scope.singles, jogo, set);
   if (!found || page > pageCount(found.count)) {
     notFound();
   }
-  const gameOpts = games.map((g) => ({ id: g.id, label: g.name }));
-  const navOpts = navGames.map((g) => ({ id: g.id, label: g.name }));
   return (
     <SinglesBrowse
-      catalog={singles}
-      games={gameOpts}
-      navGames={navOpts}
+      catalog={scope.singles}
+      games={scope.games}
+      navGames={scope.navGames}
+      setLabels={scope.setLabels}
       initialGame={jogo}
       initialSet={found.code}
       initialPage={page}

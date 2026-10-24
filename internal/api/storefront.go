@@ -17,6 +17,7 @@ import (
 // security boundary between the internal portfolio and the public catalog.
 type storefrontItem struct {
 	SKU       string  `json:"sku"`
+	Slug      string  `json:"slug"`
 	Game      string  `json:"game"`
 	GameLabel string  `json:"gameLabel"`
 	Kind      string  `json:"kind,omitempty"` // "sealed" | "accessory" for manual products, empty for singles
@@ -42,6 +43,7 @@ type storefrontResponse struct {
 	// an image the moment a corrected one lands.
 	ArtVersion string           `json:"artVersion"`
 	Items      []storefrontItem `json:"items"`
+	SoldOut    []storefrontItem `json:"soldOut"`
 }
 
 // Accessories are stocked for no game in particular, so the catalog publishes
@@ -54,7 +56,8 @@ const (
 // handleStorefront returns every listed, in-stock holding across all games plus
 // the shared accessories, stripped of cost/profit, for the public catalog site.
 func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
-	resp := storefrontResponse{Items: []storefrontItem{}}
+	resp := storefrontResponse{Items: []storefrontItem{}, SoldOut: []storefrontItem{}}
+	var sold []storefrontItem
 	fx := s.storefrontFX()
 	resp.FXRate = fx
 	var artVersion int64
@@ -77,6 +80,9 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			if item, ok := storefrontItemFor(t, gs.Game.ID, gs.Game.Name, fx, lookup); ok {
 				resp.Items = append(resp.Items, item)
 			}
+			if item, ok := soldOutItemFor(t, gs.Game.ID, gs.Game.Name, fx, lookup); ok {
+				sold = append(sold, item)
+			}
 		}
 	}
 	if s.accessories != nil {
@@ -89,6 +95,9 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			if item, ok := storefrontItemFor(t, accessoryGameID, accessoryGameLabel, fx, nil); ok {
 				resp.Items = append(resp.Items, item)
 			}
+			if item, ok := soldOutItemFor(t, accessoryGameID, accessoryGameLabel, fx, nil); ok {
+				sold = append(sold, item)
+			}
 		}
 	}
 	if s.Checkout.Orders != nil {
@@ -97,12 +106,17 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		resp.Items = subtractReserved(resp.Items, reserved)
+		var drained []storefrontItem
+		resp.Items, drained = subtractReserved(resp.Items, reserved)
+		sold = append(drained, sold...)
 	}
+	resp.SoldOut = soldOutOnly(resp.Items, sold)
 	base := publicBase(r)
-	for i := range resp.Items {
-		if strings.HasPrefix(resp.Items[i].ImageURL, "/") {
-			resp.Items[i].ImageURL = base + resp.Items[i].ImageURL
+	for _, list := range [][]storefrontItem{resp.Items, resp.SoldOut} {
+		for i := range list {
+			if strings.HasPrefix(list[i].ImageURL, "/") {
+				list[i].ImageURL = base + list[i].ImageURL
+			}
 		}
 	}
 	resp.ArtVersion = strconv.FormatInt(artVersion, 10)
@@ -121,8 +135,37 @@ func storefrontItemFor(t trades.Trade, gameID, gameLabel string, fx float64, loo
 	if qty <= 0 {
 		qty = 1
 	}
+	return publicItem(t, gameID, gameLabel, qty, fx, lookup), true
+}
+
+func soldOutItemFor(t trades.Trade, gameID, gameLabel string, fx float64, lookup trades.PriceLookup) (storefrontItem, bool) {
+	if t.Status != "sold" || !t.Listed || t.AskBRL <= 0 {
+		return storefrontItem{}, false
+	}
+	return publicItem(t, gameID, gameLabel, 0, fx, lookup), true
+}
+
+func soldOutOnly(inStock, sold []storefrontItem) []storefrontItem {
+	seen := make(map[string]bool, len(inStock)+len(sold))
+	for _, it := range inStock {
+		seen[it.SKU] = true
+	}
+	out := make([]storefrontItem, 0, len(sold))
+	for _, it := range sold {
+		if seen[it.SKU] {
+			continue
+		}
+		seen[it.SKU] = true
+		it.Qty = 0
+		out = append(out, it)
+	}
+	return out
+}
+
+func publicItem(t trades.Trade, gameID, gameLabel string, qty int, fx float64, lookup trades.PriceLookup) storefrontItem {
 	item := storefrontItem{
 		SKU:       trades.SKU(gameID, t),
+		Slug:      trades.Slug(gameID, t),
 		Game:      gameID,
 		GameLabel: gameLabel,
 		Kind:      t.Kind,
@@ -155,11 +198,12 @@ func storefrontItemFor(t trades.Trade, gameID, gameLabel string, fx float64, loo
 	if fx > 0 {
 		item.AskUSD = round2(t.AskBRL * fx)
 	}
-	return item, true
+	return item
 }
 
-func subtractReserved(items []storefrontItem, reserved map[string]int) []storefrontItem {
+func subtractReserved(items []storefrontItem, reserved map[string]int) ([]storefrontItem, []storefrontItem) {
 	out := items[:0]
+	var drained []storefrontItem
 	for _, it := range items {
 		if held := reserved[it.SKU]; held > 0 {
 			take := held
@@ -170,11 +214,12 @@ func subtractReserved(items []storefrontItem, reserved map[string]int) []storefr
 			reserved[it.SKU] = held - take
 		}
 		if it.Qty <= 0 {
+			drained = append(drained, it)
 			continue
 		}
 		out = append(out, it)
 	}
-	return out
+	return out, drained
 }
 
 // storefrontFX returns a single USD-per-BRL rate (from the first deals-enabled

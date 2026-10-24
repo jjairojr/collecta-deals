@@ -35,6 +35,7 @@ export type View =
   | "pedidos"
   | "compras"
   | "importar"
+  | "importarjp"
   | "financeiro"
   | "acessorios"
   | "despesas"
@@ -88,6 +89,7 @@ export const navGroups: NavGroup[] = [
       { key: "pedidos", label: "Pedidos", icon: Truck },
       { key: "compras", label: "Compras", icon: ShoppingCart },
       { key: "importar", label: "Importar / Exportar", icon: Plane },
+      { key: "importarjp", label: "Importar Japão", icon: Plane },
       { key: "despesas", label: "Despesas", icon: Receipt },
       { key: "acessorios", label: "Acessórios", icon: Package },
       { key: "allportfolio", label: "Todos os jogos", icon: Layers },

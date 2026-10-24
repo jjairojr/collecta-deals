@@ -61,6 +61,7 @@ type Server struct {
 	OwnLigaStoreID int
 	PhotoDir       string
 	Checkout       Checkout
+	JPImport       *JPImport
 	imports        *importsCache
 	releasing      sync.Map
 }
@@ -135,6 +136,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/deals", s.handleDeals)
 	mux.HandleFunc("GET /api/imports", s.handleImports)
+	mux.HandleFunc("GET /api/jp-import", s.handleJPImport)
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
 	mux.HandleFunc("POST /api/refresh", s.handleRefresh)
@@ -178,6 +180,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/purchases/{id}/attach", s.handlePurchaseAttach)
 	mux.HandleFunc("POST /api/purchases/detach", s.handlePurchaseDetach)
 	mux.HandleFunc("GET /api/storefront", s.handleStorefront)
+	mux.HandleFunc("GET /api/storefront/market", s.handleStorefrontMarket)
 	mux.HandleFunc("GET /api/expenses", s.handleExpensesList)
 	mux.HandleFunc("POST /api/expenses", s.handleExpensesCreate)
 	mux.HandleFunc("PUT /api/expenses/{id}", s.handleExpensesUpdate)
@@ -200,7 +203,34 @@ func (s *Server) Handler() http.Handler {
 	if s.webDir != "" {
 		mux.Handle("/", s.spaHandler())
 	}
-	return cors(mux)
+	return cors(s.gate(mux))
+}
+
+var publicAPIPrefixes = []string{
+	"/api/storefront",
+	"/api/card-image",
+	"/api/image",
+	"/api/item-photos/",
+	"/api/orders",
+	"/api/shipping/",
+	"/api/admin/",
+}
+
+func isPublicAPI(path string) bool {
+	for _, p := range publicAPIPrefixes {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) gate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/") || isPublicAPI(r.URL.Path) || s.requireAdmin(w, r) {
+			next.ServeHTTP(w, r)
+		}
+	})
 }
 
 type gameInfo struct {

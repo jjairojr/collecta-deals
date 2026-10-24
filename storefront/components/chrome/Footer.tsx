@@ -62,6 +62,30 @@ export default function Footer() {
           >
             Devoluções
           </Link>
+          <Link
+            href="/frete"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Frete e entrega
+          </Link>
+          <Link
+            href="/termos"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Termos
+          </Link>
+          <Link
+            href="/privacidade"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Privacidade
+          </Link>
+          <Link
+            href="/sobre"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Sobre
+          </Link>
           <TrackedLink
             href={STORE.instagram}
             track={{ kind: "social", network: "instagram", origin: "footer" }}

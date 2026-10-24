@@ -5,6 +5,7 @@ import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
+import SoldOutBox from "@/components/product/SoldOutBox";
 import { sealedItem, trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { sealedToCartLine } from "@/lib/cart-lines";
@@ -23,9 +24,10 @@ export default function SealedDetailView({
   const sealed = item.kind === "sealed";
   const stockNoun = sealed ? "CAIXAS" : "UNIDADES";
   const preorder = item.badge === "PRE-VENDA";
-  const soldPct = Math.round(
-    ((item.stockTotal - item.stockLeft) / item.stockTotal) * 100,
-  );
+  const soldPct =
+    item.stockTotal > 0
+      ? Math.round(((item.stockTotal - item.stockLeft) / item.stockTotal) * 100)
+      : 0;
 
   const subtitle = [...new Set([item.set, item.meta].filter(Boolean))].join(
     " · ",
@@ -98,44 +100,51 @@ export default function SealedDetailView({
           </h1>
           <p className="mt-3 text-base text-muted">{subtitle}</p>
 
-          {/* Buy box */}
-          <div
-            className="sticker mt-6 rounded-[14px] bg-surface p-6"
-            style={{ ["--sh" as string]: "6px" }}
-          >
-            <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
-              {brl(item.price)}
-            </span>
-            <div className="mt-4 font-pixel text-[9px] text-brand-soft">
-              {soldPct > 0
-                ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} ${stockNoun}`
-                : `RESTAM ${item.stockLeft} ${stockNoun}`}
-            </div>
-            {soldPct > 0 && (
-              <div className="mt-2 h-[18px] overflow-hidden rounded-[10px] border-[3px] border-brand bg-outline">
-                <div
-                  className="h-full"
-                  style={{
-                    width: `${soldPct}%`,
-                    backgroundImage:
-                      "repeating-linear-gradient(90deg,#F6559B 0 10px,#FDC4E5 10px 20px)",
-                  }}
-                />
+          {item.soldOut ? (
+            <SoldOutBox
+              name={item.name}
+              price={item.price}
+              path={`/${sealed ? "selado" : "acessorio"}/${item.slug}`}
+            />
+          ) : (
+            <div
+              className="sticker mt-6 rounded-[14px] bg-surface p-6"
+              style={{ ["--sh" as string]: "6px" }}
+            >
+              <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
+                {brl(item.price)}
+              </span>
+              <div className="mt-4 font-pixel text-[9px] text-brand-soft">
+                {soldPct > 0
+                  ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} ${stockNoun}`
+                  : `RESTAM ${item.stockLeft} ${stockNoun}`}
               </div>
-            )}
+              {soldPct > 0 && (
+                <div className="mt-2 h-[18px] overflow-hidden rounded-[10px] border-[3px] border-brand bg-outline">
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${soldPct}%`,
+                      backgroundImage:
+                        "repeating-linear-gradient(90deg,#F6559B 0 10px,#FDC4E5 10px 20px)",
+                    }}
+                  />
+                </div>
+              )}
 
-            <div className="mt-5 flex flex-wrap items-stretch gap-3">
-              <Stepper value={qty} onChange={setQty} max={item.stockLeft} />
-              <button
-                type="button"
-                onClick={addToCart}
-                className="arcade-press sticker min-w-[220px] flex-1 rounded-[10px] bg-royal px-6 py-3.5 font-pixel text-[11px] text-white"
-                style={{ ["--sh" as string]: "6px" }}
-              >
-                {preorder ? "GARANTIR PRE-VENDA" : "ADICIONAR AO CARRINHO"}
-              </button>
+              <div className="mt-5 flex flex-wrap items-stretch gap-3">
+                <Stepper value={qty} onChange={setQty} max={item.stockLeft} />
+                <button
+                  type="button"
+                  onClick={addToCart}
+                  className="arcade-press sticker min-w-[220px] flex-1 rounded-[10px] bg-royal px-6 py-3.5 font-pixel text-[11px] text-white"
+                  style={{ ["--sh" as string]: "6px" }}
+                >
+                  {preorder ? "GARANTIR PRE-VENDA" : "ADICIONAR AO CARRINHO"}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Specs */}
           <div className="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -159,15 +168,16 @@ export default function SealedDetailView({
               <>
                 {item.name} é um produto selado de {item.gameLabel}
                 {item.language ? ` em ${item.language.toLowerCase()}` : ""}, com
-                lacre original de fábrica conferido antes do envio. Adicione ao
-                carrinho, finalize o pedido pelo WhatsApp e receba em todo o
-                Brasil.
+                lacre original de fábrica conferido antes do envio. Pague por
+                Pix ou cartão em até 12x no checkout do site e receba em todo o
+                Brasil, ou retire na loja em Goiânia.
               </>
             ) : (
               <>
                 {item.name} é um acessório para TCG, novo e conferido antes do
-                envio — serve para qualquer jogo da loja. Adicione ao carrinho,
-                finalize o pedido pelo WhatsApp e receba em todo o Brasil.
+                envio — serve para qualquer jogo da loja. Pague por Pix ou cartão
+                em até 12x no checkout do site e receba em todo o Brasil, ou
+                retire na loja em Goiânia.
               </>
             )}
           </p>

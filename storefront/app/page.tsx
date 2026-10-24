@@ -3,7 +3,6 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
-import HighScores from "@/components/home/HighScores";
 import SingleCard from "@/components/SingleCard";
 import SealedCard from "@/components/SealedCard";
 import TrackViewItemList from "@/components/analytics/TrackViewItemList";
@@ -176,11 +175,6 @@ export default async function HomePage() {
           </div>
         </Container>
       )}
-
-      {/* High scores */}
-      <Container className="py-6">
-        <HighScores />
-      </Container>
 
       <Container className="py-10">
         <section

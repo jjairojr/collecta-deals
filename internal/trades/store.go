@@ -88,6 +88,9 @@ func (s *Store) Add(t Trade) (Trade, error) {
 	if t.Qty <= 0 {
 		t.Qty = 1
 	}
+	if t.Slug == "" {
+		t.Slug = SlugBase(t)
+	}
 	all = append(all, t)
 	if err := s.persist(all); err != nil {
 		return Trade{}, err
@@ -146,8 +149,13 @@ func (s *Store) Update(id string, mut func(*Trade)) (Trade, error) {
 	}
 	for i := range all {
 		if all[i].ID == id {
+			slug := all[i].Slug
+			if slug == "" {
+				slug = SlugBase(all[i])
+			}
 			mut(&all[i])
 			all[i].ID = id
+			all[i].Slug = slug
 			all[i].UpdatedAt = time.Now()
 			if all[i].Qty <= 0 {
 				all[i].Qty = 1

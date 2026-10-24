@@ -1,8 +1,9 @@
 import Container from "@/components/ui/Container";
 import { pixelText } from "@/lib/format";
+import { SHIPPING } from "@/lib/store";
 
 const NOTES = [
-  // "FRETE GRATIS ACIMA DE R$ 250",
+  `FRETE GRATIS ACIMA DE R$ ${SHIPPING.freeAboveBRL}`,
   "A LOJA DE CARTAS MAIS RÁPIDA DO BRASIL",
   "CARTA CERTIFICADA E CONFERIDA",
   "ENVIO EM 24H",

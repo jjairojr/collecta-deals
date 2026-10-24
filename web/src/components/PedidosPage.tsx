@@ -310,7 +310,7 @@ export default function PedidosPage() {
   );
 }
 
-function TokenCard({ onSaved, onCancel }: { onSaved: () => void; onCancel?: () => void }) {
+export function TokenCard({ onSaved, onCancel }: { onSaved: () => void; onCancel?: () => void }) {
   const [token, setToken] = useState(getAdminToken);
   const submit = () => {
     setAdminToken(token.trim());
@@ -320,7 +320,7 @@ function TokenCard({ onSaved, onCancel }: { onSaved: () => void; onCancel?: () =
     <Card className="space-y-3 p-4">
       <div className="font-display text-base font-extrabold text-fg">Token de administrador</div>
       <p className="max-w-2xl text-sm text-slate-400">
-        O servidor exige o token ADMIN para listar e mexer nos pedidos. Ele fica salvo só neste navegador.
+        O servidor exige o token ADMIN para abrir o dashboard. Ele fica salvo só neste navegador.
       </p>
       <div className="flex flex-wrap items-end gap-2">
         <Field label="Token">

@@ -7,6 +7,7 @@ import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
+import SoldOutBox from "@/components/product/SoldOutBox";
 import {
   singleItem,
   trackAddToCart,
@@ -100,7 +101,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             {item.language && (
               <Badge className="bg-royal text-white">{item.language}</Badge>
             )}
-            {item.qty === 1 && (
+            {!item.soldOut && item.qty === 1 && (
               <Badge className="border-2 border-brand bg-outline text-brand">
                 SO 1 UNIDADE
               </Badge>
@@ -108,56 +109,64 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
           </div>
 
           <h1 className="font-display mt-4 text-4xl font-bold leading-none text-white sm:text-[54px]">
-            {item.name}
+            {item.name} {item.number}
+            {item.variant ? ` ${item.variant}` : ""}
           </h1>
           <p className="mt-3 text-base text-muted">{meta}</p>
 
-          {/* Buy box */}
-          <div
-            className="sticker mt-6 rounded-[14px] bg-surface p-6"
-            style={{ ["--sh" as string]: "6px" }}
-          >
-            <div className="flex flex-wrap items-baseline gap-3">
-              <span className="font-pixel text-[22px] text-brand sm:text-[34px]">
-                {brl(item.price)}
-              </span>
-              {item.wasPrice && (
-                <span className="text-sm text-faint line-through">
-                  {brl(item.wasPrice)}
+          {item.soldOut ? (
+            <SoldOutBox
+              name={`${item.name} ${item.number}${item.variant ? ` ${item.variant}` : ""}`}
+              price={item.price}
+              path={`/carta/${item.slug}`}
+            />
+          ) : (
+            <div
+              className="sticker mt-6 rounded-[14px] bg-surface p-6"
+              style={{ ["--sh" as string]: "6px" }}
+            >
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className="font-pixel text-[22px] text-brand sm:text-[34px]">
+                  {brl(item.price)}
                 </span>
+                {item.wasPrice && (
+                  <span className="text-sm text-faint line-through">
+                    {brl(item.wasPrice)}
+                  </span>
+                )}
+              </div>
+              {item.marketAvg && (
+                <p className="mt-2 text-[13px] text-muted">
+                  média de mercado {brl(item.marketAvg)}
+                </p>
               )}
-            </div>
-            {item.marketAvg && (
-              <p className="mt-2 text-[13px] text-muted">
-                média de mercado {brl(item.marketAvg)}
-              </p>
-            )}
 
-            <div className="mt-5 flex flex-wrap items-stretch gap-3">
-              <Stepper value={qty} onChange={setQty} max={item.qty} />
-              <button
-                type="button"
-                onClick={addMain}
-                className="arcade-press sticker order-3 min-w-[220px] flex-1 rounded-[10px] bg-brand px-6 py-3.5 font-pixel text-[11px] text-white [--sh:6px] sm:order-2"
-              >
-                ADICIONAR AO CARRINHO
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!wished) {
-                    trackAddToWishlist(singleItem(item));
-                  }
-                  setWished((w) => !w);
-                }}
-                aria-label="Adicionar à lista de desejos"
-                aria-pressed={wished}
-                className="order-2 grid w-14 place-items-center rounded-[10px] border-4 border-brand-soft py-2.5 text-brand-soft sm:order-3"
-              >
-                <Heart className={`h-5 w-5 ${wished ? "fill-brand-soft" : ""}`} />
-              </button>
+              <div className="mt-5 flex flex-wrap items-stretch gap-3">
+                <Stepper value={qty} onChange={setQty} max={item.qty} />
+                <button
+                  type="button"
+                  onClick={addMain}
+                  className="arcade-press sticker order-3 min-w-[220px] flex-1 rounded-[10px] bg-brand px-6 py-3.5 font-pixel text-[11px] text-white [--sh:6px] sm:order-2"
+                >
+                  ADICIONAR AO CARRINHO
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!wished) {
+                      trackAddToWishlist(singleItem(item));
+                    }
+                    setWished((w) => !w);
+                  }}
+                  aria-label="Adicionar à lista de desejos"
+                  aria-pressed={wished}
+                  className="order-2 grid w-14 place-items-center rounded-[10px] border-4 border-brand-soft py-2.5 text-brand-soft sm:order-3"
+                >
+                  <Heart className={`h-5 w-5 ${wished ? "fill-brand-soft" : ""}`} />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Seller bar */}
           <div
@@ -186,6 +195,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             {setLabel(item.game, item.set)},{item.variant ? ` versão ${item.variant},` : ""} em
             condição {item.condition}, conferida uma a uma antes do envio. Pague por Pix ou cartão em até 12x,
             receba em todo o Brasil pelos Correios ou retire na loja em Goiânia.
+            {item.soldOut ? " No momento está esgotada: peça pelo WhatsApp e avisamos quando voltar." : ""}
           </p>
         </div>
       </div>

@@ -9,6 +9,7 @@ Registra uma lista de cartas compradas (ex.: colada do WhatsApp ou do carrinho T
 
 ```
 B=https://collecta-deals-production.up.railway.app
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
 ```
 
 ## Entrada esperada
@@ -45,7 +46,7 @@ https://tcgcsv.com/tcgplayer/3/{groupId}/prices        # linhas por (productId, 
 Sempre rodar um **dry-run** primeiro: imprimir tabela (carta, base USD, fonte direct/market, buyBRL, shipBRL) e a lista de não-casadas. Não-casadas NÃO são postadas — resolver manualmente. Depois postar com ~0.4s entre chamadas e guardar os `id`s retornados.
 
 ```bash
-curl -s -X POST "$B/api/trades?game=pokemon" -H 'Content-Type: application/json' -d '{
+curl -s -X POST -H "X-Admin-Token: $T" "$B/api/trades?game=pokemon" -H 'Content-Type: application/json' -d '{
   "number":"167","name":"N'\''s Reshiram","set":"JTG","variant":"EN","condition":"NM",
   "qty":1,"buyBRL":95.20,"shippingBRL":9.65,"store":"TCGplayer",
   "buyDate":"2026-08-03","delivered":false,"status":"holding"}'
@@ -58,8 +59,8 @@ Convenções (padrão do import PBL, já em prod):
 - `condition`: `"NM"` salvo indicação.
 - `buyBRL` é **unitário**; `shippingBRL` é o **total da linha** (soma de todas as unidades).
 - Compra com pedido agrupado (aba Compras): `POST /api/purchases` cria o cabeçalho (`date`, `store`, `notes`), depois `POST /api/purchases/{id}/items?game=...` por item (mesmo payload de trade; `kind:"sealed"`, `set:"SEALED"`, `number:""` para selados). Câmbio JPY/outros: `https://api.frankfurter.app/latest?from=JPY&to=BRL` (seguir redirect, `-L`).
-- Foto do item: `curl -F photo=@foto.jpg "$B/api/trades/{id}/photo?game=..."` (jpeg/png/webp, 10 MB) seta `imageURL` para `/api/item-photos/<arquivo>`; `DELETE` no mesmo caminho remove.
-- Sem auth; só `/api/admin/reload` exige `X-Admin-Token`.
+- Foto do item: `curl -F photo=@foto.jpg -H "X-Admin-Token: $T" "$B/api/trades/{id}/photo?game=..."` (jpeg/png/webp, 10 MB) seta `imageURL` para `/api/item-photos/<arquivo>`; `DELETE` no mesmo caminho remove.
+- Toda rota `/api` privada exige `X-Admin-Token: $T` (token em `scripts/deploy.env`); só `/api/storefront`, `/api/card-image`, `/api/image`, `/api/item-photos/*` e o checkout são públicos.
 - **NUNCA** sincronizar `trades*.json` por arquivo — prod é dono do ledger; tudo via API. Erros corrigem-se com `PUT /api/trades/{id}` (substitui o registro INTEIRO) ou `DELETE /api/trades/{id}`.
 
 ## Passo 4 — imagens

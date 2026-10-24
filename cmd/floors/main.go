@@ -71,12 +71,13 @@ func run() error {
 	cfPath := flag.String("cf-clearance", "data/cf-clearance.json", "Cloudflare clearance file written by cmd/cfgate")
 	proxy := flag.String("liga-proxy", "http://localhost:8891", "CONNECT proxy for Liga hosts")
 	outPath := flag.String("out", "", "path to write the JSON result (default stdout)")
+	adminToken := flag.String("admin-token", os.Getenv("ADMIN_TOKEN"), "X-Admin-Token for the dashboard API")
 	flag.Parse()
 
 	g := game.ByID(*gameID)
 	log := logx.New(os.Stderr)
 
-	held, err := fetchHeld(*base, *gameID)
+	held, err := fetchHeld(*base, *gameID, *adminToken)
 	if err != nil {
 		return err
 	}
@@ -178,11 +179,12 @@ func run() error {
 	return os.WriteFile(*outPath, out, 0o644)
 }
 
-func fetchHeld(base, gameID string) ([]trade, error) {
+func fetchHeld(base, gameID, adminToken string) ([]trade, error) {
 	req, err := http.NewRequest(http.MethodGet, base+"/api/trades?game="+gameID, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("X-Admin-Token", adminToken)
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { installAdminAuth } from "./api";
 import "@fontsource/outfit/400.css";
 import "@fontsource/outfit/500.css";
 import "@fontsource/outfit/600.css";
@@ -13,6 +14,8 @@ const root = document.getElementById("root");
 if (!root) {
   throw new Error("root element not found");
 }
+
+installAdminAuth();
 
 createRoot(root).render(
   <StrictMode>

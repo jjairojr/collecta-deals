@@ -49,6 +49,7 @@ export interface Single {
   grade?: string;
   imageURL?: string;
   addedAt?: string;
+  soldOut?: boolean;
 }
 
 export interface SingleDetail extends Single {
@@ -84,6 +85,8 @@ export interface Sealed {
   badge?: string;
   imageURL?: string;
   featured?: boolean;
+  soldOut?: boolean;
+  addedAt?: string;
 }
 
 export interface SealedDetail extends Sealed {
@@ -100,13 +103,6 @@ export interface Accessory extends Omit<Sealed, "kind"> {
 
 export interface AccessoryDetail extends Omit<SealedDetail, "kind"> {
   kind: "accessory";
-}
-
-export interface HighScore {
-  position: string;
-  player: string;
-  trades: number;
-  score: number;
 }
 
 // A line in the buyer's cart. `sku` is the backend's stock key: checkout sends

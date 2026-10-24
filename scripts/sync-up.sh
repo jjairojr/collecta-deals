@@ -7,16 +7,21 @@
 # pricing needs fresh, so this always sends them. Pass -s / --snapshots-only to
 # push just the snapshots (fast) and skip the heavy tracking re-upload, or
 # -i / --images-only to push only each tracking dir's images.json (card art
-# resolved locally for cards prod can't reach behind Cloudflare).
+# resolved locally for cards prod can't reach behind Cloudflare), or
+# -r / --recent DAYS to push only the tracking snapshots written in the last
+# DAYS days (the daily job: keeps prod's market prices fresh without the
+# full re-upload).
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 snapshots_only=0
 images_only=0
+recent_days=""
 case "${1:-}" in
 	-s|--snapshots-only) snapshots_only=1 ;;
 	-i|--images-only) images_only=1 ;;
+	-r|--recent) recent_days="${2:-3}" ;;
 	"") ;;
-	*) echo "usage: sync-up.sh [-s|--snapshots-only|-i|--images-only]" >&2; exit 1 ;;
+	*) echo "usage: sync-up.sh [-s|--snapshots-only|-i|--images-only|-r|--recent DAYS]" >&2; exit 1 ;;
 esac
 
 cd "$DATA_DIR"
@@ -27,6 +32,22 @@ if [ "$images_only" -eq 1 ]; then
 		echo ">> $d/images.json"
 		vf_upload "$d/images.json" "/$d/"
 	done
+	reload_prod
+	echo "sync-up done."
+	exit 0
+fi
+
+if [ -n "$recent_days" ]; then
+	sent=0
+	for d in tracking tracking-pkm tracking-rft tracking-lor tracking-gnd; do
+		[ -d "$d" ] || continue
+		while IFS= read -r f; do
+			echo ">> $f"
+			vf_upload "$f" "/$(dirname "$f")/"
+			sent=$((sent + 1))
+		done < <(find "$d" -mindepth 2 -name '*.json' -mtime "-$recent_days" ! -name '*.bak*' ! -name '*.tmp')
+	done
+	echo "pushed $sent tracking file(s) from the last $recent_days day(s)."
 	reload_prod
 	echo "sync-up done."
 	exit 0

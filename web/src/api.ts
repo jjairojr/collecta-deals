@@ -853,6 +853,58 @@ export function getExports(f: ExportFilters): Promise<ExportsResponse> {
   return getJSON<ExportsResponse>(`${base}/imports?${params.toString()}`);
 }
 
+export interface JpLang {
+  floorBRL: number;
+  copies: number;
+  sold: number;
+}
+
+export type JpWestStatus = "ok" | "missing" | "unreleased" | "untracked";
+
+export interface JpImportRow {
+  set: string;
+  setName: string;
+  era: string;
+  number: number;
+  rarity: string;
+  name: string;
+  nameJP: string;
+  yen: number;
+  costBRL: number;
+  stock: number;
+  cardRushURL: string;
+  ligaURL: string;
+  jp: JpLang;
+  west: string;
+  westNumber: number;
+  westURL: string;
+  westStatus: JpWestStatus;
+  pt: JpLang;
+  en: JpLang;
+  realBRL: number;
+  realX: number;
+}
+
+export interface JpImportSet {
+  jp: string;
+  name: string;
+  era: string;
+  west: string[] | null;
+}
+
+export interface JpImportResponse {
+  capturedAt: string;
+  fxJPYBRL: number;
+  trackingDate: string;
+  sets: JpImportSet[];
+  count: number;
+  rows: JpImportRow[];
+}
+
+export function getJpImport(): Promise<JpImportResponse> {
+  return getJSON<JpImportResponse>(`${base}/jp-import`);
+}
+
 export function getImports(f: ImportFilters): Promise<ImportsResponse> {
   const params = new URLSearchParams({
     games: f.games.join(","),
@@ -1148,6 +1200,32 @@ export function setAdminToken(token: string): void {
   } catch {
     return;
   }
+}
+
+export const unauthorizedEvent = "collecta:unauthorized";
+
+function requestPath(input: RequestInfo | URL): string {
+  const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  return new URL(raw, window.location.origin).pathname;
+}
+
+export function installAdminAuth(): void {
+  const native = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    if (!requestPath(input).startsWith(`${base}/`)) {
+      return native(input, init);
+    }
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    const token = getAdminToken();
+    if (token) {
+      headers.set("X-Admin-Token", token);
+    }
+    const res = await native(input, { ...init, headers });
+    if (res.status === 401) {
+      window.dispatchEvent(new Event(unauthorizedEvent));
+    }
+    return res;
+  };
 }
 
 function adminHeaders(): Record<string, string> | undefined {

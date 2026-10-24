@@ -19,8 +19,10 @@ import (
 	"opdeals/internal/flaresolverr"
 	"opdeals/internal/game"
 	"opdeals/internal/httpx"
+	"opdeals/internal/jpimport"
 	"opdeals/internal/liga"
 	"opdeals/internal/logx"
+	"opdeals/internal/model"
 	"opdeals/internal/pipeline"
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
@@ -77,6 +79,11 @@ func run() error {
 	pkmTrackSealed := flag.Bool("pkm-track-sealed", true, "also capture Pokémon sealed products")
 	pkmCaptureOnce := flag.Bool("pkm-capture-once", false, "run one Pokémon tracking capture then exit")
 	pkmCaptureSealedOnce := flag.Bool("pkm-capture-sealed-once", false, "run one Pokémon sealed capture then exit")
+	pkmJPTrack := flag.Bool("pkm-jp-track", true, "capture the secret rares of the Japanese/western Pokémon sets the Card Rush import page compares (sets not already tracked)")
+	pkmJPTrackDir := flag.String("pkm-jp-track-dir", "data/jpimport-pkm", "directory to store the Card Rush import Liga snapshots")
+	pkmJPTrackSet := flag.String("pkm-jp-track-set", "", "comma-separated Liga set codes for the Card Rush import capture (default: every set in the jpimport table not already tracked)")
+	pkmJPCaptureOnce := flag.Bool("pkm-jp-capture-once", false, "run one Card Rush import Liga capture then exit")
+	cardRushPath := flag.String("cardrush", "data/cardrush-pkm.json", "path to the Card Rush (Japan) price capture")
 	rftTrack := flag.Bool("rft-track", true, "capture Riftbound (ligariftbound.com.br) tracking snapshots")
 	rftTrackDir := flag.String("rft-track-dir", "data/tracking-rft", "directory to store Riftbound tracking snapshots")
 	rftTradesPath := flag.String("rft-trades", "data/trades-rft.json", "path to the Riftbound trade ledger (portfolio)")
@@ -139,7 +146,7 @@ func run() error {
 	dealsLog := logger.WithPrefix("DEALS")
 	trackLog := logger.WithPrefix("TRACKING")
 
-	oneShot := *captureOnce || *captureSealedOnce || *pkmCaptureOnce || *pkmCaptureSealedOnce ||
+	oneShot := *captureOnce || *captureSealedOnce || *pkmCaptureOnce || *pkmCaptureSealedOnce || *pkmJPCaptureOnce ||
 		*rftCaptureOnce || *rftCaptureSealedOnce || *lorCaptureOnce || *lorCaptureSealedOnce ||
 		*gndCaptureOnce || *gndCaptureSealedOnce || *backfillImages
 	// The unified scheduler owns all refresh timing, so the per-store background
@@ -285,6 +292,15 @@ func run() error {
 		return err
 	}
 
+	jpStore := tracking.NewStore(*pkmJPTrackDir, pkmLog)
+	var jpCapturer *tracking.Capturer
+	if *pkmJPTrack {
+		jpCapturer, err = buildJPCapturer(jpStore, pkmStack, parseSets(*pkmTrackSet), parseSets(*pkmJPTrackSet), *timeout, *concurrency, tz, *trackInterval, *trackMinPrice, ligaFetcherFor, pkmLog)
+		if err != nil {
+			return err
+		}
+	}
+
 	rftStack, rftCapturer, err := buildStack(stackParams{
 		game:        game.Riftbound(),
 		trackDir:    *rftTrackDir,
@@ -392,6 +408,12 @@ func run() error {
 		}
 		return pkmCapturer.Capture(context.Background(), time.Now())
 	}
+	if *pkmJPCaptureOnce {
+		if jpCapturer == nil {
+			return fmt.Errorf("pkm-jp-capture-once requires -pkm-jp-track enabled")
+		}
+		return jpCapturer.Capture(context.Background(), time.Now())
+	}
 	if *rftCaptureSealedOnce || *rftCaptureOnce {
 		if rftCapturer == nil {
 			return fmt.Errorf("rft-capture-once requires -rft-track enabled")
@@ -440,6 +462,7 @@ func run() error {
 		}
 		jobs = append(jobs, captureJob("gundam capture", gndCapturer)...)
 		jobs = append(jobs, captureJob("pokemon capture", pkmCapturer)...)
+		jobs = append(jobs, captureJob("pokemon jp import capture", jpCapturer)...)
 		go runUnifiedScheduler(jobs, *scheduleInterval, *scheduleGap, *schedulerState, logger.WithPrefix("SCHED"))
 	} else if *trackSchedule {
 		for _, c := range []*tracking.Capturer{opCapturer, pkmCapturer, rftCapturer, lorCapturer, gndCapturer} {
@@ -454,6 +477,7 @@ func run() error {
 	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, expenseStore, purchaseStore, *serveOnly, *adminToken)
 	srv.OwnLigaStoreID = *ligaStoreID
 	srv.PhotoDir = *photoDir
+	srv.JPImport = &api.JPImport{Store: jpStore, CardRushPath: *cardRushPath}
 	checkout, err := buildCheckout(*ordersPath, *storefrontToken, *collectaAPI, *collectaStoreToken, logger)
 	if err != nil {
 		return fmt.Errorf("checkout: %w", err)
@@ -703,6 +727,33 @@ func buildStack(p stackParams) (*api.GameStack, *tracking.Capturer, error) {
 		Trades:   tradeStore,
 		Quotes:   quoteStore,
 	}, capturer, nil
+}
+
+func buildJPCapturer(store *tracking.Store, pkm *api.GameStack, tracked, only []string, timeout time.Duration, concurrency int, tz *time.Location, interval time.Duration, minPrice float64, fetcherFor liga.FetcherFor, log *logx.Logger) (*tracking.Capturer, error) {
+	skip := make(map[string]bool, len(tracked))
+	for _, s := range tracked {
+		skip[s] = true
+	}
+	sets := only
+	if len(sets) == 0 {
+		for _, s := range jpimport.LigaSets() {
+			if !skip[s] {
+				sets = append(sets, s)
+			}
+		}
+	}
+	if len(sets) == 0 {
+		return nil, nil
+	}
+	httpClient, err := httpx.NewThrottled(timeout)
+	if err != nil {
+		return nil, fmt.Errorf("jp import tracking http client: %w", err)
+	}
+	g := pkm.Game
+	ligaClient := liga.New(ligaFetcherOr(fetcherFor, httpClient, g), log, concurrency, sets, g)
+	c := tracking.NewCapturer(log, ligaClient, store, sets, minPrice, tz, interval, false, g.FloorLangs, nil, pkm.Cardimg)
+	c.SetCardFilter(func(l model.BrazilListing) bool { return jpimport.IsSecret(l.Name, l.Number) })
+	return c, nil
 }
 
 func backfillCardImages(ctx context.Context, logger *logx.Logger, ts *tracking.Store, is *cardimg.Store) error {

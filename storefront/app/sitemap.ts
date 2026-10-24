@@ -7,7 +7,7 @@ import { absoluteURL } from "@/lib/site";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { singles, sealed, accessories, games, navGames, live } =
+  const { singles, sealed, accessories, soldOut, games, live } =
     await loadCatalog();
   const urls: MetadataRoute.Sitemap = [
     { url: absoluteURL("/"), changeFrequency: "daily", priority: 1 },
@@ -19,6 +19,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    { url: absoluteURL("/frete"), changeFrequency: "yearly", priority: 0.3 },
+    { url: absoluteURL("/termos"), changeFrequency: "yearly", priority: 0.3 },
+    { url: absoluteURL("/privacidade"), changeFrequency: "yearly", priority: 0.3 },
+    { url: absoluteURL("/sobre"), changeFrequency: "yearly", priority: 0.3 },
   ];
   if (live && accessories.length > 0) {
     urls.push({
@@ -35,13 +39,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: absoluteURL(`/singles/pagina/${n}`),
       changeFrequency: "daily",
       priority: 0.6,
-    });
-  }
-  for (const g of navGames) {
-    urls.push({
-      url: absoluteURL(`/jogo/${g.id}`),
-      changeFrequency: "daily",
-      priority: 0.8,
     });
   }
   for (const g of games) {
@@ -82,26 +79,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     });
   }
-  for (const s of singles) {
+  const product = (
+    path: string,
+    p: { imageURL?: string; addedAt?: string },
+    priority: number,
+  ) => {
     urls.push({
-      url: absoluteURL(`/carta/${s.slug}`),
+      url: absoluteURL(path),
+      lastModified: p.addedAt,
       changeFrequency: "weekly",
-      priority: 0.7,
+      priority,
+      images: p.imageURL ? [absoluteURL(p.imageURL)] : undefined,
     });
+  };
+  for (const s of singles) {
+    product(`/carta/${s.slug}`, s, 0.7);
   }
   for (const s of sealed) {
-    urls.push({
-      url: absoluteURL(`/selado/${s.slug}`),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    });
+    product(`/selado/${s.slug}`, s, 0.7);
   }
   for (const a of accessories) {
-    urls.push({
-      url: absoluteURL(`/acessorio/${a.slug}`),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    });
+    product(`/acessorio/${a.slug}`, a, 0.7);
+  }
+  for (const s of soldOut.singles) {
+    product(`/carta/${s.slug}`, s, 0.4);
+  }
+  for (const s of soldOut.sealed) {
+    product(`/selado/${s.slug}`, s, 0.4);
+  }
+  for (const a of soldOut.accessories) {
+    product(`/acessorio/${a.slug}`, a, 0.4);
   }
   return urls;
 }

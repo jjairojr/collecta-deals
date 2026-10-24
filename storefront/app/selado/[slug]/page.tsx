@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import SealedGrid from "@/components/SealedGrid";
 import KindToggle from "@/components/ui/KindToggle";
+import { CategoryIntro } from "@/components/singles/CategoryExtras";
 import SealedDetailView from "@/components/product/SealedDetailView";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadCatalog, loadSealedDetail } from "@/lib/catalog";
@@ -32,20 +33,22 @@ export async function generateMetadata({
     const { sealed, live } = await loadCatalog();
     const count = sealed.filter((s) => s.game === slug).length;
     return {
-      title: `Produto selado de ${gameName}`,
+      title: `${gameName} selado — booster box, ETB e boosters lacrados`,
       description: `${count > 0 ? `${count} produtos selados` : "Produtos selados"} de ${gameName} na Collecta: booster boxes, ETBs e mais, com lacre original e envio para todo o Brasil.`,
       alternates: { canonical: `/selado/${slug}` },
       robots: live ? undefined : { index: false },
     };
   }
   const res = await loadSealedDetail(slug);
-  if (!res) {
+  if (!res || "redirect" in res) {
     return { title: "Produto não encontrado" };
   }
   const { item, live } = res;
   return {
     title: `${item.headline ?? item.name} · ${item.gameLabel}`,
-    description: `Comprar ${item.name} lacrado na Collecta: ${item.format ?? "produto selado"} de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, com lacre original, por ${brl(item.price)}. Retire na loja em Goiânia ou receba em todo o Brasil.`,
+    description: item.soldOut
+      ? `${item.name} está esgotado na Collecta. Último preço ${brl(item.price)}. Peça pelo WhatsApp e avisamos quando voltar ao estoque.`
+      : `Comprar ${item.name} lacrado na Collecta: ${item.format ?? "produto selado"} de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, com lacre original, por ${brl(item.price)}. Retire na loja em Goiânia ou receba em todo o Brasil.`,
     alternates: { canonical: `/selado/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: productOpenGraph(`/selado/${slug}`, item.imageURL),
@@ -71,6 +74,11 @@ export default async function SeladoSlugPage({
           heading="h1"
         />
         <KindToggle singlesHref={`/singles/${slug}`} />
+        <CategoryIntro>
+          {list.length > 0 ? `${list.length} produtos selados de ${gameName} em estoque: ` : `Produtos selados de ${gameName}: `}
+          booster boxes, ETBs, bundles, blisters e decks com lacre original de fábrica, conferidos antes do envio. Pix ou
+          cartão em até 12x, envio para todo o Brasil ou retirada na loja em Goiânia.
+        </CategoryIntro>
         <SealedGrid
           list={list}
           listId={`selado_${slug}`}
@@ -82,6 +90,9 @@ export default async function SeladoSlugPage({
   const res = await loadSealedDetail(slug);
   if (!res) {
     notFound();
+  }
+  if ("redirect" in res) {
+    permanentRedirect(res.redirect);
   }
   const { item, live } = res;
   return (

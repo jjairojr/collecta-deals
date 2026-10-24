@@ -73,3 +73,29 @@ func TestStorefrontNeverLeaksCost(t *testing.T) {
 		}
 	}
 }
+
+func TestStorefrontKeepsSoldOutProducts(t *testing.T) {
+	s, store := storefrontServer(t)
+	gone, _ := store.Add(trades.Trade{Number: "OP02-013", Name: "Ace", Set: "OP02", Qty: 1, BuyBRL: 80})
+	store.SetListings(map[string]trades.Listing{gone.ID: {AskBRL: 500, Listed: true}})
+	store.Sell(gone.ID, trades.Sale{SellPrice: 500, SellCurrency: "BRL"})
+	partial, _ := store.Add(trades.Trade{Number: "OP16-080", Name: "Teach", Set: "OP16", Qty: 2, BuyBRL: 100})
+	store.SetListings(map[string]trades.Listing{partial.ID: {AskBRL: 250, Listed: true}})
+	store.Sell(partial.ID, trades.Sale{Qty: 1, SellPrice: 250, SellCurrency: "BRL"})
+
+	rec := httptest.NewRecorder()
+	s.handleStorefront(rec, httptest.NewRequest(http.MethodGet, "/api/storefront", nil))
+	var resp storefrontResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Items) != 1 || resp.Items[0].Slug != "onepiece-teach-op16-080" {
+		t.Fatalf("in stock = %+v", resp.Items)
+	}
+	if len(resp.SoldOut) != 1 || resp.SoldOut[0].Slug != "onepiece-ace-op02-013" || resp.SoldOut[0].Qty != 0 {
+		t.Fatalf("sold out = %+v", resp.SoldOut)
+	}
+	if strings.Contains(rec.Body.String(), "sellPrice") || strings.Contains(rec.Body.String(), "buyer") {
+		t.Fatalf("sold-out entry leaked sale data: %s", rec.Body.String())
+	}
+}

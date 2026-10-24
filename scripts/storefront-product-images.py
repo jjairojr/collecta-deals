@@ -1,20 +1,34 @@
 import json
+import os
 import sys
 import urllib.request
 
 B = "https://collecta-deals-production.up.railway.app"
+
+
+def admin_token():
+    if os.environ.get("ADMIN_TOKEN"):
+        return os.environ["ADMIN_TOKEN"]
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy.env")
+    for line in open(path, encoding="utf-8"):
+        if line.startswith("ADMIN_TOKEN="):
+            return line.split("=", 1)[1].strip()
+    raise SystemExit("ADMIN_TOKEN ausente em scripts/deploy.env")
+
+
+AUTH = {"X-Admin-Token": admin_token()}
 MAPPING = sys.argv[1] if len(sys.argv) > 1 else "tasks/storefront-images-2026-10-09/product-images.json"
 
 
 def get(path):
-    return json.load(urllib.request.urlopen(f"{B}{path}", timeout=60))
+    return json.load(urllib.request.urlopen(urllib.request.Request(f"{B}{path}", headers=AUTH), timeout=60))
 
 
 def post(path, body):
     req = urllib.request.Request(
         f"{B}{path}",
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **AUTH},
         method="POST",
     )
     return json.load(urllib.request.urlopen(req, timeout=120))

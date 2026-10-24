@@ -38,7 +38,8 @@ Nunca use `data/trades*.json` local — fica defasado em dias.
 
 ```bash
 B=https://collecta-deals-production.up.railway.app
-curl -s --max-time 30 "$B/api/trades?game=riftbound" > /tmp/rft.json
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
+curl -s --max-time 30 -H "X-Admin-Token: $T" "$B/api/trades?game=riftbound" > /tmp/rft.json
 ```
 
 Entra quem tem `status == "holding"` **e** `qty > 0` **e** `askBRL > 0` **e**

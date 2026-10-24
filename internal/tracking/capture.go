@@ -29,10 +29,15 @@ type Capturer struct {
 	sealed     bool
 	floorLangs []string
 	img        *cardimg.Store
+	cardFilter func(model.BrazilListing) bool
 }
 
 func NewCapturer(log *logx.Logger, ligaClient *liga.Client, store *Store, sets []string, minCardBRL float64, tz *time.Location, interval time.Duration, sealed bool, floorLangs []string, fxProvider func() float64, img *cardimg.Store) *Capturer {
 	return &Capturer{log: log, liga: ligaClient, store: store, sets: sets, minCardBRL: minCardBRL, tz: tz, interval: interval, sealed: sealed, floorLangs: floorLangs, fxProvider: fxProvider, img: img}
+}
+
+func (c *Capturer) SetCardFilter(keep func(model.BrazilListing) bool) {
+	c.cardFilter = keep
 }
 
 func (c *Capturer) Sets() []string { return c.sets }
@@ -132,6 +137,9 @@ func (c *Capturer) captureSingles(ctx context.Context, now time.Time, date strin
 	toDetail := make([]model.BrazilListing, 0, len(listings))
 	for _, l := range listings {
 		if !wanted[l.SetCode] || l.LowBRL < c.minCardBRL {
+			continue
+		}
+		if c.cardFilter != nil && !c.cardFilter(l) {
 			continue
 		}
 		bySet[l.SetCode] = append(bySet[l.SetCode], l)

@@ -51,7 +51,8 @@ defasado em dias e já me fez reportar número errado.
 
 ```bash
 B=https://collecta-deals-production.up.railway.app
-curl -s --max-time 30 "$B/api/trades?game=pokemon" | python3 -c "
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
+curl -s --max-time 30 -H "X-Admin-Token: $T" "$B/api/trades?game=pokemon" | python3 -c "
 import json,sys,re
 d=json.load(sys.stdin)
 items=d if isinstance(d,list) else d.get('trades',d.get('items',[]))

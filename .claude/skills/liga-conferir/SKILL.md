@@ -33,7 +33,8 @@ Piece em 2026-07-30. Então antes de qualquer reimportação é obrigatório sab
 
 ```bash
 B=https://collecta-deals-production.up.railway.app
-curl -s --max-time 30 "$B/api/trades?game=onepiece" > /tmp/dash-op.json
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
+curl -s --max-time 30 -H "X-Admin-Token: $T" "$B/api/trades?game=onepiece" > /tmp/dash-op.json
 ```
 
 Conta como "deveria estar na Liga" quem tem `status == "holding"`, `qty > 0` e

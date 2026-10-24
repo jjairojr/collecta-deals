@@ -5,7 +5,6 @@
 import type {
   Accessory,
   AccessoryDetail,
-  HighScore,
   Sealed,
   SealedDetail,
   Seller,
@@ -189,14 +188,6 @@ export const SEALED: Sealed[] = [
     qty: 4,
     badge: "SO RESTAM 4",
   },
-];
-
-export const HIGH_SCORES: HighScore[] = [
-  { position: "1ST", player: "BRUNO_TCG", trades: 312, score: 98420 },
-  { position: "2ND", player: "MARI.PULLS", trades: 287, score: 91105 },
-  { position: "3RD", player: "DOJO_CARDS", trades: 241, score: 84660 },
-  { position: "4TH", player: "RIFT_KID", trades: 198, score: 72310 },
-  { position: "5TH", player: "SEALED_SP", trades: 176, score: 68940 },
 ];
 
 const OFFICIAL_SELLER = {
@@ -430,18 +421,12 @@ export function buildSingleDetail(s: Single): SingleDetail {
 }
 
 export function buildSealedDetail(s: Sealed): SealedDetail {
-  const [content, metaLanguage] = s.meta.split(" · ");
-  const specs = s.language
-    ? [
-        { key: "JOGO", value: s.gameLabel },
-        { key: "IDIOMA", value: s.language },
-        { key: "GARANTIA", value: "Lacre original de fábrica" },
-      ]
-    : [
-        { key: "CONTEUDO", value: content ?? "24 packs" },
-        { key: "IDIOMA", value: metaLanguage ?? "Inglês" },
-        { key: "GARANTIA", value: "Lacre original de fábrica" },
-      ];
+  const specs = [
+    { key: "JOGO", value: s.gameLabel },
+    ...(s.language ? [{ key: "IDIOMA", value: s.language }] : []),
+    ...(s.set ? [{ key: "COLECAO", value: s.set }] : []),
+    { key: "GARANTIA", value: "Lacre original de fábrica" },
+  ];
   return {
     ...s,
     stockLeft: s.qty,

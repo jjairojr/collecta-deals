@@ -1,6 +1,8 @@
 export const STORE = {
   name: "Collecta TCG",
-  legalName: "Collecta",
+  legalName: "COLLECTA COLECIONAVEIS LTDA",
+  cnpj: "68.804.333/0001-07",
+  email: "tcgcollecta@gmail.com",
   street: "Rua 10, 163, Loja 03",
   building: "Galeria Badra",
   district: "Setor Oeste",
@@ -14,6 +16,13 @@ export const STORE = {
   closes: "22:00",
   instagram: "https://www.instagram.com/tcgcollecta",
   instagramHandle: "@tcgcollecta",
+} as const;
+
+export const SHIPPING = {
+  minBRL: 25,
+  freeAboveBRL: 300,
+  handlingDays: [0, 1],
+  transitDays: [1, 10],
 } as const;
 
 export const STORE_ADDRESS_LINE = `${STORE.street}, ${STORE.building}, ${STORE.district}, ${STORE.city} - ${STORE.state}, CEP ${STORE.cep}`;

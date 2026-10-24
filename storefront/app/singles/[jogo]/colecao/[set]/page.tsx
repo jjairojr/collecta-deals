@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import JsonLd from "@/components/seo/JsonLd";
+import { SetIntro, SetLinks } from "@/components/singles/CategoryExtras";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
-import { loadCatalog } from "@/lib/catalog";
+import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { brl } from "@/lib/format";
 import { GAME_NAMES } from "@/lib/games";
-import { breadcrumbJsonLd } from "@/lib/seo";
+import { SINGLES_PAGE_SIZE } from "@/lib/paging";
+import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
 import { findSet, setsOf } from "@/lib/sets";
 
 export const revalidate = 60;
@@ -31,7 +33,7 @@ export async function generateMetadata({
     return {};
   }
   return {
-    title: `Cartas ${found.label} de ${name} (singles)`,
+    title: `Cartas ${found.label} de ${name} — singles e preços`,
     description: `${found.count} cartas da coleção ${found.label} de ${name} em estoque na Collecta, a partir de ${brl(found.minPrice)}. Conferidas uma a uma, Pix ou cartão em até 12x e envio para todo o Brasil.`,
     alternates: { canonical: `/singles/${jogo}/colecao/${found.slug}` },
     robots: live ? undefined : { index: false },
@@ -44,13 +46,12 @@ export default async function SetPage({ params }: { params: Promise<{ jogo: stri
   if (!name) {
     notFound();
   }
-  const { singles, games, navGames } = await loadCatalog();
-  const found = findSet(singles, jogo, set);
+  const scope = scopeToGame(await loadCatalog(), jogo);
+  const found = findSet(scope.singles, jogo, set);
   if (!found) {
     notFound();
   }
-  const gameOpts = games.map((g) => ({ id: g.id, label: g.name }));
-  const navOpts = navGames.map((g) => ({ id: g.id, label: g.name }));
+  const inSet = scope.singles.filter((s) => s.set === found.code);
   return (
     <>
       <JsonLd
@@ -60,13 +61,22 @@ export default async function SetPage({ params }: { params: Promise<{ jogo: stri
           { name: found.label },
         ])}
       />
+      <JsonLd
+        data={itemListJsonLd(
+          `Cartas ${found.label} de ${name}`,
+          inSet.slice(0, SINGLES_PAGE_SIZE).map((s) => `/carta/${s.slug}`),
+        )}
+      />
       <SinglesBrowse
-        catalog={singles}
-        games={gameOpts}
-        navGames={navOpts}
+        catalog={scope.singles}
+        games={scope.games}
+        navGames={scope.navGames}
+        setLabels={scope.setLabels}
         initialGame={jogo}
         initialSet={found.code}
         basePath={`/singles/${jogo}/colecao/${found.slug}`}
+        intro={<SetIntro name={name} set={found} />}
+        footer={<SetLinks game={jogo} name={name} sets={scope.sets} current={found.code} />}
       />
     </>
   );

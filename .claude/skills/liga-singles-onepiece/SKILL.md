@@ -125,7 +125,8 @@ arquivo (linha 3 = primeira linha de dados). Use isso para mapear de volta.
 
 ```bash
 B=https://collecta-deals-production.up.railway.app
-curl -s --max-time 30 "$B/api/trades?game=onepiece" > /tmp/op.json
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
+curl -s --max-time 30 -H "X-Admin-Token: $T" "$B/api/trades?game=onepiece" > /tmp/op.json
 ```
 
 `status == "holding"`, `qty > 0`, `askBRL > 0`, sem `kind`.

@@ -59,3 +59,16 @@ export function gameSurface(game: string): Surface {
 export function gamePixel(game: string, label: string): string {
   return PIXEL[game] ?? pixelText(label);
 }
+
+export const GAME_BLURB: Record<string, string> = {
+  pokemon:
+    "Cartas Pokémon avulsas e produto selado lacrado: boosters, booster boxes, bundles e decks das coleções mais recentes, além de singles raras, full art e illustration rare conferidas uma a uma.",
+  onepiece:
+    "One Piece Card Game: leaders, alternate arts, mangas e secret rares avulsas, mais booster boxes e decks lacrados de cada OP, com condição descrita carta por carta.",
+  riftbound:
+    "Riftbound, o TCG de League of Legends: singles de Origins e das coleções seguintes, incluindo foils e alternate arts, além de boosters e boxes lacrados.",
+  lorcana:
+    "Disney Lorcana: cartas avulsas enchanted, legendary e promos, mais boosters e produtos selados das coleções lançadas.",
+  gundam:
+    "Gundam Card Game: singles e produto selado das primeiras coleções, conferidos uma a uma antes do envio.",
+};

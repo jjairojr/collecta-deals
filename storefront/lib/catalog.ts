@@ -9,6 +9,9 @@ import {
   sealedBySlug,
 } from "@/lib/mock";
 import { gameSurface } from "@/lib/games";
+import { setsOf } from "@/lib/sets";
+import LEGACY_SLUGS from "@/lib/legacy-slugs.json";
+import LEGACY_SOLD from "@/lib/legacy-sold.json";
 import type {
   Accessory,
   AccessoryDetail,
@@ -23,6 +26,7 @@ import type {
 // internal/api/storefront.go). Prices are in reais; there is no slug/language.
 interface RawItem {
   sku?: string;
+  slug?: string;
   game: string;
   gameLabel: string;
   kind?: string;
@@ -38,19 +42,31 @@ interface RawItem {
   askUSD?: number;
   featured?: boolean;
   addedAt?: string;
+  noArt?: boolean;
 }
+
+const legacySold: RawItem[] = LEGACY_SOLD;
 
 interface RawResponse {
   fxRate: number;
   count: number;
   artVersion?: string;
   items: RawItem[];
+  soldOut?: RawItem[];
+}
+
+export interface SoldOut {
+  singles: Single[];
+  sealed: Sealed[];
+  accessories: Accessory[];
 }
 
 export interface Catalog {
   singles: Single[];
   sealed: Sealed[];
   accessories: Accessory[];
+  soldOut: SoldOut;
+  redirects: Map<string, string>;
   games: Game[]; // games that have singles — home cabinets + /singles JOGO filter
   navGames: Game[]; // games with any stock (singles or sealed) — header nav
   live: boolean; // true when served by the real backend, false when mock fallback
@@ -66,6 +82,9 @@ function slugify(s: string): string {
 }
 
 function slugFor(it: RawItem): string {
+  if (it.slug) {
+    return it.slug;
+  }
   return slugify(
     [it.game, it.name, it.number, it.variant, it.condition]
       .filter(Boolean)
@@ -103,7 +122,7 @@ function resolveImage(it: RawItem, version: string): string | undefined {
   if (it.imageURL) {
     return it.imageURL;
   }
-  if (!it.number) {
+  if (!it.number || it.noArt) {
     return undefined;
   }
   const p = new URLSearchParams({ game: it.game, set: it.set, number: it.number });
@@ -129,7 +148,7 @@ function mapItem(it: RawItem, version: string): Single {
     condition,
     language: "", // backend has no language field yet
     price: Math.round(it.askBRL * 100),
-    qty: it.qty > 0 ? it.qty : 1,
+    qty: Math.max(it.qty, 0),
     grade: /^PSA/i.test(condition) ? condition : undefined,
     imageURL: resolveImage(it, version),
     addedAt: it.addedAt,
@@ -227,10 +246,11 @@ function mapSealed(it: RawItem, version: string): Sealed {
     meta: [set || it.gameLabel, language].filter(Boolean).join(" · "),
     language,
     price: Math.round(it.askBRL * 100),
-    qty: it.qty > 0 ? it.qty : 1,
+    qty: Math.max(it.qty, 0),
     badge: "LACRADO",
     imageURL: resolveImage(it, version),
     featured: it.featured,
+    addedAt: it.addedAt,
   };
 }
 
@@ -249,10 +269,11 @@ function mapAccessory(it: RawItem, version: string): Accessory {
     set,
     meta: set || "Acessório",
     price: Math.round(it.askBRL * 100),
-    qty: it.qty > 0 ? it.qty : 1,
+    qty: Math.max(it.qty, 0),
     badge: "ACESSORIO",
     imageURL: resolveImage(it, version),
     featured: it.featured,
+    addedAt: it.addedAt,
   };
 }
 
@@ -282,30 +303,54 @@ function deriveGames(items: { game: string; gameLabel: string }[]): Game[] {
 // Collapse the ledger rows behind one stock key (sku), summing quantity. The
 // backend sells the cheapest row first, so the group shows the lowest price —
 // the same number checkout will charge.
-function dedupProducts<
-  T extends {
-    sku: string;
-    qty: number;
-    price: number;
-    featured?: boolean;
-    addedAt?: string;
-  },
->(items: T[]): T[] {
-  const bySKU = new Map<string, T>();
+interface Product {
+  slug: string;
+  sku: string;
+  qty: number;
+  price: number;
+  featured?: boolean;
+  addedAt?: string;
+}
+
+function dedupProducts<T extends Product>(items: T[], aliases: Map<string, string>): T[] {
+  const bySKU = new Map<string, { item: T; firstAdded?: string }>();
   for (const s of items) {
-    const cur = bySKU.get(s.sku);
-    if (cur) {
-      cur.qty += s.qty;
-      cur.price = Math.min(cur.price, s.price);
-      cur.featured = cur.featured || s.featured;
-      if (s.addedAt && (!cur.addedAt || s.addedAt > cur.addedAt)) {
-        cur.addedAt = s.addedAt;
+    const group = bySKU.get(s.sku);
+    if (!group) {
+      bySKU.set(s.sku, { item: { ...s }, firstAdded: s.addedAt });
+      continue;
+    }
+    const cur = group.item;
+    cur.qty += s.qty;
+    cur.price = Math.min(cur.price, s.price);
+    cur.featured = cur.featured || s.featured;
+    if (s.slug !== cur.slug) {
+      const older = s.addedAt && group.firstAdded && s.addedAt < group.firstAdded;
+      aliases.set(older ? cur.slug : s.slug, older ? s.slug : cur.slug);
+      if (older) {
+        cur.slug = s.slug;
       }
-    } else {
-      bySKU.set(s.sku, { ...s });
+    }
+    if (s.addedAt && (!group.firstAdded || s.addedAt < group.firstAdded)) {
+      group.firstAdded = s.addedAt;
+    }
+    if (s.addedAt && (!cur.addedAt || s.addedAt > cur.addedAt)) {
+      cur.addedAt = s.addedAt;
     }
   }
-  return [...bySKU.values()];
+  return [...bySKU.values()].map((g) => g.item);
+}
+
+function resolveAliases(aliases: Map<string, string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const from of aliases.keys()) {
+    let to = aliases.get(from) ?? from;
+    for (let hops = 0; aliases.has(to) && hops < 8; hops++) {
+      to = aliases.get(to) ?? to;
+    }
+    out.set(from, to);
+  }
+  return out;
 }
 
 // Mock catalog for design work with no backend configured. It never stands in
@@ -319,6 +364,8 @@ function mockCatalog(): Catalog {
     singles,
     sealed,
     accessories: [],
+    soldOut: { singles: [], sealed: [], accessories: [] },
+    redirects: new Map(),
     games: deriveGames(singles),
     navGames: deriveGames([...singles, ...sealed]),
     live: false,
@@ -350,21 +397,40 @@ export async function loadCatalog(): Promise<Catalog> {
     return mockCatalog();
   }
   const data = await fetchStorefront(base);
-  const raw = data.items ?? [];
   const version = artVersion(data.artVersion);
-  const singles = dedupProducts(
-    raw.filter((it) => !it.kind).map((it) => mapItem(it, version)),
-  );
-  const sealed = dedupProducts(
-    raw.filter((it) => it.kind === "sealed").map((it) => mapSealed(it, version)),
-  );
-  const accessories = dedupProducts(
-    raw.filter((it) => it.kind === "accessory").map((it) => mapAccessory(it, version)),
-  );
+  const aliases = new Map<string, string>();
+  const shelf = (raw: RawItem[]) => ({
+    singles: dedupProducts(
+      raw.filter((it) => !it.kind).map((it) => mapItem(it, version)),
+      aliases,
+    ),
+    sealed: dedupProducts(
+      raw.filter((it) => it.kind === "sealed").map((it) => mapSealed(it, version)),
+      aliases,
+    ),
+    accessories: dedupProducts(
+      raw.filter((it) => it.kind === "accessory").map((it) => mapAccessory(it, version)),
+      aliases,
+    ),
+  });
+  const { singles, sealed, accessories } = shelf(data.items ?? []);
+  const gone = shelf([...(data.soldOut ?? []), ...legacySold]);
+  const taken = new Set([...singles, ...sealed, ...accessories].map((p) => p.slug));
+  const soldOut: SoldOut = {
+    singles: gone.singles.filter((p) => !taken.has(p.slug)).map((p) => ({ ...p, soldOut: true })),
+    sealed: gone.sealed.filter((p) => !taken.has(p.slug)).map((p) => ({ ...p, soldOut: true })),
+    accessories: gone.accessories.filter((p) => !taken.has(p.slug)).map((p) => ({ ...p, soldOut: true })),
+  };
   return {
     singles,
     sealed,
     accessories,
+    soldOut,
+    redirects: productRedirects(resolveAliases(aliases), [
+      ...[...singles, ...soldOut.singles].map((p) => ({ slug: p.slug, path: `/carta/${p.slug}` })),
+      ...[...sealed, ...soldOut.sealed].map((p) => ({ slug: p.slug, path: `/selado/${p.slug}` })),
+      ...[...accessories, ...soldOut.accessories].map((p) => ({ slug: p.slug, path: `/acessorio/${p.slug}` })),
+    ]),
     games: deriveGames(singles),
     navGames: deriveGames([...singles, ...sealed]),
     live: true,
@@ -386,9 +452,32 @@ export function findBySku(
   );
 }
 
-export interface DetailResult<T> {
-  item: T;
-  live: boolean;
+function productRedirects(
+  aliases: Map<string, string>,
+  products: { slug: string; path: string }[],
+): Map<string, string> {
+  const pathOf = new Map(products.map((p) => [p.slug, p.path]));
+  const out = new Map<string, string>();
+  const add = (from: string, to: string) => {
+    const path = pathOf.get(to);
+    if (path && !pathOf.has(from)) {
+      out.set(from, path);
+    }
+  };
+  for (const [from, to] of aliases) {
+    add(from, to);
+  }
+  const legacy: Record<string, string> = LEGACY_SLUGS;
+  for (const [from, to] of Object.entries(legacy)) {
+    add(from, to);
+  }
+  return out;
+}
+
+export type DetailResult<T> = { item: T; live: boolean } | { redirect: string };
+
+function findProduct<T extends { slug: string }>(live: T[], gone: T[], slug: string): T | undefined {
+  return live.find((c) => c.slug === slug) ?? gone.find((c) => c.slug === slug);
 }
 
 export async function loadSingleDetail(
@@ -401,8 +490,12 @@ export async function loadSingleDetail(
       return { item: curated, live: false };
     }
   }
-  const s = catalog.singles.find((c) => c.slug === slug);
-  return s ? { item: buildSingleDetail(s), live: catalog.live } : null;
+  const s = findProduct(catalog.singles, catalog.soldOut.singles, slug);
+  if (s) {
+    return { item: buildSingleDetail(s), live: catalog.live };
+  }
+  const redirect = catalog.redirects.get(slug);
+  return redirect ? { redirect } : null;
 }
 
 export async function loadSealedDetail(
@@ -415,14 +508,37 @@ export async function loadSealedDetail(
       return { item: curated, live: false };
     }
   }
-  const s = catalog.sealed.find((c) => c.slug === slug);
-  return s ? { item: buildSealedDetail(s), live: catalog.live } : null;
+  const s = findProduct(catalog.sealed, catalog.soldOut.sealed, slug);
+  if (s) {
+    return { item: buildSealedDetail(s), live: catalog.live };
+  }
+  const redirect = catalog.redirects.get(slug);
+  return redirect ? { redirect } : null;
 }
 
 export async function loadAccessoryDetail(
   slug: string,
 ): Promise<DetailResult<AccessoryDetail> | null> {
   const catalog = await loadCatalog();
-  const a = catalog.accessories.find((c) => c.slug === slug);
-  return a ? { item: buildAccessoryDetail(a), live: catalog.live } : null;
+  const a = findProduct(catalog.accessories, catalog.soldOut.accessories, slug);
+  if (a) {
+    return { item: buildAccessoryDetail(a), live: catalog.live };
+  }
+  const redirect = catalog.redirects.get(slug);
+  return redirect ? { redirect } : null;
+}
+
+export function scopeToGame(catalog: Catalog, game: string) {
+  const singles = catalog.singles.filter((s) => s.game === game);
+  const opts = catalog.games
+    .filter((g) => g.id === game)
+    .map((g) => ({ id: g.id, label: g.name }));
+  const sets = setsOf(singles, game);
+  return {
+    singles,
+    games: opts,
+    navGames: opts,
+    sets,
+    setLabels: Object.fromEntries(sets.map((s) => [s.code, s.label])),
+  };
 }

@@ -54,8 +54,9 @@ baixados (regex `Liga #(\d+)` sobre o `buyer` dos `status:"sold"`):
 
 ```bash
 B=https://collecta-deals-production.up.railway.app
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
 for g in onepiece pokemon riftbound; do
-  curl -s "$B/api/trades?game=$g" > /tmp/trades-$g.json
+  curl -s -H "X-Admin-Token: $T" "$B/api/trades?game=$g" > /tmp/trades-$g.json
 done
 python3 - <<'EOF'
 import json, re
@@ -183,7 +184,8 @@ Uma chamada por item vendido:
 
 ```bash
 B=https://collecta-deals-production.up.railway.app
-curl -s -X POST "$B/api/trades/<id>/sell?game=<game>" \
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
+curl -s -X POST -H "X-Admin-Token: $T" "$B/api/trades/<id>/sell?game=<game>" \
   -H 'Content-Type: application/json' \
   -d '{"qty":2,"sellPrice":260.0,"sellCurrency":"BRL","sellDate":"2026-08-01","buyer":"Fulano — Liga #11542408"}'
 ```
@@ -209,7 +211,7 @@ restante NÃO acompanha (o split copia, não decrementa) — a linha ficaria
 baixa parcial:
 
 ```bash
-curl -s -X POST "$B/api/trades/liga?game=<game>" \
+curl -s -X POST -H "X-Admin-Token: $T" "$B/api/trades/liga?game=<game>" \
   -H 'Content-Type: application/json' \
   -d '{"items":[{"id":"<id>","ligaListed":true,"ligaQty":<ligaQty - vendidos>,"ligaPriceBRL":<inalterado>}]}'
 ```
@@ -435,3 +437,122 @@ desse conhecimento.
   Decree of Unity #131 (VEN esgotados), 1× Dreepy 247/217 (2 pedidos, 1
   holding), 1× Solosis 118/086 PT (2 vendidos, holding listado qty 1 + um
   `AR (JP)` sem ask), 1× Armarouge.
+
+2026-10-12 (9ª execução — 370 pedidos na Liga, 13 novos pagos, 40 itens baixados):
+
+- **A Fase 0 pode vir vazia de propósito.** Em 07/10/2026 12:30 o dono zerou os três
+  ledgers de prod e recriou tudo a partir do export da Liga (`tasks/liga-sync-2026-10-07/`,
+  export das 13:11, nota "Cadastrado a partir do estoque da LigaMagic"). O histórico de
+  `sold` com `Liga #` ficou só no backup `data/.sync-bak/prewipe-20261007-123024/`
+  (último pedido baixado antes do wipe: #12026327, 21/09). Quando não houver nenhum
+  `sold`, confira `createdAt` dos holdings: se todos nasceram no mesmo dia, a fronteira é
+  o horário do export que gerou o ledger — a Liga já tinha descontado as vendas
+  anteriores do estoque exportado, então só pedidos criados DEPOIS do export precisam
+  de baixa. Não use o backup pré-wipe para dedup: ele descreve outro ledger.
+- Desconto novo: cupom `Desconto (#CONTINUE5)` de 10% (Carlos Pratti, 2 pedidos); o
+  `Desconto:` sem cupom segue 5%. Fator aplicado por item sobre unitário × qty.
+- O cliente pode fechar um segundo pedido como "Adicionar a um pedido já existente"
+  (#12203534 sobre #12203353): são dois números na listagem, cada um com seus itens;
+  baixar os dois.
+- Selado One Piece japonês (`(JAP) Kit Colecionável - Base Shop Limited Card Collection
+  Vol.1`, categoria Produtos) está no ledger **pokemon** como `BASE Shop` kind sealed,
+  qty 9 sem ask — casado por nome, baixado com `game=pokemon`.
+- Sem lastro: Toxtricity `#134/128` PT (Celebração de 30 Anos, não existe no export nem
+  no ledger) e Singularity `#105` OGN (export de 07/10 com qty 0, holding ausente).
+- Preços do pedido abaixo do `askBRL` em 8 cartas do pedido grande (Dragonite-V 130 vs
+  149,99; Munkidori 210 vs 263,09; Cofagrigus 160 vs 205,69; Eelektross 135 vs 162,10;
+  Landorus 165 vs 179,99; Deoxys-VSTAR 470 vs 499,89; Salamence ex 290 vs 319,79;
+  Bewear 140 vs 156) e Ezreal - Prodigy #149 SFD 95 vs 113,99: o anúncio da Liga já
+  estava reprecificado para baixo (rodada de 10/10) e o ledger não acompanhou.
+
+2026-10-13 (10ª execução — 376 pedidos na Liga, 2 novos pagos, 111 itens baixados):
+
+- Fronteira `Liga #` = #12204163 (12/10). Quatro cancelados depois dela ignorados
+  (#12214893, #12211420, #12211319, #12209168).
+- Pedido de "playset de comuns" do Riftbound (#12208690: 111 cartas VEN × 3 un, R$ 0,09
+  a R$ 3,99, total R$ 84,61 + frete 30,75): o `innerText` do detalhe tem 140 k
+  caracteres — parsear em `window.__it` e ler em 4 fatias de 28 itens no formato
+  `q;nome;nº;unit;F`. Casou 111/111 por nome + nº + Foil (variant do ledger) contra
+  `ligaPriceBRL`; 74 holdings parciais tiveram `ligaQty` decrementado.
+- `(CHN) Caixa de Booster - GEM Pack Vol.5` (#12208277, R$ 289,90) não existe no ledger
+  pokemon: só há Vol.2, Vol.3 (sem ask), Vol.4 e Vol. 6 (ask 319,90, qty 19). Não baixado
+  — perguntado ao dono qual registro representa a Vol.5.
+
+2026-10-18 (11ª execução — 389 pedidos na Liga, 9 novos pagos, 41 itens baixados):
+
+- Fronteira `Liga #` = #12208690 (12/10). #12208277 (GEM Pack Vol.5) segue pendente de
+  resposta do dono desde a 10ª execução; não baixado. Cancelados ignorados (#12247038,
+  #12230193, #12220983); #12256803 aguardando pagamento.
+- `Enviado` via PIX sem `Data Pag.` (#12219480) baixado pelo status, como antes.
+- Descontos: 5% (#12237998, #12217566) e 80/806,90 ≈ 10% (#12219480, cupom). Fator
+  aplicado por item.
+- Riftbound: a Liga marca `Foil` por item no detalhe (linha solta depois da condição);
+  o número sem sufixo (`#178`, `#19`) casa com o registro sem `A`, o `#R05A`/`#143A` com
+  o AA. O preço do pedido = `ligaPriceBRL`/ask desempata.
+- Sem lastro: pedido #12241188 inteiro (Pikachu 023, Eevee 118, Snorlax 119 da
+  Celebração de 30 Anos PT), Chaos Rune #166A OGN ×3, Garen - Commander #13b OGS,
+  Astral Heron #44 VEN (R$ 249,90), Cataclysmic Duel #90 ×2 (único registro já vendido
+  no #12208690), Boa Hancock OP07-051, 1× Dracule Mihawk OP01-070 (pedido 3, ledger 2),
+  1× Swain #65 (pedido 2, ledger 1).
+
+2026-10-20 (12ª execução — 393 pedidos na Liga, 4 novos pagos, 7 itens baixados):
+
+- Fronteira `Liga #` = #12261686 (18/10). #12256803 (Kit Base Shop Vol.1), que estava
+  "Aguardando Pagamento" na 11ª, virou Enviado/pago — baixado agora; revisitar pedidos
+  pendentes de pagamento a cada execução.
+- **Canal novo: MyPCards (loja CollectaTCG, desde 19/10).** O mesmo estoque está anunciado
+  lá, então todo item baixado aqui precisa sair (ou ter a qty reduzida) no MyP: achar o
+  anúncio em `/CollectaTCG/<jogo>?PastaSearch[query]=<número>` (link
+  `/estoque/update/<id>`) e excluir com `$.ajax({url:'/estoque/delete?id=<id>',type:'POST'})`
+  disparado sem await (vários de uma vez num `forEach`); a página navega logo depois e
+  mata o `javascript_tool`, então confira depois com `fetch('/estoque/update/<id>',
+  {redirect:'manual'})` → 404 = removido. `fetch` POST manual dá 403 (21/10). Reduzir qtd:
+  `new FormData(form)` da página de update, trocar `Estoque[quantidadeestoque]`, POST no
+  action → flash "N x R$ X gravado com sucesso". Mapa ga→id de anúncio: varrer
+  `/CollectaTCG/<jogo>?page=N` (link `/estoque/update/`, `data-ga-item-id`). Vendas do MyP aparecem no ledger
+  com buyer "MYP Cards" (baixa manual do dono) e devem sair da Liga.
+- Kit Base Shop Vol.1 agora tem registro de nome exato no ledger **onepiece** (ask
+  398,90); o `BASE Shop` do pokemon (q8, sem ask) é provável duplicata do mesmo estoque.
+- Sem lastro: Rowlet `#090/088` JP Foil (Equilíbrio Perfeito) R$ 19,65 (#12268010).
+
+2026-10-21 (13ª execução — 4 pedidos novos pagos, 21 itens, 13 baixados):
+
+- Vendas do site (`— Site #N`, checkout Mercado Pago) também precisam sair da Liga e do
+  MyP. Neste caso a Liga já estava zerada/decrementada para os 5 itens do Site #7 —
+  conferir o admin antes de mexer; só o `ligaQty` do dashboard precisou de ajuste.
+- Pedido Pokémon grande de JP Foil: 8 de 12 itens sem lastro no ledger (Beautifly 219/217,
+  Togekiss 203/193, Chespin 087/086, Frogadier 089/086, Aurorus 084/080, Xerneas 089/083,
+  Dhelmise 091/084 JP; Fomantis 085/084 PT só casaria com M5 #082 AR (JP) de outro preço).
+- Script de baixa em shell quebra com apóstrofo no nome ("Lisia's Appeal"): gerar as
+  chamadas em Python (urllib) em vez de `curl -d '<json>'`. Toda chamada ao prod leva o header `X-Admin-Token` (valor de `ADMIN_TOKEN` em `scripts/deploy.env`).
+
+2026-10-22 (14ª execução — 1 pedido novo pago, 16 itens, 3 baixados):
+
+- #12289145: 13 de 16 cartas JP Foil sem lastro de novo (o dono cadastra JP direto na Liga
+  sem passar pelo dashboard). Banette TG07 LORTG Foil JP casou por nome+nº+idioma com
+  ask 23,99 vs vendido 16,99 (único candidato).
+- Na mesma rodada, sync Liga → dashboard do OP: varrer `cartas/all&tcg=11` (busca com
+  `btBuscar`), comparar soma de qty por `h_numero_carta` com os holdings, e criar o que
+  falta via `POST /api/trades` (buyBRL 0, nota "Cadastrado a partir do estoque da
+  LigaMagic <data>") + `/api/trades/listings` + `/api/trades/liga`. Qty maior na Liga vira
+  lote extra (registro novo com a diferença), não PUT no registro antigo.
+- Sync Liga → dashboard do **Pokémon** (22/10): o dono anuncia cada JP AR DUAS vezes na Liga
+  — na edição JP (M5, M2A, M3, M4, M2, M1L/M1S) e na EN equivalente (PBL, ASC, POR, CRI, PFL,
+  MEG; às vezes MEP/CRZ/CEC/OBF/CZGG com preço igual). Contar uma vez só: canônico = edição JP,
+  qty = max das duas linhas; parear só por nome EN + par de edição conhecido ou preço igual
+  (parear só por nome juntou Spiritomb LORTG com M1L). Mapa edid→sigla: `select[name=txt_edicao]`
+  do próprio admin (texto termina em "(SIGLA)"). Saída grande do admin: clicar na página e
+  `navigator.clipboard.writeText` → `pbpaste` (48 KB passou).
+
+2026-10-24 (15ª execução, via `baixa-vendas` — 7 pedidos pagos, 19 linhas, 18 baixas):
+
+- **A listagem mudou de layout**: `innerText` agora vem em colunas, uma por
+  linha — `#N | cliente | data | hora | data pag. (opcional) | status | pagamento | envio | R$ total`.
+  Separe por `\|(?=#\d{8}\|)` depois de trocar as quebras por `|`; a data pag.
+  some quando o pedido não foi pago (cancelado).
+- Detalhe do item continua no formato antigo; parser linha a linha
+  (`^(\d+)x nome`, depois unitário, edição, idioma, condição, `Cod:`, `Foil`).
+- Tyrunt `#070/∞` MEP JP = ledger M3 089 Foil JP; Flygon `#101/094` PFL JP = M2
+  088 Foil JP — os dois por nome + `ligaPriceBRL` 14,90 exato.
+- `(JAP) Caixa de Booster - Storm Emeralda` = ledger pokemon `Storm Emeralda
+  (With Shrink)` (sem ask). Kit Base Shop Vol.1 de novo no ledger **onepiece**.

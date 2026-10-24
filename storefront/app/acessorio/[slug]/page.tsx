@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import SealedDetailView from "@/components/product/SealedDetailView";
 import JsonLd from "@/components/seo/JsonLd";
@@ -20,13 +20,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const res = await loadAccessoryDetail(slug);
-  if (!res) {
+  if (!res || "redirect" in res) {
     return { title: "Produto não encontrado" };
   }
   const { item, live } = res;
   return {
     title: `${item.name} · Acessórios`,
-    description: `${item.name}, acessório para TCG, produto novo, por ${brl(item.price)}. Serve para qualquer jogo. Retire na loja da Collecta em Goiânia ou receba em todo o Brasil.`,
+    description: item.soldOut
+      ? `${item.name} está esgotado na Collecta. Último preço ${brl(item.price)}. Peça pelo WhatsApp e avisamos quando voltar ao estoque.`
+      : `${item.name}, acessório para TCG, produto novo, por ${brl(item.price)}. Serve para qualquer jogo. Retire na loja da Collecta em Goiânia ou receba em todo o Brasil.`,
     alternates: { canonical: `/acessorio/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: productOpenGraph(`/acessorio/${slug}`, item.imageURL),
@@ -42,6 +44,9 @@ export default async function AcessorioSlugPage({
   const res = await loadAccessoryDetail(slug);
   if (!res) {
     notFound();
+  }
+  if ("redirect" in res) {
+    permanentRedirect(res.redirect);
   }
   const { item, live } = res;
   return (

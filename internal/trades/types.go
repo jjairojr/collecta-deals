@@ -8,6 +8,7 @@ const KindAccessory = "accessory"
 
 type Trade struct {
 	ID        string `json:"id"`
+	Slug      string `json:"slug,omitempty"`
 	Kind      string `json:"kind,omitempty"`
 	Number    string `json:"number"`
 	Name      string `json:"name"`

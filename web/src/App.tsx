@@ -5,6 +5,7 @@ import {
   getStatus,
   setGame as setApiGame,
   triggerRefresh,
+  unauthorizedEvent,
   type GameInfo,
   type Status,
 } from "./api";
@@ -14,9 +15,10 @@ import TrackingPage from "./components/TrackingPage";
 import PortfolioPage from "./components/PortfolioPage";
 import AllPortfolioPage from "./components/AllPortfolioPage";
 import LigaSalesPage from "./components/LigaSalesPage";
-import PedidosPage from "./components/PedidosPage";
+import PedidosPage, { TokenCard } from "./components/PedidosPage";
 import PurchasesPage from "./components/PurchasesPage";
 import ImportsPage from "./components/ImportsPage";
+import JpImportPage from "./components/JpImportPage";
 import FinanceiroPage from "./components/FinanceiroPage";
 import StockPage from "./components/StockPage";
 import ExpensesPage from "./components/ExpensesPage";
@@ -74,6 +76,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     description:
       "Piso em inglês da Liga contra o anúncio ao vivo da TCGplayer, nos dois sentidos — o que trazer dos EUA e o que mandar pra lá.",
   },
+  importarjp: {
+    title: "Importar Japão",
+    description: "AR e SAR japonesas da Card Rush contra o piso japonês e português da Liga — o que vale trazer do Japão.",
+  },
   financeiro: {
     title: "Financeiro",
     description: "Quanto entrou, quanto veio da Liga e o que sobrou depois das despesas.",
@@ -117,6 +123,7 @@ export default function App() {
   const [game, setGameState] = useState<string>(getGame());
   const [games, setGames] = useState<GameInfo[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
+  const needsToken = useUnauthorized();
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -202,7 +209,11 @@ export default function App() {
             >
               <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} badge={scopeBadge} />
 
-              {activeView === "buyout" ? (
+              {needsToken ? (
+                <div className="mt-6">
+                  <TokenCard onSaved={() => window.location.reload()} />
+                </div>
+              ) : activeView === "buyout" ? (
                 <div className="mt-6">
                   <BuyoutPage />
                 </div>
@@ -247,6 +258,10 @@ export default function App() {
                 <div className="mt-6">
                   <ImportsPage />
                 </div>
+              ) : activeView === "importarjp" ? (
+                <div className="mt-6">
+                  <JpImportPage />
+                </div>
               ) : activeView === "financeiro" ? (
                 <div className="mt-6">
                   <FinanceiroPage />
@@ -286,6 +301,16 @@ export default function App() {
       <SelectionTray />
     </SelectionProvider>
   );
+}
+
+function useUnauthorized(): boolean {
+  const [hit, setHit] = useState(false);
+  useEffect(() => {
+    const onHit = () => setHit(true);
+    window.addEventListener(unauthorizedEvent, onHit);
+    return () => window.removeEventListener(unauthorizedEvent, onHit);
+  }, []);
+  return hit;
 }
 
 function readView(): View {

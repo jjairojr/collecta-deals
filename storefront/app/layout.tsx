@@ -35,7 +35,7 @@ const pressStart = Press_Start_2P({
 export const metadata: Metadata = {
   metadataBase: new URL(siteURL),
   title: {
-    default: "Collecta — Loja de cartas Pokémon, One Piece e TCG · Singles e Selados · Envio para todo o Brasil",
+    default: "Collecta TCG — Loja de cartas Pokémon, One Piece e Riftbound em Goiânia",
     template: "%s — Collecta",
   },
   description:
@@ -46,13 +46,9 @@ export const metadata: Metadata = {
   // invisible to the verifier.
   verification: { google: "XoLIZnAr8k3IRTvhhH2xi3uSc1Rr3Z4GYa4VTPg5_2w" },
   openGraph: {
-    title: "Collecta — Loja de cartas TCG",
-    description:
-      "Singles e selados de Pokémon, One Piece, Riftbound, Lorcana e Gundam. Conferido carta por carta, envio para todo o Brasil.",
     type: "website",
     locale: "pt_BR",
     siteName: "Collecta",
-    url: siteURL,
   },
   twitter: {
     card: "summary_large_image",

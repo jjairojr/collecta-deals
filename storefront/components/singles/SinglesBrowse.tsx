@@ -65,6 +65,9 @@ export default function SinglesBrowse({
   basePath = null,
   query = "",
   filtersOnTop = false,
+  setLabels = {},
+  intro,
+  footer,
 }: {
   catalog: Single[];
   games: { id: string; label: string }[];
@@ -75,6 +78,9 @@ export default function SinglesBrowse({
   basePath?: string | null;
   query?: string;
   filtersOnTop?: boolean;
+  setLabels?: Record<string, string>;
+  intro?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const router = useRouter();
   const q = query.trim().toLowerCase();
@@ -299,7 +305,8 @@ export default function SinglesBrowse({
     gameSel.length === 1
       ? navGames.find((g) => g.id === gameSel[0])?.label
       : undefined;
-  const setLabel = colecaoSel.length === 1 ? colecaoSel[0] : undefined;
+  const setLabel =
+    colecaoSel.length === 1 ? (setLabels[colecaoSel[0]] ?? colecaoSel[0]) : undefined;
   const title = [selectedLabel ?? "Todos", setLabel, "Singles"].filter(Boolean).join(" · ");
   const heading = current > 1 ? `${title} · página ${current}` : title;
 
@@ -536,6 +543,7 @@ export default function SinglesBrowse({
               {filtered.length.toLocaleString("pt-BR")}{" "}
               {filtered.length === 1 ? "RESULTADO" : "RESULTADOS"}
             </div>
+            {intro}
           </div>
           <div className="flex flex-wrap gap-2">
             {SORTS.map((s) => (
@@ -670,6 +678,7 @@ export default function SinglesBrowse({
             />
           </div>
         )}
+        {footer}
       </div>
     </Container>
   );
