@@ -26,6 +26,7 @@ type storefrontItem struct {
 	Set       string  `json:"set"`
 	Variant   string  `json:"variant,omitempty"`
 	Condition string  `json:"condition,omitempty"`
+	GTIN      string  `json:"gtin,omitempty"`
 	Qty       int     `json:"qty"`
 	ProductID int     `json:"productID,omitempty"`
 	ImageURL  string  `json:"imageURL,omitempty"`
@@ -174,6 +175,7 @@ func publicItem(t trades.Trade, gameID, gameLabel string, qty int, fx float64, l
 		Set:       t.Set,
 		Variant:   t.Variant,
 		Condition: t.Condition,
+		GTIN:      t.GTIN,
 		Qty:       qty,
 		AskBRL:    round2(t.AskBRL),
 		Featured:  t.Featured,

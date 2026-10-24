@@ -43,6 +43,7 @@ interface RawItem {
   featured?: boolean;
   addedAt?: string;
   noArt?: boolean;
+  gtin?: string;
 }
 
 const legacySold: RawItem[] = LEGACY_SOLD;
@@ -251,6 +252,7 @@ function mapSealed(it: RawItem, version: string): Sealed {
     imageURL: resolveImage(it, version),
     featured: it.featured,
     addedAt: it.addedAt,
+    gtin: it.gtin,
   };
 }
 
@@ -274,6 +276,7 @@ function mapAccessory(it: RawItem, version: string): Accessory {
     imageURL: resolveImage(it, version),
     featured: it.featured,
     addedAt: it.addedAt,
+    gtin: it.gtin,
   };
 }
 

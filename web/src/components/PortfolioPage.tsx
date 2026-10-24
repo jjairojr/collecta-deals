@@ -1645,6 +1645,7 @@ function EditTradeForm({
   const [store, setStore] = useState(t.store ?? "");
   const [buyDate, setBuyDate] = useState(t.buyDate ?? "");
   const [imageURL, setImageURL] = useState(t.imageURL ?? "");
+  const [gtin, setGtin] = useState(t.gtin ?? "");
   const [saving, setSaving] = useState(false);
 
   const nextQty = Math.max(Number(qty) || 1, 1);
@@ -1665,6 +1666,7 @@ function EditTradeForm({
         store,
         buyDate,
         imageURL: imageURL.trim(),
+        gtin: gtin.replace(/\D/g, ""),
         ...(manual ? { manualBRL: Number(manualBRL) || 0 } : {}),
       });
       onDone();
@@ -1736,6 +1738,17 @@ function EditTradeForm({
           placeholder="Legends"
         />
       </Field>
+      {manual && (
+        <Field label="GTIN / código de barras">
+          <Input
+            value={gtin}
+            onChange={(e) => setGtin(e.target.value)}
+            className="w-44"
+            inputMode="numeric"
+            placeholder="0 00000 00000 0"
+          />
+        </Field>
+      )}
       <Field label="Buy date">
         <Input
           type="date"

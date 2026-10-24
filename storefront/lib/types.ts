@@ -87,6 +87,7 @@ export interface Sealed {
   featured?: boolean;
   soldOut?: boolean;
   addedAt?: string;
+  gtin?: string;
 }
 
 export interface SealedDetail extends Sealed {

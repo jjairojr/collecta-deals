@@ -29,7 +29,7 @@ function itemXML(it: FeedItem): string {
     tag("g:brand", it.brand),
     // Trading cards carry no GTIN or MPN. Without this Merchant Center rejects
     // every item for a missing unique identifier.
-    tag("g:identifier_exists", "no"),
+    it.gtin ? tag("g:gtin", it.gtin) : tag("g:identifier_exists", "no"),
     tag("g:google_product_category", it.googleCategory),
     tag("g:product_type", it.productType),
     ...it.labels.map((l, i) => tag(`g:custom_label_${i}`, l)),

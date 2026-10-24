@@ -572,6 +572,7 @@ export interface Trade {
   set: string;
   variant?: string;
   condition?: string;
+  gtin?: string;
   qty: number;
   buyBRL: number;
   shippingBRL: number;

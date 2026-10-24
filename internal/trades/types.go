@@ -15,6 +15,7 @@ type Trade struct {
 	Set       string `json:"set"`
 	Variant   string `json:"variant,omitempty"`
 	Condition string `json:"condition,omitempty"`
+	GTIN      string `json:"gtin,omitempty"`
 	Qty       int    `json:"qty"`
 
 	BuyBRL      float64 `json:"buyBRL"`

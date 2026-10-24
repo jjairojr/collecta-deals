@@ -17,6 +17,7 @@ export interface FeedItem {
   quantity: number;
   condition: "new" | "used";
   brand: string;
+  gtin?: string;
   productType: string;
   googleCategory: string;
   labels: string[];
@@ -136,6 +137,7 @@ async function sealedRow(s: Sealed): Promise<FeedItem | null> {
     quantity: s.qty,
     condition: "new",
     brand: maker(s.game, s.gameLabel),
+    gtin: s.gtin,
     productType: ["Selados", s.gameLabel, s.set].filter(Boolean).join(" > "),
     googleCategory: CAT_CARDS,
     labels: [s.gameLabel, s.set, "lacrado", priceBand(s.price)].filter(Boolean),
@@ -161,6 +163,7 @@ async function accessoryRow(a: Accessory): Promise<FeedItem | null> {
     quantity: a.qty,
     condition: "new",
     brand: a.set || "Collecta",
+    gtin: a.gtin,
     productType: ["Acessórios", a.set].filter(Boolean).join(" > "),
     googleCategory: CAT_GAMES,
     labels: ["Acessórios", a.set, "novo", priceBand(a.price)].filter(Boolean),

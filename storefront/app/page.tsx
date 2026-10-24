@@ -62,6 +62,9 @@ export default async function HomePage() {
               PLAYER 1 · READY
             </span>
             <h1 className="font-display hero-shadow mt-6 text-5xl font-bold leading-[.92] text-white sm:text-6xl lg:text-[76px]">
+              <span className="mb-4 block font-pixel text-[11px] leading-relaxed text-brand-soft [text-shadow:none] sm:text-[12px]">
+                {pixelText("LOJA DE CARTAS TCG EM GOIÂNIA")}
+              </span>
               SUA COLEÇÃO
               <br />
               COMEÇA AQUI
