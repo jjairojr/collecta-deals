@@ -33,7 +33,7 @@ import {
   type OrderLineInput,
   type ShippingOption,
 } from "@/lib/checkout";
-import { couponsApplicable, type CheckoutCoupon } from "@/lib/coupons";
+import { couponsApplicable, promoDiscountCents, type CheckoutCoupon, type PromoCoupon } from "@/lib/coupons";
 import { brl, pixelText } from "@/lib/format";
 import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
@@ -66,6 +66,22 @@ async function loadCoupons(): Promise<CheckoutCoupon[]> {
   return data.coupons ?? [];
 }
 
+async function checkPromo(code: string): Promise<PromoCoupon> {
+  const res = await fetch("/api/cupom", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const data = (await res.json()) as Partial<PromoCoupon> & { error?: string; message?: string };
+  if (res.ok && data.code && typeof data.percentBps === "number") {
+    return { code: data.code, percentBps: data.percentBps };
+  }
+  if (data.error === "login_required") {
+    throw new Error("Sua sessão expirou. Entre de novo para usar cupons.");
+  }
+  throw new Error(data.message ?? "Esse cupom não pôde ser aplicado.");
+}
+
 async function quote(cep: string, lines: OrderLineInput[]): Promise<ShippingOption[]> {
   const res = await fetch("/api/frete", {
     method: "POST",
@@ -86,6 +102,10 @@ export default function CheckoutView() {
   const [coupons, setCoupons] = useState<CheckoutCoupon[] | null>(null);
   const [selectedCoupons, setSelectedCoupons] = useState<string[]>([]);
   const [couponsVersion, setCouponsVersion] = useState(0);
+  const [promo, setPromo] = useState<PromoCoupon | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS);
   const [buyerErrors, setBuyerErrors] = useState<BuyerErrors>({});
   const [addressErrors, setAddressErrors] = useState<AddressErrors>({});
@@ -130,6 +150,7 @@ export default function CheckoutView() {
     if (accountStatus !== "ready") {
       setCoupons(null);
       setSelectedCoupons([]);
+      setPromo(null);
       return;
     }
     let cancelled = false;
@@ -223,7 +244,9 @@ export default function CheckoutView() {
   const minOrderCents = coupons?.[0]?.minOrderCents;
   const applicable = couponsApplicable(coupons?.length ?? 0, itemsCents, minOrderCents);
   const activeCoupons = (coupons ?? []).filter((c) => selectedCoupons.includes(c.id)).slice(0, applicable);
-  const discountCents = activeCoupons.reduce((sum, c) => sum + c.valueCents, 0);
+  const promoCents = promo ? promoDiscountCents(itemsCents, promo.percentBps) : 0;
+  const discountCents = promo ? promoCents : activeCoupons.reduce((sum, c) => sum + c.valueCents, 0);
+  const discountCodes = promo ? [promo.code] : activeCoupons.map((c) => c.code);
   const totalCents = Math.max(itemsCents + shippingCents - discountCents, 0);
 
   const toggleCoupon = (c: CheckoutCoupon) => {
@@ -235,9 +258,43 @@ export default function CheckoutView() {
       if (prev.length >= applicable) {
         return prev;
       }
+      if (promo) {
+        trackRemoveCoupon(promo.code);
+        setPromo(null);
+      }
       trackApplyCoupon(c.code, c.valueCents);
       return [...prev, c.id];
     });
+  };
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) {
+      setPromoError("Digite o código");
+      return;
+    }
+    setPromoChecking(true);
+    setPromoError(null);
+    try {
+      const found = await checkPromo(code);
+      setPromo(found);
+      setPromoInput("");
+      setSelectedCoupons([]);
+      trackApplyCoupon(found.code, promoDiscountCents(itemsCents, found.percentBps));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Esse cupom não pôde ser aplicado.";
+      trackCouponError(message);
+      setPromoError(message);
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
+  const removePromo = () => {
+    if (promo) {
+      trackRemoveCoupon(promo.code);
+    }
+    setPromo(null);
   };
 
   if (lines.length === 0) {
@@ -336,7 +393,8 @@ export default function CheckoutView() {
             priceBRL: chosen.priceBRL,
             joinOrder: mode === "join" ? Number(joinOrder) : 0,
           },
-          couponIds: activeCoupons.map((c) => c.id),
+          couponIds: promo ? [] : activeCoupons.map((c) => c.id),
+          promoCode: promo?.code ?? "",
         }),
       });
       const data = (await res.json()) as CreateResponse & CheckoutError;
@@ -372,11 +430,13 @@ export default function CheckoutView() {
       } else if (data.error === "coupon_invalid") {
         trackCouponError(data.message ?? "coupon_invalid");
         setSelectedCoupons([]);
+        setPromo(null);
         setCouponsVersion((n) => n + 1);
         setNotice(data.message ?? "Esse cupom não pôde ser aplicado. Confira seus cupons e tente de novo.");
       } else if (data.error === "login_required") {
         trackCouponError("login_required");
         setSelectedCoupons([]);
+        setPromo(null);
         setNotice("Sua sessão expirou. Entre de novo para usar cupons.");
       } else {
         setNotice(data.error ?? "Não foi possível criar o pedido. Tente de novo em instantes.");
@@ -390,7 +450,7 @@ export default function CheckoutView() {
 
   const whatsapp = () => {
     trackGenerateLead(itemsCents);
-    window.open(whatsappURL(buildOrder(lines, itemsCents, activeCoupons)), "_blank", "noopener");
+    window.open(whatsappURL(buildOrder(lines, itemsCents, promo ? [{ code: promo.code, valueCents: promoCents }] : activeCoupons)), "_blank", "noopener");
   };
 
   const modes: { key: Mode; title: string; detail: string; price: string }[] = [
@@ -631,52 +691,100 @@ export default function CheckoutView() {
                 >
                   Entre com sua conta Collecta
                 </Link>{" "}
-                para usar seus cupons de indicação.
+                para usar cupons de desconto e de indicação.
               </p>
             ) : coupons === null ? (
               <p className="font-pixel text-[9px] text-brand-soft animate-blink">CARREGANDO CUPONS...</p>
-            ) : coupons.length === 0 ? (
-              <p className="text-sm text-muted">
-                Você ainda não tem cupons liberados. Indique amigos no app e ganhe R$ 10 por indicação.
-              </p>
             ) : (
               <>
-                <p className="mb-3 text-xs text-muted">
-                  1 cupom a cada R$ 100 em itens
-                  {applicable < coupons.length ? ` · ${applicable} aplicável${applicable === 1 ? "" : "is"} neste pedido` : ""}
-                </p>
-                <div className="grid gap-3">
-                  {coupons.map((c) => {
-                    const selected = selectedCoupons.includes(c.id);
-                    const disabled = !selected && selectedCoupons.length >= applicable;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        role="checkbox"
-                        aria-checked={selected}
-                        disabled={disabled}
-                        onClick={() => toggleCoupon(c)}
-                        className={`sticker flex w-full items-center justify-between gap-3 rounded-[10px] px-4 py-3 text-left transition-colors [--sh:3px] ${
-                          selected ? "bg-brand text-white" : "bg-outline text-[#c9c9d1] hover:text-white"
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-pixel text-[8px]">{c.code}</span>
-                          <span className={`block text-xs ${selected ? "text-white/90" : "text-muted"}`}>
-                            {selected ? "aplicado" : "toque para aplicar"}
-                          </span>
-                        </span>
-                        <span className="shrink-0 font-pixel text-[11px]">−{brl(c.valueCents)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {activeCoupons.length > 0 && (
-                  <p className="mt-3 text-xs text-muted">
-                    Pelo WhatsApp o cupom é conferido manualmente na hora do pagamento.
+                {coupons.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    Você ainda não tem cupons de indicação liberados. Indique amigos no app e ganhe R$ 10 por indicação.
                   </p>
+                ) : (
+                  <>
+                    <p className="mb-3 text-xs text-muted">
+                      1 cupom a cada R$ 100 em itens
+                      {applicable < coupons.length ? ` · ${applicable} aplicável${applicable === 1 ? "" : "is"} neste pedido` : ""}
+                    </p>
+                    <div className="grid gap-3">
+                      {coupons.map((c) => {
+                        const selected = selectedCoupons.includes(c.id);
+                        const disabled = !selected && selectedCoupons.length >= applicable;
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            role="checkbox"
+                            aria-checked={selected}
+                            disabled={disabled}
+                            onClick={() => toggleCoupon(c)}
+                            className={`sticker flex w-full items-center justify-between gap-3 rounded-[10px] px-4 py-3 text-left transition-colors [--sh:3px] ${
+                              selected ? "bg-brand text-white" : "bg-outline text-[#c9c9d1] hover:text-white"
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate font-pixel text-[8px]">{c.code}</span>
+                              <span className={`block text-xs ${selected ? "text-white/90" : "text-muted"}`}>
+                                {selected ? "aplicado" : "toque para aplicar"}
+                              </span>
+                            </span>
+                            <span className="shrink-0 font-pixel text-[11px]">−{brl(c.valueCents)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
+                <div className="mt-5 border-t-[3px] border-outline pt-5">
+                  <h3 className="mb-3 font-pixel text-[9px] text-brand-soft">TEM UM CODIGO?</h3>
+                  {promo ? (
+                    <button
+                      type="button"
+                      onClick={removePromo}
+                      className="sticker flex w-full items-center justify-between gap-3 rounded-[10px] bg-brand px-4 py-3 text-left text-white [--sh:3px]"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-pixel text-[8px]">{promo.code}</span>
+                        <span className="block text-xs text-white/90">
+                          {promo.percentBps / 100}% nos itens · toque para remover
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-pixel text-[11px]">−{brl(promoCents)}</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <Field
+                        label="Código do cupom"
+                        name="promoCode"
+                        value={promoInput}
+                        onChange={(v) => {
+                          setPromoInput(v.toUpperCase());
+                          setPromoError(null);
+                        }}
+                        error={promoError ?? undefined}
+                        onEnter={() => void applyPromo()}
+                        autoComplete="off"
+                        maxLength={40}
+                        placeholder="ex. BEMVINDO"
+                        className="min-w-0 flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void applyPromo()}
+                        disabled={promoChecking}
+                        className="arcade-press sticker mt-6 shrink-0 rounded-[10px] bg-brand px-4 py-3 font-pixel text-[9px] text-white [--sh:3px] disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {promoChecking ? "..." : "APLICAR"}
+                      </button>
+                    </div>
+                  )}
+                  {(selectedCoupons.length > 0 || promo) && (
+                    <p className="mt-3 text-xs text-muted">
+                      Os cupons não acumulam. Pelo WhatsApp o cupom é conferido manualmente na hora do pagamento.
+                    </p>
+                  )}
+                </div>
               </>
             )}
           </Section>
@@ -715,7 +823,7 @@ export default function CheckoutView() {
             />
             {discountCents > 0 && (
               <Row
-                label={`Cupom${activeCoupons.length > 1 ? "s" : ""} · ${activeCoupons.map((c) => c.code).join(", ")}`}
+                label={`Cupom${discountCodes.length > 1 ? "s" : ""} · ${discountCodes.join(", ")}`}
                 value={`−${brl(discountCents)}`}
               />
             )}

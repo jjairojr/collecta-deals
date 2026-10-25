@@ -10,6 +10,7 @@ export default function Field({
   value,
   onChange,
   onBlur,
+  onEnter,
   error,
   placeholder,
   inputMode,
@@ -22,6 +23,7 @@ export default function Field({
   value: string;
   onChange: (v: string) => void;
   onBlur?: () => void;
+  onEnter?: () => void;
   error?: string;
   placeholder?: string;
   inputMode?: "text" | "numeric" | "tel" | "email";
@@ -45,6 +47,16 @@ export default function Field({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
+          onKeyDown={
+            onEnter
+              ? (e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    onEnter();
+                  }
+                }
+              : undefined
+          }
           placeholder={placeholder}
           inputMode={inputMode}
           autoComplete={autoComplete}

@@ -195,6 +195,7 @@ func (s *Server) Handler() http.Handler {
 	if s.Checkout.Orders != nil {
 		mux.HandleFunc("POST /api/shipping/quote", s.handleShippingQuote)
 		mux.HandleFunc("POST /api/orders", s.handleOrderCreate)
+		mux.HandleFunc("POST /api/promos/check", s.handlePromoCheck)
 		mux.HandleFunc("GET /api/orders", s.handleOrdersList)
 		mux.HandleFunc("GET /api/orders/{id}", s.handleOrderGet)
 		mux.HandleFunc("PATCH /api/orders/{id}", s.handleOrderPatch)
@@ -212,6 +213,7 @@ var publicAPIPrefixes = []string{
 	"/api/image",
 	"/api/item-photos/",
 	"/api/orders",
+	"/api/promos/",
 	"/api/shipping/",
 	"/api/admin/",
 	"/api/games",

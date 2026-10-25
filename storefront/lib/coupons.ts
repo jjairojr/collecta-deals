@@ -17,3 +17,12 @@ export function couponsApplicable(
   }
   return Math.min(available, Math.floor(totalCents / minOrderCents));
 }
+
+export interface PromoCoupon {
+  code: string;
+  percentBps: number;
+}
+
+export function promoDiscountCents(itemsCents: number, percentBps: number): number {
+  return Math.floor((itemsCents * percentBps) / 10000);
+}

@@ -9,11 +9,12 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return Response.json({ error: "pedido inválido" }, { status: 400 });
   }
-  const { couponIds: rawCoupons, ...rest } = payload;
+  const { couponIds: rawCoupons, promoCode: rawPromo, ...rest } = payload;
   delete rest.collectaUserId;
   const couponIds = Array.isArray(rawCoupons) ? rawCoupons.filter((c): c is string => typeof c === "string") : [];
+  const promoCode = typeof rawPromo === "string" ? rawPromo.trim() : "";
   const session = await sessionUser();
-  if (couponIds.length > 0 && !session) {
+  if ((couponIds.length > 0 || promoCode) && !session) {
     return Response.json({ error: "login_required" }, { status: 401 });
   }
   return checkoutFetch("/api/orders", {
@@ -23,6 +24,7 @@ export async function POST(req: Request): Promise<Response> {
       backURLBase: siteURL,
       collectaUserId: session?.user.id ?? "",
       couponIds,
+      promoCode,
     }),
   });
 }

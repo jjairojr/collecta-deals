@@ -82,6 +82,12 @@ type Coupon struct {
 	ValueBRL float64 `json:"valueBRL"`
 }
 
+type Promo struct {
+	Code       string  `json:"code"`
+	PercentBps int64   `json:"percentBps"`
+	ValueBRL   float64 `json:"valueBRL"`
+}
+
 type MP struct {
 	PreferenceID string `json:"preferenceID,omitempty"`
 	InitPoint    string `json:"initPoint,omitempty"`
@@ -105,6 +111,7 @@ type Order struct {
 	CollectaUserID    string    `json:"collectaUserId,omitempty"`
 	Coupons           []Coupon  `json:"coupons,omitempty"`
 	CouponsReleasedAt time.Time `json:"couponsReleasedAt,omitempty"`
+	Promo             *Promo    `json:"promo,omitempty"`
 
 	TrackingCode string `json:"trackingCode,omitempty"`
 	Notes        string `json:"notes,omitempty"`
@@ -218,7 +225,7 @@ func reserved(all []Order, now time.Time) map[string]int {
 	return out
 }
 
-func (s *Store) Create(build func(reserved map[string]int) (Order, error)) (Order, error) {
+func (s *Store) Create(build func(reserved map[string]int, existing []Order) (Order, error)) (Order, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all, err := s.load()
@@ -226,7 +233,7 @@ func (s *Store) Create(build func(reserved map[string]int) (Order, error)) (Orde
 		return Order{}, err
 	}
 	now := time.Now()
-	o, err := build(reserved(all, now))
+	o, err := build(reserved(all, now), all)
 	if err != nil {
 		return Order{}, err
 	}

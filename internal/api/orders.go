@@ -70,6 +70,7 @@ type orderCreateInput struct {
 	BackURLBase    string   `json:"backURLBase"`
 	CollectaUserID string   `json:"collectaUserId"`
 	CouponIDs      []string `json:"couponIds"`
+	PromoCode      string   `json:"promoCode"`
 }
 
 type skuEntry struct {
@@ -397,6 +398,24 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.CollectaUserID = strings.TrimSpace(in.CollectaUserID)
+	in.PromoCode = normalizePromoCode(in.PromoCode)
+	var promoRule promo
+	if in.PromoCode != "" {
+		if in.CollectaUserID == "" {
+			writeError(w, http.StatusBadRequest, map[string]any{"error": "cupom exige login"})
+			return
+		}
+		if len(couponIDs) > 0 {
+			writeError(w, http.StatusConflict, map[string]any{"error": "coupon_invalid", "message": promoNoStacking})
+			return
+		}
+		rule, ok := lookupPromo(in.PromoCode)
+		if !ok {
+			writeError(w, http.StatusConflict, map[string]any{"error": "coupon_invalid", "message": promoUnknown})
+			return
+		}
+		promoRule = rule
+	}
 	if len(couponIDs) > 0 {
 		if in.CollectaUserID == "" {
 			writeError(w, http.StatusBadRequest, map[string]any{"error": "cupom exige login"})
@@ -472,7 +491,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var conflict map[string]any
-	order, err := s.Checkout.Orders.Create(func(reserved map[string]int) (orders.Order, error) {
+	order, err := s.Checkout.Orders.Create(func(reserved map[string]int, existing []orders.Order) (orders.Order, error) {
 		idx, err := s.buildSKUIndex()
 		if err != nil {
 			return orders.Order{}, err
@@ -490,14 +509,27 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 			return orders.Order{}, errors.New("out_of_stock")
 		}
 		items := itemsTotal(res.lines)
-		return orders.Order{
+		o := orders.Order{
 			Lines:          res.lines,
 			Buyer:          in.Buyer,
 			Address:        in.Address,
 			Shipping:       ship,
 			Totals:         orders.Totals{ItemsBRL: items, ShippingBRL: ship.PriceBRL, TotalBRL: round2(items + ship.PriceBRL)},
 			CollectaUserID: in.CollectaUserID,
-		}, nil
+		}
+		if in.PromoCode == "" {
+			return o, nil
+		}
+		if msg := promoRejection(promoRule, existing, in.CollectaUserID, in.Buyer.CPF, time.Now()); msg != "" {
+			conflict = map[string]any{"error": "coupon_invalid", "message": msg}
+			return orders.Order{}, errors.New("coupon_invalid")
+		}
+		itemCents := itemsCents(res.lines)
+		discount := promoDiscountCents(itemCents, promoRule)
+		o.Promo = &orders.Promo{Code: in.PromoCode, PercentBps: promoRule.PercentBps, ValueBRL: brl(discount)}
+		o.Totals.DiscountBRL = brl(discount)
+		o.Totals.TotalBRL = brl(itemCents + cents(ship.PriceBRL) - discount)
+		return o, nil
 	})
 	if err != nil {
 		if conflict != nil {
@@ -694,6 +726,9 @@ func publicView(o orders.Order, now time.Time) publicOrder {
 	}
 	for _, c := range o.Coupons {
 		out.Coupons = append(out.Coupons, publicCoupon{Code: c.Code, ValueBRL: c.ValueBRL})
+	}
+	if o.Promo != nil {
+		out.Coupons = append(out.Coupons, publicCoupon{Code: o.Promo.Code, ValueBRL: o.Promo.ValueBRL})
 	}
 	for _, l := range o.Lines {
 		out.Lines = append(out.Lines, publicLine{

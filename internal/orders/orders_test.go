@@ -17,7 +17,7 @@ func testStore(t *testing.T) *Store {
 
 func TestCreateNumbersAndReserves(t *testing.T) {
 	s := testStore(t)
-	first, err := s.Create(func(reserved map[string]int) (Order, error) {
+	first, err := s.Create(func(reserved map[string]int, _ []Order) (Order, error) {
 		if len(reserved) != 0 {
 			t.Fatalf("reserved = %v want empty", reserved)
 		}
@@ -32,7 +32,7 @@ func TestCreateNumbersAndReserves(t *testing.T) {
 	if first.ExpiresAt.Sub(first.CreatedAt) != ReservationTTL {
 		t.Fatalf("expires = %v", first.ExpiresAt)
 	}
-	second, err := s.Create(func(reserved map[string]int) (Order, error) {
+	second, err := s.Create(func(reserved map[string]int, _ []Order) (Order, error) {
 		if reserved["a"] != 2 {
 			t.Fatalf("reserved = %v want a:2", reserved)
 		}
@@ -67,7 +67,7 @@ func TestCreateNumbersAndReserves(t *testing.T) {
 func TestCreateBuildErrorPersistsNothing(t *testing.T) {
 	s := testStore(t)
 	want := errors.New("no stock")
-	if _, err := s.Create(func(map[string]int) (Order, error) { return Order{}, want }); !errors.Is(err, want) {
+	if _, err := s.Create(func(map[string]int, []Order) (Order, error) { return Order{}, want }); !errors.Is(err, want) {
 		t.Fatalf("err = %v", err)
 	}
 	all, err := s.List()
@@ -78,7 +78,7 @@ func TestCreateBuildErrorPersistsNothing(t *testing.T) {
 
 func TestTransactRollsBackOnError(t *testing.T) {
 	s := testStore(t)
-	o, _ := s.Create(func(map[string]int) (Order, error) { return Order{}, nil })
+	o, _ := s.Create(func(map[string]int, []Order) (Order, error) { return Order{}, nil })
 	if _, err := s.Transact(o.ID, func(o *Order) error {
 		o.Status = StatusPaid
 		return errors.New("boom")
