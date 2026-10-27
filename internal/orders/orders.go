@@ -26,6 +26,7 @@ const (
 	StatusCancelled Status = "cancelled"
 	StatusOversold  Status = "oversold"
 	StatusShipped   Status = "shipped"
+	StatusDelivered Status = "delivered"
 	StatusRefunded  Status = "refunded"
 )
 
@@ -116,11 +117,12 @@ type Order struct {
 	TrackingCode string `json:"trackingCode,omitempty"`
 	Notes        string `json:"notes,omitempty"`
 
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-	ExpiresAt time.Time `json:"expiresAt"`
-	PaidAt    time.Time `json:"paidAt,omitempty"`
-	ShippedAt time.Time `json:"shippedAt,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	PaidAt      time.Time `json:"paidAt,omitempty"`
+	ShippedAt   time.Time `json:"shippedAt,omitempty"`
+	DeliveredAt time.Time `json:"deliveredAt,omitempty"`
 }
 
 func EffectiveStatus(o Order, now time.Time) Status {

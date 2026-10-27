@@ -39,7 +39,7 @@ func promoDiscountCents(items int64, p promo) int64 {
 
 func countsAsPurchase(o orders.Order, now time.Time) bool {
 	switch orders.EffectiveStatus(o, now) {
-	case orders.StatusPending, orders.StatusPaid, orders.StatusShipped, orders.StatusRefunded:
+	case orders.StatusPending, orders.StatusPaid, orders.StatusShipped, orders.StatusDelivered, orders.StatusRefunded:
 		return true
 	}
 	return false

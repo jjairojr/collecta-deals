@@ -20,6 +20,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   cancelled: "CANCELADO",
   oversold: "EM CONFERENCIA",
   shipped: "ENVIADO",
+  delivered: "ENTREGUE",
   refunded: "ESTORNADO",
 };
 

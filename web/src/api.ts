@@ -1242,6 +1242,7 @@ export type OrderStatus =
   | "cancelled"
   | "oversold"
   | "shipped"
+  | "delivered"
   | "refunded";
 
 export interface OrderLine {
@@ -1313,10 +1314,11 @@ export interface Order {
   expiresAt: string;
   paidAt: string;
   shippedAt: string;
+  deliveredAt: string;
 }
 
 export interface OrderPatch {
-  status?: "shipped" | "cancelled";
+  status?: "shipped" | "delivered" | "cancelled";
   trackingCode?: string;
   notes?: string;
 }

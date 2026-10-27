@@ -159,7 +159,7 @@ func (s *Server) releaseCoupons(ctx context.Context, o orders.Order) error {
 			continue
 		}
 		switch orders.EffectiveStatus(other, now) {
-		case orders.StatusPending, orders.StatusPaid, orders.StatusShipped:
+		case orders.StatusPending, orders.StatusPaid, orders.StatusShipped, orders.StatusDelivered:
 			for _, c := range other.Coupons {
 				held[c.Code] = true
 			}

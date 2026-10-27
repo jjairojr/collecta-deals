@@ -99,6 +99,7 @@ export default function AppSidebar({
   onChangeGame,
   dealsEnabled,
   status,
+  counts,
 }: {
   game: string;
   games: GameInfo[];
@@ -107,6 +108,7 @@ export default function AppSidebar({
   onChangeGame: (g: string) => void;
   dealsEnabled: boolean;
   status: Status | null;
+  counts: Partial<Record<View, number>>;
 }) {
   const { collapsed, setMobileOpen } = useSidebar();
   const onGlobalView = scopeOf(view) === "global";
@@ -147,6 +149,7 @@ export default function AppSidebar({
                   icon={item.icon}
                   label={item.label}
                   active={view === item.key}
+                  count={counts[item.key]}
                   onClick={() => navigate(item.key)}
                 />
               ))}

@@ -841,7 +841,7 @@ func (s *Server) applyPayment(ctx context.Context, pay mercadopago.Payment) erro
 	o, err := s.Checkout.Orders.Transact(pay.ExternalReference, func(o *orders.Order) error {
 		now := time.Now()
 		switch orders.EffectiveStatus(*o, now) {
-		case orders.StatusPaid, orders.StatusShipped:
+		case orders.StatusPaid, orders.StatusShipped, orders.StatusDelivered:
 			if pay.ID != o.MP.PaymentID && pay.Status == "approved" {
 				o.Notes = appendNote(o.Notes, fmt.Sprintf("pagamento duplicado %d", pay.ID))
 			}
@@ -1028,8 +1028,17 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 			if o.ShippedAt.IsZero() {
 				o.ShippedAt = now
 			}
+		case orders.StatusDelivered:
+			if current != orders.StatusPaid && current != orders.StatusShipped && current != orders.StatusDelivered {
+				bad = "só pedidos pagos podem ser marcados como entregues"
+				return errors.New(bad)
+			}
+			o.Status = orders.StatusDelivered
+			if o.DeliveredAt.IsZero() {
+				o.DeliveredAt = now
+			}
 		case orders.StatusCancelled:
-			if current == orders.StatusPaid || current == orders.StatusShipped {
+			if current == orders.StatusPaid || current == orders.StatusShipped || current == orders.StatusDelivered {
 				bad = "pedido pago não pode ser cancelado por aqui"
 				return errors.New(bad)
 			}

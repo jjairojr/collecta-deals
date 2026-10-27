@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Truck } from "lucide-react";
 import {
   getGame,
   getGames,
@@ -32,7 +33,9 @@ import AppSidebar from "./components/AppSidebar";
 import TopBar from "./components/TopBar";
 import PageHeader from "./components/PageHeader";
 import { SelectionProvider } from "./selection";
+import { useOrderAlerts } from "./orderAlerts";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+import { Button } from "./components/ui/button";
 
 const pageMeta: Record<View, { title: string; description: string }> = {
   deals: {
@@ -180,6 +183,7 @@ export default function App() {
   }, [refreshStatus]);
 
   const activeView: View = view === "deals" && !dealsEnabled ? "tracking" : view;
+  const orderAlerts = useOrderAlerts(activeView === "pedidos" && !needsToken);
   const meta = pageMeta[activeView];
   const ViewIcon = iconOf(activeView);
   const scopeBadge = (
@@ -199,6 +203,7 @@ export default function App() {
           onChangeGame={changeGame}
           dealsEnabled={dealsEnabled}
           status={status}
+          counts={{ pedidos: orderAlerts.toShip }}
         />
         <SidebarInset>
           <TopBar game={game} status={status} onRefresh={onRefresh} dealsEnabled={dealsEnabled} />
@@ -207,6 +212,10 @@ export default function App() {
               key={activeView}
               className={`animate-fade-in mx-auto w-full flex-1 px-4 py-7 sm:px-6 lg:px-8 ${pageWidth}`}
             >
+              {orderAlerts.fresh > 0 && activeView !== "pedidos" && (
+                <NewOrdersBanner count={orderAlerts.fresh} onOpen={() => setView("pedidos")} />
+              )}
+
               <PageHeader title={meta.title} description={meta.description} icon={ViewIcon} badge={scopeBadge} />
 
               {needsToken ? (
@@ -248,7 +257,7 @@ export default function App() {
                 </div>
               ) : activeView === "pedidos" ? (
                 <div className="mt-6">
-                  <PedidosPage />
+                  <PedidosPage since={orderAlerts.since} onChanged={orderAlerts.refresh} />
                 </div>
               ) : activeView === "compras" ? (
                 <div className="mt-6">
@@ -340,6 +349,28 @@ function useView(): [View, (v: View) => void] {
   }, []);
 
   return [view, setView];
+}
+
+function NewOrdersBanner({ count, onOpen }: { count: number; onOpen: () => void }) {
+  const plural = count > 1;
+  return (
+    <div className="sticker sticker-sm mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-panel px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-outline bg-brand text-white">
+          <Truck className="h-[18px] w-[18px]" />
+        </span>
+        <div>
+          <div className="font-display text-base font-extrabold text-fg">
+            {count} {plural ? "pedidos pagos novos" : "pedido pago novo"} no site
+          </div>
+          <p className="text-xs text-slate-400">{plural ? "Estão esperando" : "Está esperando"} envio ou retirada.</p>
+        </div>
+      </div>
+      <Button variant="primary" size="sm" onClick={onOpen}>
+        Ver pedidos
+      </Button>
+    </div>
+  );
 }
 
 function Footer({ game, hasDeals }: { game: string; hasDeals: boolean }) {

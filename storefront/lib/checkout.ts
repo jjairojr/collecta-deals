@@ -8,6 +8,7 @@ export type OrderStatus =
   | "cancelled"
   | "oversold"
   | "shipped"
+  | "delivered"
   | "refunded";
 
 export const PICKUP_SERVICE_ID = -1;

@@ -498,6 +498,18 @@ func TestOrdersAdminListAndPatch(t *testing.T) {
 	if got.Status != orders.StatusShipped || got.TrackingCode != "AA123456789BR" || got.ShippedAt.IsZero() {
 		t.Fatalf("order = %+v", got)
 	}
+	rec = f.do(t, http.MethodPatch, "/api/orders/"+o.ID, map[string]string{"status": "delivered"}, admin)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deliver: %d %s", rec.Code, rec.Body.String())
+	}
+	got, _ = f.s.Checkout.Orders.Get(o.ID)
+	if got.Status != orders.StatusDelivered || got.DeliveredAt.IsZero() || got.TrackingCode != "AA123456789BR" {
+		t.Fatalf("order = %+v", got)
+	}
+	rec = f.do(t, http.MethodPatch, "/api/orders/"+o.ID, map[string]string{"status": "shipped"}, admin)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("shipping a delivered order: %d", rec.Code)
+	}
 }
 
 func TestShippingQuoteAppliesFreeShipping(t *testing.T) {

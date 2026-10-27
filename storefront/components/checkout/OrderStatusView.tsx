@@ -13,6 +13,12 @@ const POLL_LIMIT = 60;
 
 type Phase = "loading" | "missing" | "ready";
 
+const STATUS_EYEBROW: Record<"paid" | "shipped" | "delivered", string> = {
+  paid: "PAGO",
+  shipped: "ENVIADO",
+  delivered: "ENTREGUE",
+};
+
 export default function OrderStatusView({
   id,
   paymentID,
@@ -76,7 +82,7 @@ export default function OrderStatusView({
     if (!order || settled.current) {
       return;
     }
-    if (order.status !== "paid" && order.status !== "shipped") {
+    if (order.status !== "paid" && order.status !== "shipped" && order.status !== "delivered") {
       return;
     }
     settled.current = true;
@@ -131,10 +137,11 @@ export default function OrderStatusView({
   switch (order.status) {
     case "paid":
     case "shipped":
+    case "delivered":
       return (
         <Shell
           title={`Pagamento confirmado, ${order.firstName}!`}
-          eyebrow={pixelText(`PEDIDO ${number} · ${order.status === "shipped" ? "ENVIADO" : "PAGO"}`)}
+          eyebrow={pixelText(`PEDIDO ${number} · ${STATUS_EYEBROW[order.status]}`)}
           tone="win"
         >
           {isPickup(order.shipping.serviceID) ? (

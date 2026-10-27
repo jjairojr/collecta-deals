@@ -169,9 +169,10 @@ interface SidebarNavItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   active?: boolean;
   badge?: ReactNode;
+  count?: number;
 }
 
-export function SidebarNavItem({ icon: IconCmp, label, active, badge, className, ...props }: SidebarNavItemProps) {
+export function SidebarNavItem({ icon: IconCmp, label, active, badge, count, className, ...props }: SidebarNavItemProps) {
   const { collapsed } = useSidebar();
   return (
     <button
@@ -187,12 +188,22 @@ export function SidebarNavItem({ icon: IconCmp, label, active, badge, className,
       )}
       {...props}
     >
-      <IconCmp
-        className={cn(
-          "h-[18px] w-[18px] shrink-0 transition-colors",
-          active ? "text-fg" : "text-slate-500 group-hover/item:text-fg",
+      <span className="relative shrink-0">
+        <IconCmp
+          className={cn(
+            "h-[18px] w-[18px] transition-colors",
+            active ? "text-fg" : "text-slate-500 group-hover/item:text-fg",
+          )}
+        />
+        {count !== undefined && count > 0 && (
+          <span
+            aria-label={`${count} novos`}
+            className="font-pixel absolute -right-2.5 -top-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-outline bg-rose-500 px-1 text-[8px] leading-none text-white"
+          >
+            {count > 99 ? "99+" : count}
+          </span>
         )}
-      />
+      </span>
       <span className={cn("flex-1 truncate text-left", collapsed && "lg:hidden")}>{label}</span>
       {badge !== undefined && badge !== null && <span className={cn(collapsed && "lg:hidden")}>{badge}</span>}
       {collapsed && (

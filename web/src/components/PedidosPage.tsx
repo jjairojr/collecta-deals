@@ -8,6 +8,7 @@ import {
   ExternalLink,
   ImageOff,
   KeyRound,
+  HandHelping,
   PackageCheck,
   RefreshCw,
   Truck,
@@ -23,6 +24,7 @@ import {
   type OrderStatus,
 } from "../api";
 import { brl2, fullStamp } from "../format";
+import { isNewOrder } from "../orderAlerts";
 import EmptyState from "./EmptyState";
 import { Kpi } from "./PortfolioPage";
 import { Badge, type BadgeProps } from "./ui/badge";
@@ -32,12 +34,13 @@ import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ToggleGroup } from "./ui/toggle-group";
 
-type Filter = "all" | "paid" | "shipped" | "pending" | "problems" | "closed";
+type Filter = "all" | "paid" | "shipped" | "delivered" | "pending" | "problems" | "closed";
 
 const filterStatuses: Record<Filter, OrderStatus[]> = {
-  all: ["pending", "paid", "failed", "expired", "cancelled", "oversold", "shipped", "refunded"],
+  all: ["pending", "paid", "failed", "expired", "cancelled", "oversold", "shipped", "delivered", "refunded"],
   paid: ["paid"],
   shipped: ["shipped"],
+  delivered: ["delivered"],
   pending: ["pending"],
   problems: ["oversold", "failed", "refunded"],
   closed: ["expired", "cancelled"],
@@ -47,12 +50,13 @@ const filterLabels: Record<Filter, string> = {
   all: "Todos",
   paid: "A enviar",
   shipped: "Enviados",
+  delivered: "Entregues",
   pending: "Pendentes",
   problems: "Problemas",
   closed: "Expirados",
 };
 
-const FILTER_ORDER: Filter[] = ["all", "paid", "shipped", "pending", "problems", "closed"];
+const FILTER_ORDER: Filter[] = ["all", "paid", "shipped", "delivered", "pending", "problems", "closed"];
 
 const statusLabels: Record<OrderStatus, string> = {
   pending: "Aguardando pagamento",
@@ -62,6 +66,7 @@ const statusLabels: Record<OrderStatus, string> = {
   cancelled: "Cancelado",
   oversold: "Sem estoque",
   shipped: "Enviado",
+  delivered: "Entregue",
   refunded: "Reembolsado",
 };
 
@@ -73,10 +78,13 @@ const statusVariants: Record<OrderStatus, BadgeProps["variant"]> = {
   cancelled: "default",
   oversold: "rose",
   shipped: "sky",
+  delivered: "default",
   refunded: "rose",
 };
 
 const cancellable: OrderStatus[] = ["pending", "failed", "expired", "oversold"];
+
+const fulfilled: OrderStatus[] = ["paid", "shipped", "delivered"];
 
 function isFilter(value: string): value is Filter {
   return FILTER_ORDER.some((f) => f === value);
@@ -128,14 +136,14 @@ function isUnauthorized(err: unknown): boolean {
   return err instanceof Error && err.message === "unauthorized";
 }
 
-export default function PedidosPage() {
+export default function PedidosPage({ since, onChanged }: { since: number; onChanged: () => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [showToken, setShowToken] = useState(false);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [picked, setPicked] = useState<Filter | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -161,9 +169,13 @@ export default function PedidosPage() {
     load();
   }, [load]);
 
-  const replace = useCallback((updated: Order) => {
-    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-  }, []);
+  const replace = useCallback(
+    (updated: Order) => {
+      setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      onChanged();
+    },
+    [onChanged],
+  );
 
   const counts = useMemo(() => {
     const byStatus: Record<OrderStatus, number> = {
@@ -174,17 +186,20 @@ export default function PedidosPage() {
       cancelled: 0,
       oversold: 0,
       shipped: 0,
+      delivered: 0,
       refunded: 0,
     };
     let revenue = 0;
     for (const o of orders) {
       byStatus[o.status] += 1;
-      if (o.status === "paid" || o.status === "shipped") {
+      if (fulfilled.includes(o.status)) {
         revenue += o.totals.totalBRL;
       }
     }
     return { byStatus, revenue };
   }, [orders]);
+
+  const filter: Filter = picked ?? (counts.byStatus.paid > 0 ? "paid" : "all");
 
   const visible = useMemo(
     () => orders.filter((o) => filterStatuses[filter].includes(o.status)),
@@ -211,7 +226,7 @@ export default function PedidosPage() {
           value={filter}
           onChange={(v) => {
             if (isFilter(v)) {
-              setFilter(v);
+              setPicked(v);
             }
           }}
           options={FILTER_ORDER.map((f) => ({
@@ -244,13 +259,13 @@ export default function PedidosPage() {
           icon={<Truck className="h-5 w-5" />}
           label="Enviados"
           value={String(counts.byStatus.shipped)}
-          sub="já postados"
+          sub={`já postados · ${counts.byStatus.delivered} entregues`}
         />
         <Kpi
           icon={<Coins className="h-5 w-5" />}
           label="Receita paga"
           value={brl2(counts.revenue)}
-          sub="pagos + enviados, com frete"
+          sub="pagos, enviados e entregues, com frete"
         />
         <Kpi
           icon={<Clock className="h-5 w-5" />}
@@ -296,6 +311,7 @@ export default function PedidosPage() {
                 <OrderRow
                   key={o.id}
                   order={o}
+                  fresh={isNewOrder(o, since)}
                   open={open === o.id}
                   onToggle={() => setOpen((k) => (k === o.id ? null : o.id))}
                   onChanged={replace}
@@ -352,12 +368,14 @@ export function TokenCard({ onSaved, onCancel }: { onSaved: () => void; onCancel
 
 function OrderRow({
   order,
+  fresh,
   open,
   onToggle,
   onChanged,
   onUnauthorized,
 }: {
   order: Order;
+  fresh: boolean;
   open: boolean;
   onToggle: () => void;
   onChanged: (o: Order) => void;
@@ -403,14 +421,22 @@ function OrderRow({
     }
   };
 
-  const shipped = order.status === "shipped";
+  const shipped = order.status === "shipped" || order.status === "delivered";
   const canShip = order.status === "paid";
+  const canDeliver = order.status === "paid" || order.status === "shipped";
   const whatsapp = `https://wa.me/55${order.buyer.phone}`;
 
   return (
     <>
       <TableRow className="cursor-pointer" onClick={onToggle}>
-        <TableCell className="font-semibold tabular-nums text-slate-100">#{order.number}</TableCell>
+        <TableCell className="whitespace-nowrap font-semibold tabular-nums text-slate-100">
+          #{order.number}
+          {fresh && (
+            <Badge variant="rose" className="ml-2">
+              Novo
+            </Badge>
+          )}
+        </TableCell>
         <TableCell className="whitespace-nowrap tabular-nums text-slate-400">
           {fullStamp(order.createdAt)}
         </TableCell>
@@ -481,6 +507,7 @@ function OrderRow({
                   <Stamp label="Criado" value={order.createdAt} />
                   <Stamp label="Pago" value={order.paidAt} />
                   <Stamp label="Enviado" value={order.shippedAt} />
+                  <Stamp label="Entregue" value={order.deliveredAt} />
                   {order.status === "pending" && <Stamp label="Expira" value={order.expiresAt} />}
                 </dl>
               </section>
@@ -557,6 +584,11 @@ function OrderRow({
               >
                 <Truck className="h-4 w-4" /> {shipped ? "Atualizar rastreio" : "Marcar enviado"}
               </Button>
+              {canDeliver && (
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => patch({ status: "delivered" })}>
+                  <HandHelping className="h-4 w-4" /> Marcar entregue
+                </Button>
+              )}
               <Field label="Notas">
                 <textarea
                   value={notes}
