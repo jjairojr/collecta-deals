@@ -132,6 +132,61 @@ func EffectiveStatus(o Order, now time.Time) Status {
 	return o.Status
 }
 
+var ErrTransition = errors.New("status transition not allowed")
+
+var manualTargets = map[Status][]Status{
+	StatusPending:   {StatusCancelled},
+	StatusFailed:    {StatusCancelled},
+	StatusExpired:   {StatusCancelled},
+	StatusOversold:  {StatusPaid, StatusShipped, StatusDelivered, StatusRefunded, StatusCancelled},
+	StatusPaid:      {StatusShipped, StatusDelivered, StatusRefunded},
+	StatusShipped:   {StatusPaid, StatusDelivered, StatusRefunded},
+	StatusDelivered: {StatusPaid, StatusShipped, StatusRefunded},
+	StatusRefunded:  {StatusPaid, StatusShipped, StatusDelivered},
+}
+
+func ManualTargets(from Status) []Status {
+	return manualTargets[from]
+}
+
+func SetStatus(o *Order, to Status, now time.Time) error {
+	current := EffectiveStatus(*o, now)
+	if to == current {
+		return nil
+	}
+	allowed := false
+	for _, s := range manualTargets[current] {
+		if s == to {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return ErrTransition
+	}
+	o.Status = to
+	switch to {
+	case StatusPaid:
+		stamp(&o.PaidAt, now)
+		o.ShippedAt = time.Time{}
+		o.DeliveredAt = time.Time{}
+	case StatusShipped:
+		stamp(&o.PaidAt, now)
+		stamp(&o.ShippedAt, now)
+		o.DeliveredAt = time.Time{}
+	case StatusDelivered:
+		stamp(&o.PaidAt, now)
+		stamp(&o.DeliveredAt, now)
+	}
+	return nil
+}
+
+func stamp(t *time.Time, now time.Time) {
+	if t.IsZero() {
+		*t = now
+	}
+}
+
 func (o Order) Reserves(now time.Time) bool {
 	return EffectiveStatus(o, now) == StatusPending
 }

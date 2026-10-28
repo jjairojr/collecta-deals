@@ -105,3 +105,30 @@ func TestEffectiveStatus(t *testing.T) {
 		t.Fatal("paid must not expire")
 	}
 }
+
+func TestSetStatus(t *testing.T) {
+	now := time.Now()
+	o := Order{Status: StatusOversold}
+	if err := SetStatus(&o, StatusDelivered, now); err != nil {
+		t.Fatal(err)
+	}
+	if o.Status != StatusDelivered || o.PaidAt.IsZero() || o.DeliveredAt.IsZero() {
+		t.Fatalf("order = %+v", o)
+	}
+	if err := SetStatus(&o, StatusPaid, now); err != nil {
+		t.Fatal(err)
+	}
+	if !o.DeliveredAt.IsZero() || !o.ShippedAt.IsZero() {
+		t.Fatalf("rollback kept stamps: %+v", o)
+	}
+	if err := SetStatus(&o, StatusCancelled, now); !errors.Is(err, ErrTransition) {
+		t.Fatalf("cancel paid: %v", err)
+	}
+	p := Order{Status: StatusPending, ExpiresAt: now.Add(time.Hour)}
+	if err := SetStatus(&p, StatusShipped, now); !errors.Is(err, ErrTransition) {
+		t.Fatalf("ship pending: %v", err)
+	}
+	if err := SetStatus(&p, StatusCancelled, now); err != nil || p.Status != StatusCancelled {
+		t.Fatalf("cancel pending: %v %+v", err, p)
+	}
+}

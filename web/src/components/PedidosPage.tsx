@@ -8,7 +8,6 @@ import {
   ExternalLink,
   ImageOff,
   KeyRound,
-  HandHelping,
   PackageCheck,
   RefreshCw,
   Truck,
@@ -31,6 +30,7 @@ import { Badge, type BadgeProps } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
+import { Select } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ToggleGroup } from "./ui/toggle-group";
 
@@ -82,9 +82,23 @@ const statusVariants: Record<OrderStatus, BadgeProps["variant"]> = {
   refunded: "rose",
 };
 
-const cancellable: OrderStatus[] = ["pending", "failed", "expired", "oversold"];
+const manualTargets: Record<OrderStatus, OrderStatus[]> = {
+  pending: ["cancelled"],
+  failed: ["cancelled"],
+  expired: ["cancelled"],
+  oversold: ["paid", "shipped", "delivered", "refunded", "cancelled"],
+  paid: ["shipped", "delivered", "refunded"],
+  shipped: ["paid", "delivered", "refunded"],
+  delivered: ["paid", "shipped", "refunded"],
+  refunded: ["paid", "shipped", "delivered"],
+  cancelled: [],
+};
 
 const fulfilled: OrderStatus[] = ["paid", "shipped", "delivered"];
+
+function isStatus(value: string): value is OrderStatus {
+  return filterStatuses.all.some((s) => s === value);
+}
 
 function isFilter(value: string): value is Filter {
   return FILTER_ORDER.some((f) => f === value);
@@ -387,11 +401,16 @@ function OrderRow({
   const [failed, setFailed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [target, setTarget] = useState<OrderStatus>(order.status);
 
   useEffect(() => {
     setTracking(order.trackingCode ?? "");
     setNotes(order.notes ?? "");
   }, [order.trackingCode, order.notes]);
+
+  useEffect(() => {
+    setTarget(order.status);
+  }, [order.status]);
 
   const patch = async (body: OrderPatch) => {
     setBusy(true);
@@ -415,15 +434,21 @@ function OrderRow({
     window.setTimeout(() => setCopied(false), 1500);
   };
 
-  const cancel = () => {
-    if (window.confirm(`Cancelar o pedido #${order.number}?`)) {
-      patch({ status: "cancelled" });
+  const changeStatus = () => {
+    if (
+      (target === "cancelled" || target === "refunded") &&
+      !window.confirm(`Mudar o pedido #${order.number} para "${statusLabels[target]}"?`)
+    ) {
+      return;
     }
+    const code = tracking.trim();
+    patch(target === "shipped" && code !== (order.trackingCode ?? "") ? { status: target, trackingCode: code } : { status: target });
   };
 
+  const targets = manualTargets[order.status];
   const shipped = order.status === "shipped" || order.status === "delivered";
   const canShip = order.status === "paid";
-  const canDeliver = order.status === "paid" || order.status === "shipped";
+  const noStockMove = order.status === "oversold" && fulfilled.includes(target);
   const whatsapp = `https://wa.me/55${order.buyer.phone}`;
 
   return (
@@ -584,10 +609,31 @@ function OrderRow({
               >
                 <Truck className="h-4 w-4" /> {shipped ? "Atualizar rastreio" : "Marcar enviado"}
               </Button>
-              {canDeliver && (
-                <Button variant="outline" size="sm" disabled={busy} onClick={() => patch({ status: "delivered" })}>
-                  <HandHelping className="h-4 w-4" /> Marcar entregue
-                </Button>
+              {targets.length > 0 && (
+                <>
+                  <Field label="Status">
+                    <div className="w-52">
+                      <Select
+                        value={target}
+                        disabled={busy}
+                        onChange={(e) => {
+                          if (isStatus(e.target.value)) {
+                            setTarget(e.target.value);
+                          }
+                        }}
+                      >
+                        {[order.status, ...targets].map((s) => (
+                          <option key={s} value={s}>
+                            {statusLabels[s]}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  </Field>
+                  <Button variant="outline" size="sm" disabled={busy || target === order.status} onClick={changeStatus}>
+                    Mudar status
+                  </Button>
+                </>
               )}
               <Field label="Notas">
                 <textarea
@@ -606,12 +652,12 @@ function OrderRow({
               >
                 Salvar notas
               </Button>
-              {cancellable.includes(order.status) && (
-                <Button variant="ghost" size="sm" disabled={busy} onClick={cancel} className="ml-auto text-rose-300">
-                  Cancelar pedido
-                </Button>
-              )}
             </div>
+            {noStockMove && (
+              <p className="mt-2 text-[11px] text-amber-300">
+                Mudar o status não dá baixa no estoque: confira se os itens já saíram do dashboard.
+              </p>
+            )}
             {failed && <p className="mt-2 text-[11px] text-rose-300">{failed}</p>}
             {viewing && <ArtViewer src={viewing} onClose={() => setViewing(null)} />}
           </TableCell>

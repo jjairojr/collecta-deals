@@ -507,8 +507,20 @@ func TestOrdersAdminListAndPatch(t *testing.T) {
 		t.Fatalf("order = %+v", got)
 	}
 	rec = f.do(t, http.MethodPatch, "/api/orders/"+o.ID, map[string]string{"status": "shipped"}, admin)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delivered back to shipped: %d %s", rec.Code, rec.Body.String())
+	}
+	got, _ = f.s.Checkout.Orders.Get(o.ID)
+	if got.Status != orders.StatusShipped || !got.DeliveredAt.IsZero() || got.ShippedAt.IsZero() {
+		t.Fatalf("order = %+v", got)
+	}
+	rec = f.do(t, http.MethodPatch, "/api/orders/"+o.ID, map[string]string{"status": "cancelled"}, admin)
 	if rec.Code != http.StatusConflict {
-		t.Fatalf("shipping a delivered order: %d", rec.Code)
+		t.Fatalf("cancelling a shipped order: %d", rec.Code)
+	}
+	rec = f.do(t, http.MethodPatch, "/api/orders/"+o.ID, map[string]string{"status": "refunded"}, admin)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("refund: %d %s", rec.Code, rec.Body.String())
 	}
 }
 

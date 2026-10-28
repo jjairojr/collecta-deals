@@ -1018,34 +1018,9 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 		}
 		now := time.Now()
 		current := orders.EffectiveStatus(*o, now)
-		switch orders.Status(*in.Status) {
-		case orders.StatusShipped:
-			if current != orders.StatusPaid && current != orders.StatusShipped {
-				bad = "só pedidos pagos podem ser marcados como enviados"
-				return errors.New(bad)
-			}
-			o.Status = orders.StatusShipped
-			if o.ShippedAt.IsZero() {
-				o.ShippedAt = now
-			}
-		case orders.StatusDelivered:
-			if current != orders.StatusPaid && current != orders.StatusShipped && current != orders.StatusDelivered {
-				bad = "só pedidos pagos podem ser marcados como entregues"
-				return errors.New(bad)
-			}
-			o.Status = orders.StatusDelivered
-			if o.DeliveredAt.IsZero() {
-				o.DeliveredAt = now
-			}
-		case orders.StatusCancelled:
-			if current == orders.StatusPaid || current == orders.StatusShipped || current == orders.StatusDelivered {
-				bad = "pedido pago não pode ser cancelado por aqui"
-				return errors.New(bad)
-			}
-			o.Status = orders.StatusCancelled
-		default:
-			bad = "status inválido"
-			return errors.New(bad)
+		if err := orders.SetStatus(o, orders.Status(*in.Status), now); err != nil {
+			bad = fmt.Sprintf("não dá para mudar de %s para %s", current, *in.Status)
+			return err
 		}
 		return nil
 	})

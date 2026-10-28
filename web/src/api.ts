@@ -1318,7 +1318,7 @@ export interface Order {
 }
 
 export interface OrderPatch {
-  status?: "shipped" | "delivered" | "cancelled";
+  status?: OrderStatus;
   trackingCode?: string;
   notes?: string;
 }
