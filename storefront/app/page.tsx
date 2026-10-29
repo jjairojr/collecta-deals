@@ -28,8 +28,9 @@ export default async function HomePage() {
   // Real catalog; high-scores stay mock until the backend serves them.
   const { singles, sealed, accessories, games } = await loadCatalog();
   const featured = [...singles].sort((a, b) => b.price - a.price).slice(0, 8);
-  const picked = sealed.filter((s) => s.featured);
-  const featuredSealed = picked.length > 0 ? picked : sealed.slice(0, 4);
+  const byFeatured = [...sealed].sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)));
+  const pokemonSealed = byFeatured.filter((s) => s.game === "pokemon").slice(0, 8);
+  const otherSealed = byFeatured.filter((s) => s.game !== "pokemon").slice(0, 4);
   const pickedAccessories = accessories.filter((a) => a.featured);
   const featuredAccessories =
     pickedAccessories.length > 0 ? pickedAccessories : accessories.slice(0, 4);
@@ -119,20 +120,41 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* Produto selado */}
-      {featuredSealed.length > 0 && (
+      {/* Selados Pokémon */}
+      {pokemonSealed.length > 0 && (
         <Container className="py-10">
           <SectionHead
-            title="Produtos selados"
+            title="Selados Pokémon"
+            eyebrow="BOOSTER BOX · BLISTER · BOX COLEÇÃO"
+            action={{ label: "VER TODOS ›", href: "/selado/pokemon" }}
+          />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            <TrackViewItemList
+              items={pokemonSealed}
+              listId="home_selados_pokemon"
+              listName="Home · Selados Pokémon"
+            />
+            {pokemonSealed.map((s) => (
+              <SealedCard key={s.slug} item={s} />
+            ))}
+          </div>
+        </Container>
+      )}
+
+      {/* Outros selados */}
+      {otherSealed.length > 0 && (
+        <Container className="py-6">
+          <SectionHead
+            title={pokemonSealed.length > 0 ? "Outros selados" : "Produtos selados"}
             action={{ label: "VER TODOS ›", href: "/selado" }}
           />
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
             <TrackViewItemList
-              items={featuredSealed}
+              items={otherSealed}
               listId="home_selados"
               listName="Home · Produtos selados"
             />
-            {featuredSealed.map((s) => (
+            {otherSealed.map((s) => (
               <SealedCard key={s.slug} item={s} />
             ))}
           </div>
