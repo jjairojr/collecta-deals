@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"opdeals/internal/collecta"
+	"opdeals/internal/game"
 	"opdeals/internal/logx"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/orders"
@@ -120,10 +121,24 @@ func (s *Server) buildSKUIndex() (skuIndex, error) {
 
 const cardImagePath = "/api/card-image?"
 
-func lineImage(t trades.Trade, gameID string, lookup trades.PriceLookup) string {
-	if t.ImageURL != "" {
-		return t.ImageURL
+// One Piece is registered on the Liga first and imported from there, so each
+// holding carries the art of its exact listing. A number-based guess can land on
+// another print of the same number (a base Nami shown as the SP), so these games
+// show the listing's art or none.
+func listingArtOnly(gameID string) bool {
+	return gameID == game.OnePiece().ID
+}
+
+func lineImage(ts []trades.Trade, gameID string, lookup trades.PriceLookup) string {
+	for _, t := range ts {
+		if t.ImageURL != "" {
+			return t.ImageURL
+		}
 	}
+	if len(ts) == 0 || listingArtOnly(gameID) {
+		return ""
+	}
+	t := ts[0]
 	if t.Kind != "" || t.Number == "" {
 		return ""
 	}
@@ -145,7 +160,7 @@ func legacyLineImage(l orders.Line) string {
 	if l.ImageURL != "" {
 		return l.ImageURL
 	}
-	if l.Kind != "single" || l.Game == accessoryGameID {
+	if l.Kind != "single" || l.Game == accessoryGameID || listingArtOnly(l.Game) {
 		return ""
 	}
 	parts := strings.Split(l.Meta, " · ")
@@ -157,6 +172,40 @@ func legacyLineImage(l orders.Line) string {
 	q.Set("set", parts[0])
 	q.Set("number", parts[1])
 	return cardImagePath + q.Encode()
+}
+
+// listingArt maps each listing-art-only SKU to the art its ledger rows carry,
+// sold rows included, so an order keeps showing the art of what was bought.
+func (s *Server) listingArt() map[string]string {
+	art := make(map[string]string)
+	for id, gs := range s.games {
+		if !listingArtOnly(id) || gs.Trades == nil {
+			continue
+		}
+		all, err := gs.Trades.List()
+		if err != nil {
+			continue
+		}
+		for _, t := range all {
+			key := trades.SKU(id, t)
+			if _, ok := art[key]; !ok && t.ImageURL != "" {
+				art[key] = t.ImageURL
+			}
+		}
+	}
+	return art
+}
+
+// orderLineImage replaces the number-based guess older orders stored for a
+// listing-art-only game with the listing's own art.
+func orderLineImage(l orders.Line, art map[string]string) string {
+	if !listingArtOnly(l.Game) {
+		return legacyLineImage(l)
+	}
+	if l.ImageURL != "" && !strings.HasPrefix(l.ImageURL, cardImagePath) {
+		return l.ImageURL
+	}
+	return art[l.SKU]
 }
 
 func storefrontImage(raw string) string {
@@ -229,7 +278,8 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int) (r
 			}
 			res.shortages = append(res.shortages, lineProblem{SKU: l.SKU, Available: available})
 		}
-		first := orders.Eligible(e.trades)[0]
+		eligible := orders.Eligible(e.trades)
+		first := eligible[0]
 		kind := first.Kind
 		if kind == "" {
 			kind = "single"
@@ -242,7 +292,7 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int) (r
 			Meta:     lineMeta(first),
 			Qty:      l.Qty,
 			UnitBRL:  round2(unit),
-			ImageURL: lineImage(first, e.game, e.lookup),
+			ImageURL: lineImage(eligible, e.game, e.lookup),
 		})
 	}
 	return res, nil
@@ -708,7 +758,7 @@ type publicOrder struct {
 	CreatedAt    time.Time       `json:"createdAt"`
 }
 
-func publicView(o orders.Order, now time.Time) publicOrder {
+func publicView(o orders.Order, now time.Time, art map[string]string) publicOrder {
 	status := orders.EffectiveStatus(o, now)
 	out := publicOrder{
 		ID:           o.ID,
@@ -737,7 +787,7 @@ func publicView(o orders.Order, now time.Time) publicOrder {
 			Kind:     l.Kind,
 			Qty:      l.Qty,
 			UnitBRL:  l.UnitBRL,
-			ImageURL: storefrontImage(legacyLineImage(l)),
+			ImageURL: storefrontImage(orderLineImage(l, art)),
 		})
 	}
 	if status == orders.StatusPending || status == orders.StatusFailed {
@@ -767,7 +817,7 @@ func (s *Server) handleOrderGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, publicView(o, time.Now()))
+	writeJSON(w, publicView(o, time.Now(), s.listingArt()))
 }
 
 func (s *Server) logCheckout(format string, args ...any) {
@@ -963,10 +1013,11 @@ func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
+	art := s.listingArt()
 	for i := range all {
 		all[i].Status = orders.EffectiveStatus(all[i], now)
 		for j := range all[i].Lines {
-			all[i].Lines[j].ImageURL = legacyLineImage(all[i].Lines[j])
+			all[i].Lines[j].ImageURL = orderLineImage(all[i].Lines[j], art)
 		}
 	}
 	writeJSON(w, all)
@@ -982,10 +1033,11 @@ func (s *Server) handleUserOrders(w http.ResponseWriter, r *http.Request, uid st
 		return
 	}
 	now := time.Now()
+	art := s.listingArt()
 	out := make([]publicOrder, 0)
 	for _, o := range all {
 		if o.CollectaUserID == uid {
-			out = append(out, publicView(o, now))
+			out = append(out, publicView(o, now, art))
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")

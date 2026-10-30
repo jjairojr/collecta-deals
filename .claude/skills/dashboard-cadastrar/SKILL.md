@@ -65,6 +65,12 @@ Convenções (padrão do import PBL, já em prod):
 
 ## Passo 4 — imagens
 
+🚫 **One Piece: a arte vem SEMPRE da Liga.** O fluxo é cadastrar na Liga primeiro e depois
+importar, então o `imageURL` de cada holding OP é a imagem da Liga daquele anúncio
+(`repositorio.sbrauble.com`, com `ed=<sigla>` para AA/SP/reprint). A marca "SAMPLE" é normal.
+Nunca semeie OP pelo `images.json`/TCGplayer nem por número: o número sozinho pega o print
+errado (Nami OP01-016 base virou SP). Antes de encerrar: zero holdings OP sem `imageURL`.
+
 1. Comparar as chaves `"SET/NUM"` cadastradas com `data/tracking-pkm/images.json` (ou `tracking`/`tracking-rft`/... conforme o jogo).
 2. Para as faltantes, semear `"SET/NUM": "https://product-images.tcgplayer.com/fit-in/400x559/{productId}.jpg"` (productId veio do casamento no Passo 1). Fazer backup do arquivo antes.
 3. Upload direcionado (não precisa do sync-up pesado) + reload:

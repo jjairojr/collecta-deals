@@ -275,17 +275,12 @@ func TestOrderCreateBuildsPreference(t *testing.T) {
 	if o.Lines[0].UnitBRL != 250 || o.Lines[0].Meta != "OP16 · OP16-080" || o.Lines[0].Kind != "single" {
 		t.Fatalf("line = %+v", o.Lines[0])
 	}
-	if o.Lines[0].ImageURL != "/api/card-image?game=onepiece&number=OP16-080&set=OP16" {
-		t.Fatalf("line image = %q", o.Lines[0].ImageURL)
+	if o.Lines[0].ImageURL != "" {
+		t.Fatalf("line image = %q, want none for an OP listing without art", o.Lines[0].ImageURL)
 	}
-	pub := publicView(o, time.Now())
-	if pub.Lines[0].ImageURL != "/img?game=onepiece&number=OP16-080&set=OP16" {
+	pub := publicView(o, time.Now(), nil)
+	if pub.Lines[0].ImageURL != "" {
 		t.Fatalf("public image = %q", pub.Lines[0].ImageURL)
-	}
-	legacy := o.Lines[0]
-	legacy.ImageURL = ""
-	if legacyLineImage(legacy) != o.Lines[0].ImageURL {
-		t.Fatalf("legacy image = %q", legacyLineImage(legacy))
 	}
 	if o.Shipping.ServiceName != "Mini Envios" || o.MP.PreferenceID != "pref-"+o.ID {
 		t.Fatalf("shipping/mp = %+v %+v", o.Shipping, o.MP)
@@ -646,5 +641,53 @@ func TestCancelPendingIgnoresOtherBuyers(t *testing.T) {
 	got, _ := f.s.Checkout.Orders.Get(first.ID)
 	if got.Status != orders.StatusPending {
 		t.Fatalf("first order = %+v", got)
+	}
+}
+
+const listingArtURL = "https://repositorio.sbrauble.com/arquivos/in/onepiece/1/teach.jpg"
+
+func TestOrderLineTakesListingArtFromAnyLot(t *testing.T) {
+	f := checkoutServer(t)
+	if _, err := f.store.SetListings(map[string]trades.Listing{
+		f.newer.ID: {AskBRL: 250, Listed: true, ImageURL: listingArtURL},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	o := f.createOrder(t)
+	if o.Lines[0].ImageURL != listingArtURL {
+		t.Fatalf("line image = %q, want the newer lot's listing art", o.Lines[0].ImageURL)
+	}
+}
+
+func TestOrderLineReplacesGuessedListingArt(t *testing.T) {
+	f := checkoutServer(t)
+	o := f.createOrder(t)
+	o.Lines[0].ImageURL = "/api/card-image?game=onepiece&number=OP16-080&productID=656656&set=OP16"
+	if got := orderLineImage(o.Lines[0], f.s.listingArt()); got != "" {
+		t.Fatalf("guess without listing art = %q, want none", got)
+	}
+	if _, err := f.store.SetListings(map[string]trades.Listing{
+		f.older.ID: {AskBRL: 260, Listed: true, ImageURL: listingArtURL},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	art := f.s.listingArt()
+	if got := orderLineImage(o.Lines[0], art); got != listingArtURL {
+		t.Fatalf("line image = %q, want listing art", got)
+	}
+	if got := publicView(o, time.Now(), art).Lines[0].ImageURL; got != listingArtURL {
+		t.Fatalf("public image = %q", got)
+	}
+	o.Lines[0].ImageURL = "https://example.test/photo.jpg"
+	if got := orderLineImage(o.Lines[0], art); got != "https://example.test/photo.jpg" {
+		t.Fatalf("stored listing art replaced: %q", got)
+	}
+}
+
+func TestOrderLineGuessKeptForOtherGames(t *testing.T) {
+	l := orders.Line{Kind: "single", Game: "pokemon", Meta: "MEG · 086"}
+	want := "/api/card-image?game=pokemon&number=086&set=MEG"
+	if got := orderLineImage(l, nil); got != want {
+		t.Fatalf("pokemon image = %q, want %q", got, want)
 	}
 }
