@@ -98,7 +98,7 @@ Sessão do dono já está logada no Chrome (claude-in-chrome) — não há autom
 de login. Página de pedidos (mapeada em 2026-08-01):
 
 ```
-https://www.ligamagic.com.br/?view=ecom/admin/pedidos
+https://www.ligacollectatcg.com.br/?view=ecom/admin/pedidos
 ```
 
 ⚠️ `?view=ecom/admin/compras` (a referência antiga herdada de liga-conferir)
@@ -556,3 +556,46 @@ desse conhecimento.
   088 Foil JP — os dois por nome + `ligaPriceBRL` 14,90 exato.
 - `(JAP) Caixa de Booster - Storm Emeralda` = ledger pokemon `Storm Emeralda
   (With Shrink)` (sem ask). Kit Base Shop Vol.1 de novo no ledger **onepiece**.
+
+2026-10-24 (16ª execução — 2 pedidos novos pagos, 6 linhas One Piece, 6 baixadas):
+
+- Fronteira `Liga #` = #12310823. Novos: #12314875 e #12314771, ambos sem desconto.
+- O mesmo número pode ter dois holdings (lote original + "lote extra" criado no sync
+  Liga → dashboard). Não é ambiguidade: é a mesma carta. Baixar do lote mais antigo
+  (`createdAt`) e decrementar o `ligaQty` só dele; a soma dos `ligaQty` dos lotes é o
+  estoque da Liga.
+- MyP: o anúncio tem uma linha só por carta com a qty somada dos lotes. Reduzir para
+  qty atual − vendidos via FormData da página de update (fetch POST com o FormData do
+  próprio form funcionou, flash "N x R$ X gravado com sucesso").
+
+2026-10-27 (auditoria Liga × aba Vendas — 42 pedidos pagos desde 13/10):
+
+- **Admin da loja agora em `www.ligacollectatcg.com.br`** (mesmos paths `?view=ecom/admin/...`).
+  Em `www.ligamagic.com.br` o admin responde "Você não está logado" mesmo com a sessão ativa.
+- Item vendido "sem lastro" nunca entrava na aba Vendas, então o faturamento ficava menor.
+  Correção: `POST /api/trades` com `status:"sold"`, `buyBRL 0`, `sellPrice`/`sellDate`/`buyer`
+  do pedido e nota "Venda da Liga sem registro no estoque do dashboard". Não mexe em holding:
+  a Liga já tinha descontado essas unidades. Lançados 38 registros (10 pedidos).
+- Auditoria completa: detalhe de todos os pedidos pagos em `window.__det` (8 s entre fetches),
+  `JSON.stringify` → clipboard → `pbpaste`, parser linha a linha e casamento por nome contra
+  os `sold` com `Liga #N`. A soma dos itens bateu com "Valor dos Itens" nos 42.
+- Gravar várias linhas da busca `cartas/all&txt_filtro=1` num submit só funciona; ir da última
+  página para a primeira, porque a linha zerada some e desloca as páginas seguintes. Conferir
+  qty e preço atuais de cada linha antes de escrever.
+
+2026-10-29 (17ª execução — 4 pedidos novos pagos, 50 linhas, 57 baixas):
+
+- **A listagem mudou de layout de novo**: cada pedido é um bloco rotulado, uma
+  linha por campo — `#N / Cliente`, `Data`, `<data>`, `<hora>`, `Data Pag.`,
+  `<data>`, `Status`, `<status>`, `Pagamento / Envio`, …, `Valor Total`,
+  `R$ x`. Ache `^#(\d{8}) / (.*)$` e leia o valor seguinte a cada rótulo nas ~16
+  linhas abaixo; `Data Pag.` some no cancelado sem pagamento.
+- Pedido já baixado e depois cancelado: #12327804 (Parasect TG01, sellPrice
+  0,001) virou `Cancelado`. Não há holding para devolver; reportar ao dono.
+- Venda em vários canais esgota o ledger antes da Liga: Gloriosa OP17-046 teve
+  4 na Liga sem lastro porque MyP e Site já tinham levado o resto e o anúncio
+  da Liga não tinha sido reduzido. Baixar o que existe e reportar como possível
+  venda sem estoque.
+- Lotes múltiplos do mesmo número: alocar a venda do lote mais antigo
+  (`createdAt`) para o mais novo, filtrando por número exato e ask = unitário
+  do pedido (separa base de Parallel, como Franky OP09-072 vs OP09-072-P).
