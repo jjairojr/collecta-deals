@@ -194,6 +194,14 @@ function today(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function noCost(item: PurchaseItem): boolean {
+  return item.buyBRL === 0 && !item.writeOff;
+}
+
+function askOf(item: PurchaseItem): number {
+  return item.askBRL || item.ligaPriceBRL || 0;
+}
+
 function num(v: string): number {
   const n = Number(v.replace(",", "."));
   return Number.isFinite(n) ? n : 0;
@@ -235,6 +243,7 @@ export default function PurchasesPage() {
   const [status, setStatus] = useState<StatusFilter>("holding");
   const [kinds, setKinds] = useState<Set<ItemKind>>(new Set());
   const [transitOnly, setTransitOnly] = useState(false);
+  const [noCostOnly, setNoCostOnly] = useState(false);
 
   const toggleKind = (kind: ItemKind) =>
     setKinds((prev) => {
@@ -307,24 +316,37 @@ export default function PurchasesPage() {
       if (transitOnly && (item.realized || item.delivered)) {
         return false;
       }
+      if (noCostOnly && !noCost(item)) {
+        return false;
+      }
       return matchesItem(item, q);
     },
-    [gameFilter, kinds, status, transitOnly, q],
+    [gameFilter, kinds, status, transitOnly, noCostOnly, q],
   );
 
   const visibleOrders = useMemo(
     () =>
       orders
         .map((o) => ({ ...o, items: o.items.filter(keep) }))
-        .filter((o) => o.items.length > 0 || (!q && gameFilter === "all" && kinds.size === 0 && !transitOnly))
+        .filter(
+          (o) =>
+            o.items.length > 0 ||
+            (!q && gameFilter === "all" && kinds.size === 0 && !transitOnly && !noCostOnly),
+        )
         .filter((o) => o.items.length > 0 || matchesOrder(o, q)),
-    [orders, keep, q, gameFilter, kinds, transitOnly],
+    [orders, keep, q, gameFilter, kinds, transitOnly, noCostOnly],
   );
   const visibleLoose = useMemo(() => loose.filter(keep), [loose, keep]);
   // A aba Itens é o estoque inteiro numa lista só, venha o item de um pedido ou
   // não.
   const allItems = useMemo(() => [...orders.flatMap((o) => o.items), ...loose], [orders, loose]);
   const visibleAll = useMemo(() => allItems.filter(keep), [allItems, keep]);
+  const missingCost = useMemo(() => {
+    const rows = allItems.filter(
+      (it) => noCost(it) && (status === "all" || (status === "sold") === it.realized),
+    );
+    return { count: rows.length, askBRL: rows.reduce((s, it) => s + askOf(it) * it.qty, 0) };
+  }, [allItems, status]);
 
   const totals = useMemo(() => {
     let spent = 0;
@@ -393,6 +415,14 @@ export default function PurchasesPage() {
           sub="lançados fora de uma compra"
         />
       </div>
+
+      {missingCost.count > 0 && (
+        <p className="text-[11px] text-amber-300">
+          {missingCost.count} {missingCost.count === 1 ? "lote sem custo" : "lotes sem custo"}
+          {missingCost.askBRL > 0 ? ` (${brl2(missingCost.askBRL)} a preço de venda)` : ""} — filtre por
+          “Sem custo” e preencha o custo un. direto na linha.
+        </p>
+      )}
 
       <GameSummary active={gameFilter} onPick={setGameFilter} />
 
@@ -467,6 +497,9 @@ export default function PurchasesPage() {
           <span className="inline-flex items-center gap-1">
             <Truck className="h-3 w-3" /> Em trânsito
           </span>
+        </Chip>
+        <Chip active={noCostOnly} onClick={() => setNoCostOnly((v) => !v)}>
+          Sem custo · {missingCost.count}
         </Chip>
         <span className="ml-auto text-[11px] text-slate-500">
           {kinds.size === 0 ? "todas as categorias" : `${kinds.size} de 3 categorias`}
@@ -1089,7 +1122,14 @@ function ItemRow({
             <PhotoViewer item={item} game={tradeGame(item)} onClose={() => setViewing(false)} onChanged={onChanged} />
           )}
           <div className="min-w-0">
-            <div className="truncate text-slate-100">{item.name}</div>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-slate-100">{item.name}</span>
+              {noCost(item) && (
+                <span className="shrink-0 rounded-[6px] border-2 border-outline bg-amber-500/10 px-1.5 text-[10px] font-bold text-amber-300">
+                  sem custo
+                </span>
+              )}
+            </div>
             <div className="truncate text-[10px] text-slate-500">
               {[
                 item.number,
@@ -1108,7 +1148,9 @@ function ItemRow({
       </TableCell>
       <TableCell className="whitespace-nowrap text-[11px] text-slate-400">{item.gameName}</TableCell>
       <TableCell className="text-right tabular-nums text-slate-400">{item.qty}</TableCell>
-      <TableCell className="text-right tabular-nums text-slate-400">{brl2(unit)}</TableCell>
+      <TableCell className="text-right tabular-nums text-slate-400">
+        {noCost(item) ? <CostInput item={item} onChanged={onChanged} /> : brl2(unit)}
+      </TableCell>
       <TableCell className="text-right font-semibold tabular-nums text-slate-200">
         {brl2(item.costBRL)}
       </TableCell>
@@ -1257,6 +1299,47 @@ function MergeBar({ items, onDone }: { items: PurchaseItem[]; onDone: () => Prom
       </div>
       {failed && <p className="w-full text-[11px] text-rose-300">{failed}</p>}
     </div>
+  );
+}
+
+function CostInput({ item, onChanged }: { item: PurchaseItem; onChanged: () => Promise<void> | void }) {
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const save = async () => {
+    const cost = num(value);
+    if (cost <= 0 || saving) {
+      return;
+    }
+    setSaving(true);
+    setFailed(false);
+    try {
+      await updateTrade(item.id, { buyBRL: cost }, tradeGame(item));
+      await onChanged();
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          save();
+        }
+      }}
+      disabled={saving}
+      inputMode="decimal"
+      placeholder="custo un."
+      title={failed ? "falha ao salvar — tente de novo" : "Custo pago por unidade; Enter salva"}
+      className={`ml-auto h-8 w-24 text-right ${failed ? "border-rose-500" : ""}`}
+    />
   );
 }
 
