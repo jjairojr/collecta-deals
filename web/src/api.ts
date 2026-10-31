@@ -1077,6 +1077,10 @@ export function unsellTrade(id: string, game?: string): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades/${id}/unsell?${params.toString()}`, "POST", {});
 }
 
+export function moveTrade(id: string, from: string, to: string): Promise<Trade> {
+  return sendJSON<Trade>(`${base}/trades/${id}/move?${gp(new URLSearchParams()).toString()}`, "POST", { from, to });
+}
+
 export async function deleteTrade(id: string, game?: string): Promise<void> {
   const params = gp(new URLSearchParams());
   if (game) {

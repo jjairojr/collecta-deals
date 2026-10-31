@@ -1157,8 +1157,8 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - [x] Editor da aba Vendas perde `qty` (fica preço, data, comprador, canal) e ganha Desfazer venda.
 
 ### Fase 5 — trocar jogo
-- [ ] Campo Jogo no form de edição: move o item de ledger preservando id, slug, custo, compra, venda e fotos.
-- [ ] Bloqueado com anúncio ativo ou pedido do site aberto, com aviso. Slug mantido, produto aparece no jogo novo na vitrine.
+- [x] Campo Jogo no form de edição: move o item de ledger preservando id, slug, custo, compra, venda e fotos (`POST /api/trades/{id}/move`).
+- [x] Bloqueado com anúncio ativo ou pedido do site aberto, com aviso. Slug base mantido, produto aparece no jogo novo na vitrine (a URL pública ganha o prefixo do jogo novo). Também bloqueia acessório e item com pendência aberta na fila de sincronização.
 
 ### Fase 6 — rateio do frete do pedido
 - [ ] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado no `shippingBRL` do item; recalcula a cada mudança de frete/itens; lote vendido não é recalculado.

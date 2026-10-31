@@ -31,6 +31,7 @@ import {
   getQuote,
   listPurchases,
   mergeTrades,
+  moveTrade,
   productIDFromTcgURL,
   sellTrade,
   unsellTrade,
@@ -456,6 +457,7 @@ export default function PurchasesPage() {
         <ItemsList
           items={visibleAll}
           orders={orders}
+          games={gameOptions}
           total={allItems.length}
           onChanged={load}
           empty="Nada em estoque ainda — lance a primeira compra."
@@ -481,7 +483,7 @@ export default function PurchasesPage() {
           </div>
         )
       ) : (
-        <ItemsList items={visibleLoose} orders={orders} total={loose.length} onChanged={load} />
+        <ItemsList items={visibleLoose} orders={orders} games={gameOptions} total={loose.length} onChanged={load} />
       )}
     </div>
   );
@@ -791,6 +793,7 @@ function OrderCard({
                               key={it.id}
                               item={it}
                               orders={orders}
+                              games={games}
                               selected={picked.has(it.id)}
                               onSelect={() => togglePick(it.id)}
                               onChanged={onChanged}
@@ -827,6 +830,7 @@ function OrderCard({
 function ItemRow({
   item,
   orders,
+  games,
   selected,
   onSelect,
   showOrigin,
@@ -834,6 +838,7 @@ function ItemRow({
 }: {
   item: PurchaseItem;
   orders: PurchaseView[];
+  games: { id: string; name: string }[];
   selected?: boolean;
   onSelect?: () => void;
   // Outside a purchase card there is no header saying when and from whom the item
@@ -878,6 +883,7 @@ function ItemRow({
           {panel === "edit" && (
             <EditItemForm
               item={item}
+              games={games}
               onCancel={() => setPanel("none")}
               onReload={onChanged}
               onSaved={async () => {
@@ -1145,17 +1151,20 @@ function DeliveryToggle({ item, onChanged }: { item: PurchaseItem; onChanged: ()
 // ledger, which the write endpoints reach without a game.
 function EditItemForm({
   item,
+  games,
   onCancel,
   onReload,
   onSaved,
 }: {
   item: PurchaseItem;
+  games: { id: string; name: string }[];
   onCancel: () => void;
   onReload: () => Promise<void> | void;
   onSaved: () => Promise<void> | void;
 }) {
   const accessory = kindOf(item) === "accessory";
   const [kind, setKind] = useState<ItemKind>(kindOf(item));
+  const [game, setGame] = useState(item.game);
   const single = kind === "single";
   const [name, setName] = useState(item.name);
   const [number, setNumber] = useState(item.number);
@@ -1189,6 +1198,10 @@ function EditItemForm({
     setSaving(true);
     setFailed(null);
     try {
+      const moved = !accessory && game !== item.game;
+      if (moved) {
+        await moveTrade(item.id, item.game, game);
+      }
       await updateTrade(
         item.id,
         {
@@ -1207,7 +1220,7 @@ function EditItemForm({
           imageURL: imageURL.trim(),
           notes,
         },
-        tradeGame(item),
+        moved ? game : tradeGame(item),
       );
       await onSaved();
     } catch (err: unknown) {
@@ -1223,6 +1236,19 @@ function EditItemForm({
         <Field label="Nome">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
+        {!accessory && (
+          <Field label="Jogo">
+            <Select value={game} onChange={(e) => setGame(e.target.value)}>
+              {games
+                .filter((g) => g.id !== ACCESSORIES)
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        )}
         {!accessory && (
           <Field label="Tipo">
             <Select value={kind} onChange={(e) => changeKind(e.target.value === "sealed" ? "sealed" : "single")}>
@@ -1709,12 +1735,14 @@ function AddItemForm({
 function ItemsList({
   items,
   orders,
+  games,
   total,
   onChanged,
   empty,
 }: {
   items: PurchaseItem[];
   orders: PurchaseView[];
+  games: { id: string; name: string }[];
   total: number;
   onChanged: () => Promise<void> | void;
   empty?: string;
@@ -1895,6 +1923,7 @@ function ItemsList({
                       key={it.id}
                       item={it}
                       orders={orders}
+                      games={games}
                       showOrigin
                       selected={picked.has(it.id)}
                       onSelect={() => toggle(it.id)}
