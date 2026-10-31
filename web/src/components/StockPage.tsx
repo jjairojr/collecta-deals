@@ -45,8 +45,9 @@ import { ToggleGroup } from "./ui/toggle-group";
 // public catalog only shows a card when it is both listed and priced.
 const isBRGame = () => !gameHasDeals(getGame());
 
-function cleanName(n: string): string {
-  return n.replace(/\s*\([^)]*\)\s*$/, "");
+function displayName(t: Pick<TradeView, "name" | "number" | "kind">): string {
+  const name = t.kind ? t.name : t.name.replace(/\s*\([^)]*\)\s*$/, "");
+  return name || t.number;
 }
 
 // rowMeta is the small line under a product's name. Accessories say so, since
@@ -146,7 +147,7 @@ function sortValue(
 ): number | string {
   switch (key) {
     case "name":
-      return (cleanName(t.name) || t.number).toLowerCase();
+      return displayName(t).toLowerCase();
     case "qty":
       return t.qty;
     case "ref":
@@ -298,7 +299,7 @@ export default function StockPage() {
     () =>
       visible.map((t) => ({
         ...t,
-        name: cleanName(t.name) || t.number,
+        name: displayName(t),
         askBRL: rows[t.id]?.askBRL ?? t.askBRL ?? 0,
         listed: rows[t.id]?.listed ?? Boolean(t.listed),
         imageURL: rows[t.id]?.imageURL || t.imageURL,
@@ -708,7 +709,7 @@ export default function StockPage() {
             </div>
             <div className="p-6">
             <h2 className="font-display text-lg font-extrabold text-fg">
-              {cleanName(mergePreview.primary.name) || mergePreview.primary.number}
+              {displayName(mergePreview.primary)}
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               Vira uma linha só. Mantém o preço, o "à venda" e a identidade da compra mais antiga; some as
@@ -762,7 +763,7 @@ export default function StockPage() {
             </div>
             <div className="p-6">
             <h2 className="font-display text-lg font-extrabold text-fg">
-              {cleanName(imgEditTrade.name) || imgEditTrade.number}
+              {displayName(imgEditTrade)}
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               Cole a URL de uma imagem — ela aparece na vitrine no lugar do ícone padrão.
@@ -901,9 +902,9 @@ function StockRow({
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1">
               <div className="truncate font-medium text-slate-100" title={t.name}>
-                {cleanName(t.name) || t.number}
+                {displayName(t)}
               </div>
-              <CopyButton text={cleanName(t.name) || t.number} />
+              <CopyButton text={displayName(t)} />
             </div>
             <div className="font-mono text-[10px] text-slate-500">{rowMeta(t)}</div>
           </div>
