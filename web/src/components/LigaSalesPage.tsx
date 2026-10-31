@@ -10,9 +10,10 @@ import {
   Pencil,
   Receipt,
   TrendingUp,
+  Undo2,
   X,
 } from "lucide-react";
-import { listSales, productIDFromTcgURL, updateTrade, type SaleChannel, type SaleRow } from "../api";
+import { listSales, productIDFromTcgURL, unsellTrade, updateTrade, type SaleChannel, type SaleRow } from "../api";
 import { brl0, brl2, dayLabel } from "../format";
 import {
   buildPackages,
@@ -630,7 +631,6 @@ function PackageItemRow({ s, onSaved }: { s: SaleRow; onSaved: () => void }) {
 }
 
 function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void; onSaved: () => void }) {
-  const [qty, setQty] = useState(String(s.qty));
   const [price, setPrice] = useState(String(s.sellPrice ?? s.valueBRL));
   const [date, setDate] = useState(s.sellDate ?? "");
   const [buyer, setBuyer] = useState(s.buyer ?? "");
@@ -638,24 +638,38 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
+  const game = s.game === "acessorios" ? undefined : s.game;
+  const fromSite = channelOfSale(s) === "site";
+
   const save = async () => {
-    const units = Number(qty.replace(",", "."));
     const total = Number(price.replace(",", "."));
-    if (!Number.isFinite(units) || units <= 0 || !Number.isFinite(total) || total < 0) {
-      setFailed("quantidade e valor precisam ser números");
+    if (!Number.isFinite(total) || total < 0) {
+      setFailed("o valor precisa ser um número");
       return;
     }
     setSaving(true);
     try {
-      await updateTrade(
-        s.id,
-        { ...s, qty: units, sellPrice: total, sellDate: date, buyer: buyer.trim(), channel },
-        s.game === "acessorios" ? undefined : s.game,
-      );
+      await updateTrade(s.id, { sellPrice: total, sellDate: date, buyer: buyer.trim(), channel }, game);
       onSaved();
       onCancel();
     } catch (err: unknown) {
       setFailed(err instanceof Error ? err.message : "falha ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const undo = async () => {
+    if (!confirm(`Desfazer a venda de ${s.name}? O lote volta para o estoque.`)) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await unsellTrade(s.id, game);
+      onSaved();
+      onCancel();
+    } catch (err: unknown) {
+      setFailed(err instanceof Error ? err.message : "falha ao desfazer");
     } finally {
       setSaving(false);
     }
@@ -670,10 +684,6 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
             {[s.number, s.set, s.gameName].filter(Boolean).join(" · ")}
           </div>
         </div>
-        <label className="w-[4.5rem]">
-          <FieldLabel>Un.</FieldLabel>
-          <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
-        </label>
         <label className="w-[7.5rem]">
           <FieldLabel>Venda total</FieldLabel>
           <Input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" />
@@ -700,6 +710,19 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
           <Button variant="primary" size="sm" onClick={save} disabled={saving}>
             <Check className="h-4 w-4" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={undo}
+            disabled={saving || fromSite}
+            title={
+              fromSite
+                ? "Venda do site: desfaça pelo pedido em Pedidos"
+                : "Desfazer venda: o lote volta para o estoque"
+            }
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
             <X className="h-4 w-4" />
           </Button>
@@ -707,7 +730,8 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
       </div>
       <p className="mt-1 text-[10px] text-slate-500">
         Venda total é o valor do item inteiro (unitário × unidades), sem frete. O nº do pedido fica no comprador
-        (“— Liga #nº”, “— MyP #nº”, “— Site #nº”) e agrupa a venda no pacote.
+        (“— Liga #nº”, “— MyP #nº”, “— Site #nº”) e agrupa a venda no pacote. Para mudar a quantidade, desfaça a
+        venda e dê baixa de novo.
       </p>
       {failed && <p className="mt-1 text-[11px] text-rose-300">{failed}</p>}
     </div>

@@ -164,6 +164,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/trades", s.handleTradesCreate)
 	mux.HandleFunc("PUT /api/trades/{id}", s.handleTradesUpdate)
 	mux.HandleFunc("POST /api/trades/{id}/sell", s.handleTradesSell)
+	mux.HandleFunc("POST /api/trades/{id}/unsell", s.handleTradesUnsell)
 	mux.HandleFunc("POST /api/trades/{id}/photo", s.handleTradePhotoUpload)
 	mux.HandleFunc("DELETE /api/trades/{id}/photo", s.handleTradePhotoDelete)
 	mux.HandleFunc("GET /api/item-photos/{name}", s.handleItemPhoto)

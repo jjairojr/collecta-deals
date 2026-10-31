@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   Trash2,
   Truck,
+  Undo2,
   Unlink,
   X,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import {
   mergeTrades,
   productIDFromTcgURL,
   sellTrade,
+  unsellTrade,
   updatePurchase,
   updateTrade,
   type GameInfo,
@@ -971,28 +973,48 @@ function ItemRow({
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
           <PhotoButton item={item} game={tradeGame(item)} onChanged={onChanged} />
-          {!item.realized && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                title="Dar baixa: vender este item"
-                onClick={() => setPanel("sell")}
-              >
-                <HandCoins className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                title="Editar o item (preço, quantidade, variante, loja…)"
-                onClick={() => setPanel("edit")}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </>
+          {item.realized ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy || item.channel === "site"}
+              title={
+                item.channel === "site"
+                  ? "Venda do site: desfaça pelo pedido em Pedidos"
+                  : "Desfazer venda: o lote volta para o estoque"
+              }
+              onClick={() => {
+                if (confirm(`Desfazer a venda de ${item.name}? O lote volta para o estoque.`)) {
+                  run(() => unsellTrade(item.id, tradeGame(item)));
+                }
+              }}
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              title="Dar baixa: vender este item"
+              onClick={() => setPanel("sell")}
+            >
+              <HandCoins className="h-4 w-4" />
+            </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            title={
+              item.realized
+                ? "Editar o lote vendido (nome, tipo, custo, loja…)"
+                : "Editar o item (preço, quantidade, variante, loja…)"
+            }
+            onClick={() => setPanel("edit")}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -1225,9 +1247,11 @@ function EditItemForm({
             </Field>
           </>
         )}
-        <Field label="Un.">
-          <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
-        </Field>
+        {!item.realized && (
+          <Field label="Un.">
+            <Input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
+          </Field>
+        )}
         <Field label="Preço pago R$ (un.)">
           <Input value={buyBRL} onChange={(e) => setBuyBRL(e.target.value)} inputMode="decimal" />
         </Field>

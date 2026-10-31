@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -155,6 +156,37 @@ func (s *Store) SetStatus(id, status, errMsg string) (Task, error) {
 		return all[i], nil
 	}
 	return Task{}, ErrNotFound
+}
+
+func (s *Store) CancelOpen(tradeID, action, note string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	now := time.Now()
+	for i := range all {
+		t := &all[i]
+		if t.TradeID != tradeID || t.Action != action || t.Status == StatusDone {
+			continue
+		}
+		t.Status = StatusDone
+		t.Error = ""
+		t.DoneAt = now
+		if note != "" {
+			t.Reason = strings.TrimSpace(t.Reason + " · " + note)
+		}
+		n++
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	if err := s.persist(all); err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func newID() string {

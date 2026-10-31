@@ -58,6 +58,7 @@ type Trade struct {
 	Channel      string  `json:"channel,omitempty"`
 	WriteOff     string  `json:"writeOff,omitempty"`
 	SemLastro    bool    `json:"semLastro,omitempty"`
+	SplitFrom    string  `json:"splitFrom,omitempty"`
 
 	Notes     string    `json:"notes,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`

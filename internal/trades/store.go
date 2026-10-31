@@ -20,6 +20,10 @@ var ErrNotFound = errors.New("trade not found")
 
 var ErrAlreadySold = errors.New("trade already sold")
 
+var ErrNotSold = errors.New("trade is not sold")
+
+var ErrSiteSale = errors.New("venda do site: desfaça pelo pedido em Pedidos")
+
 type Store struct {
 	path string
 	mu   sync.RWMutex
@@ -318,6 +322,7 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 		sold.Buyer = sale.Buyer
 		sold.Channel = sale.Channel
 		sold.WriteOff = sale.WriteOff
+		sold.SplitFrom = orig.ID
 		sold.UpdatedAt = now
 		orig.Qty -= sale.Qty
 		orig.ShippingBRL = round2(orig.ShippingBRL - soldShip)
@@ -329,6 +334,95 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 		return sold, nil
 	}
 	return Trade{}, ErrNotFound
+}
+
+type Unsold struct {
+	Sale     Trade
+	Restored Trade
+}
+
+func (s *Store) Unsell(id string) (Unsold, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return Unsold{}, err
+	}
+	at := -1
+	for i := range all {
+		if all[i].ID == id {
+			at = i
+			break
+		}
+	}
+	if at < 0 {
+		return Unsold{}, ErrNotFound
+	}
+	sale := all[at]
+	if sale.Status != "sold" {
+		return Unsold{}, ErrNotSold
+	}
+	if ChannelOf(sale) == ChannelSite {
+		return Unsold{}, ErrSiteSale
+	}
+	now := time.Now()
+	back := sale
+	back.Status = "holding"
+	back.SellPrice = 0
+	back.SellCurrency = ""
+	back.SellDate = ""
+	back.Buyer = ""
+	back.Channel = ""
+	back.WriteOff = ""
+	back.SemLastro = false
+	back.SplitFrom = ""
+	back.UpdatedAt = now
+	if back.Qty <= 0 {
+		back.Qty = 1
+	}
+
+	origin := originOf(all, sale)
+	if origin < 0 {
+		all[at] = back
+		if err := s.persist(all); err != nil {
+			return Unsold{}, err
+		}
+		return Unsold{Sale: sale, Restored: back}, nil
+	}
+	o := &all[origin]
+	qty := o.Qty + back.Qty
+	o.BuyBRL = round2((float64(o.Qty)*o.BuyBRL + float64(back.Qty)*back.BuyBRL) / float64(qty))
+	o.Qty = qty
+	o.ShippingBRL = round2(o.ShippingBRL + back.ShippingBRL)
+	o.UpdatedAt = now
+	restored := *o
+	out := append(all[:at:at], all[at+1:]...)
+	if err := s.persist(out); err != nil {
+		return Unsold{}, err
+	}
+	return Unsold{Sale: sale, Restored: restored}, nil
+}
+
+func originOf(all []Trade, sale Trade) int {
+	if sale.SplitFrom != "" {
+		for i := range all {
+			if all[i].ID == sale.SplitFrom && all[i].Status != "sold" {
+				return i
+			}
+		}
+	}
+	key := SKU("", sale)
+	best := -1
+	for i := range all {
+		t := all[i]
+		if t.ID == sale.ID || t.Status == "sold" || t.PurchaseID != sale.PurchaseID || SKU("", t) != key {
+			continue
+		}
+		if best < 0 || t.CreatedAt.Before(all[best].CreatedAt) {
+			best = i
+		}
+	}
+	return best
 }
 
 func round2(v float64) float64 {

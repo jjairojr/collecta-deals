@@ -1146,15 +1146,15 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 
 ### Fase 3 — fila de propagação
 - [x] Venda com canal ≠ liga em item `ligaListed` gera pendência "tirar X un. da Liga" (`internal/syncqueue`, `data/syncqueue.json`; cobre `/sell` e o pagamento do site; baixa sem venda também gera). O Trade não tem flag de MyP, então a tarefa é só da Liga e a skill acerta o MyP pelas mesmas unidades. `/sell` em lote já vendido agora dá 409.
-- [ ] Desfazer venda de item que estava na Liga gera pendência inversa "devolver X un." (ação `restore` já existe na fila; o gatilho entra com o Desfazer venda da Fase 4).
+- [x] Desfazer venda de item que estava na Liga gera pendência inversa "devolver X un." (Fase 4: cancela a remoção ainda aberta em vez de gerar o par tirar/devolver).
 - [x] Tela Sincronizar no grupo Negócio (pendentes/erro/feitas, contador no menu, marcar feita, voltar para pendente) + `GET /api/syncqueue`, `POST /api/syncqueue/{id}/done|error|retry`; skill baixa-vendas consome a fila na etapa 4. Servidor nunca mexe na Liga.
 - [ ] Worker automático que executa a fila sem o Claude: pendente de decisão do dono (Railway com cookie da Liga vs mini PC na loja).
 - [x] Vincular venda sem lastro a uma compra (attach) limpa `semLastro`.
 
 ### Fase 4 — lote vendido
-- [ ] Lápis em lote vendido: nome, tipo, jogo, custo, foto (não a venda).
-- [ ] "Desfazer venda": volta ao estoque e junta de volta ao lote de origem quando houver. Bloqueado para canal `site` (caminho é Pedidos → reembolsado/cancelado).
-- [ ] Editor da aba Vendas perde `qty` (fica preço, data, comprador, canal).
+- [x] Lápis em lote vendido: nome, tipo, custo, foto (não a venda nem a qtd). Jogo entra na Fase 5.
+- [x] "Desfazer venda" (`POST /api/trades/{id}/unsell`): volta ao estoque e junta de volta ao lote de origem (`splitFrom` nas vendas novas; antigas casam por compra + SKU). Bloqueado para canal `site` (caminho é Pedidos → reembolsado/cancelado).
+- [x] Editor da aba Vendas perde `qty` (fica preço, data, comprador, canal) e ganha Desfazer venda.
 
 ### Fase 5 — trocar jogo
 - [ ] Campo Jogo no form de edição: move o item de ledger preservando id, slug, custo, compra, venda e fotos.

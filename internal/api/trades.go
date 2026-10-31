@@ -356,6 +356,35 @@ func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, sold)
 }
 
+func (s *Server) handleTradesUnsell(w http.ResponseWriter, r *http.Request) {
+	gs := s.stackFor(r.URL.Query())
+	if gs.Trades == nil {
+		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	res, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Unsold, error) {
+		return st.Unsell(r.PathValue("id"))
+	})
+	if errors.Is(err, trades.ErrNotFound) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, trades.ErrNotSold) || errors.Is(err, trades.ErrSiteSale) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	game := gs.Game.ID
+	if res.Sale.Kind == trades.KindAccessory {
+		game = accessoryGameID
+	}
+	s.queueStockReturn(game, res.Sale)
+	writeJSON(w, res.Restored)
+}
+
 func (s *Server) handleTradesDelete(w http.ResponseWriter, r *http.Request) {
 	gs := s.stackFor(r.URL.Query())
 	if gs.Trades == nil {
