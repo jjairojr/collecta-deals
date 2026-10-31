@@ -16,6 +16,7 @@ import {
 import {
   getAdminToken,
   listOrders,
+  returnOrderStock,
   setAdminToken,
   updateOrder,
   type Order,
@@ -416,11 +417,11 @@ function OrderRow({
     setTarget(order.status);
   }, [order.status]);
 
-  const patch = async (body: OrderPatch) => {
+  const run = async (call: () => Promise<Order>) => {
     setBusy(true);
     setFailed(null);
     try {
-      onChanged(await updateOrder(order.id, body));
+      onChanged(await call());
     } catch (err: unknown) {
       if (isUnauthorized(err)) {
         onUnauthorized();
@@ -429,6 +430,18 @@ function OrderRow({
       }
     } finally {
       setBusy(false);
+    }
+  };
+
+  const patch = (body: OrderPatch) => run(() => updateOrder(order.id, body));
+
+  const returnStock = () => {
+    if (
+      window.confirm(
+        `Devolver ao estoque os itens do pedido #${order.number}? Faça isso só quando o produto voltou para a loja.`,
+      )
+    ) {
+      run(() => returnOrderStock(order.id));
     }
   };
 
@@ -442,9 +455,11 @@ function OrderRow({
     if (
       (target === "cancelled" || target === "refunded") &&
       !window.confirm(
-        holdsStock(order)
+        returnsStock
           ? `Mudar o pedido #${order.number} para "${statusLabels[target]}"? Os itens vendidos voltam para o estoque.`
-          : `Mudar o pedido #${order.number} para "${statusLabels[target]}"?`,
+          : keepsStock
+            ? `Mudar o pedido #${order.number} para "${statusLabels[target]}"? O pedido já foi enviado: os itens não voltam ao estoque sozinhos, use "Devolver ao estoque" quando o produto voltar.`
+            : `Mudar o pedido #${order.number} para "${statusLabels[target]}"?`,
       )
     ) {
       return;
@@ -456,9 +471,11 @@ function OrderRow({
   const targets = manualTargets[order.status];
   const shipped = order.status === "shipped" || order.status === "delivered";
   const canShip = order.status === "paid";
-  const takesStock =
-    (order.status === "oversold" || order.status === "refunded") && fulfilled.includes(target) && !holdsStock(order);
-  const returnsStock = (target === "cancelled" || target === "refunded") && holdsStock(order);
+  const takesStock = (order.status === "oversold" || order.status === "refunded") && fulfilled.includes(target);
+  const releasing = (target === "cancelled" || target === "refunded") && holdsStock(order);
+  const returnsStock = releasing && !shipped;
+  const keepsStock = releasing && shipped;
+  const canReturnStock = (order.status === "cancelled" || order.status === "refunded") && holdsStock(order);
   const whatsapp = `https://wa.me/55${order.buyer.phone}`;
 
   return (
@@ -666,13 +683,29 @@ function OrderRow({
             </div>
             {takesStock && (
               <p className="mt-2 text-[11px] text-amber-300">
-                Mudar o status dá baixa no estoque dos itens deste pedido; sem estoque suficiente, o status não muda.
+                Mudar o status dá baixa no estoque do que ainda falta deste pedido; sem estoque suficiente, o status não
+                muda.
               </p>
             )}
             {returnsStock && (
               <p className="mt-2 text-[11px] text-amber-300">
                 Mudar o status devolve ao estoque os itens já baixados deste pedido.
               </p>
+            )}
+            {keepsStock && (
+              <p className="mt-2 text-[11px] text-amber-300">
+                O pedido já foi enviado: mudar o status não devolve os itens ao estoque.
+              </p>
+            )}
+            {canReturnStock && (
+              <div className="mt-2 flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={busy} onClick={returnStock}>
+                  <PackageCheck className="h-4 w-4" /> Devolver ao estoque
+                </Button>
+                <span className="text-[11px] text-slate-500">
+                  Os itens deste pedido ainda contam como vendidos. Use quando o produto voltar para a loja.
+                </span>
+              </div>
             )}
             {failed && <p className="mt-2 text-[11px] text-rose-300">{failed}</p>}
             {viewing && <ArtViewer src={viewing} onClose={() => setViewing(null)} />}

@@ -15,7 +15,7 @@ func (s *Server) queueStockExit(game string, sold trades.Trade) {
 		return
 	}
 	channel := trades.ChannelOf(sold)
-	if channel == trades.ChannelLiga {
+	if channel == trades.ChannelLiga || channel == trades.ChannelMyP {
 		return
 	}
 	reason := "venda " + channel

@@ -148,6 +148,8 @@ func (s *Server) handleTradesList(w http.ResponseWriter, r *http.Request) {
 // name there is nothing to price, match or show.
 var errNoIdentity = errors.New("number or name required")
 
+var errStatusChange = errors.New("o status não muda pelo PUT: use /sell ou /unsell")
+
 // addTrade files a new trade under the right ledger for a game, seeding its
 // reference value from whichever market the game has. Shared by the plain
 // create endpoint and by adding an item to a purchase order.
@@ -221,8 +223,13 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if _, err := patchTrade(trades.Trade{}, patch); err != nil {
+	dry, err := patchTrade(trades.Trade{}, patch)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !trades.ValidChannel(dry.Channel) || !trades.ValidWriteOff(dry.WriteOff) {
+		http.Error(w, "unknown channel or writeOff", http.StatusBadRequest)
 		return
 	}
 	var patchErr error
@@ -230,6 +237,9 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 	mutate := func(t *trades.Trade) {
 		prevPurchase = t.PurchaseID
 		next, err := patchTrade(*t, patch)
+		if err == nil && next.Status != t.Status {
+			err = errStatusChange
+		}
 		if err != nil {
 			patchErr = err
 			return
@@ -245,6 +255,10 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil {
 		err = patchErr
+	}
+	if errors.Is(err, errStatusChange) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	if err == nil && touchesOrderShipping(patch) {
 		err = s.reallocateOrders(prevPurchase, updated.PurchaseID)
@@ -308,6 +322,17 @@ func patchTrade(cur trades.Trade, patch map[string]json.RawMessage) (trades.Trad
 	}
 	if next.PurchaseID == "" {
 		next.PurchaseID = cur.PurchaseID
+	}
+	if next.PurchaseID != cur.PurchaseID {
+		next.OrderShippingBRL = 0
+	}
+	_, hasChannel := patch["channel"]
+	_, hasWriteOff := patch["writeOff"]
+	if hasChannel && !hasWriteOff && cur.WriteOff == "" {
+		next.WriteOff = trades.WriteOffOf(cur)
+	}
+	if next.WriteOff != "" {
+		next.SellPrice = 0
 	}
 	if next.Status == "" {
 		next.Status = cur.Status

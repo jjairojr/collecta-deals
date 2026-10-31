@@ -1044,11 +1044,11 @@ export function createTrade(t: Partial<Trade>, game?: string): Promise<Trade> {
 
 export type TradeKindInput = Trade["kind"] | "single";
 
-export function updateTrade(
-  id: string,
-  t: Omit<Partial<Trade>, "kind"> & { kind?: TradeKindInput },
-  game?: string,
-): Promise<Trade> {
+export type TradePatch = Partial<
+  Omit<Trade, "id" | "kind" | "status" | "orderShippingBRL" | "createdAt" | "updatedAt">
+> & { kind?: TradeKindInput };
+
+export function updateTrade(id: string, t: TradePatch, game?: string): Promise<Trade> {
   const params = gp(new URLSearchParams());
   if (game) {
     params.set("game", game);
@@ -1399,4 +1399,8 @@ export function listOrders(): Promise<Order[]> {
 
 export function updateOrder(id: string, patch: OrderPatch): Promise<Order> {
   return sendJSON<Order>(`${base}/orders/${id}`, "PATCH", patch, adminHeaders());
+}
+
+export function returnOrderStock(id: string): Promise<Order> {
+  return sendJSON<Order>(`${base}/orders/${id}/return-stock`, "POST", {}, adminHeaders());
 }

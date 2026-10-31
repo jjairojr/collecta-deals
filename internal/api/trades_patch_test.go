@@ -30,6 +30,9 @@ func TestUpdateWithPartialBodyKeepsOtherFields(t *testing.T) {
 	order := newOrder(t, s, `{"date":"2026-10-22","store":"Copag"}`)
 	item := addItem(t, s, order.ID, "onepiece", `{"number":"OP16-080","name":"Teach","set":"OP16","qty":2,"buyBRL":100}`)
 
+	if rec := sellTrade(t, s, item.ID, `{"sellPrice":300,"sellCurrency":"BRL","sellDate":"2026-10-25","buyer":"Fulano — Liga #1"}`); rec.Code != http.StatusOK {
+		t.Fatalf("sell = %d", rec.Code)
+	}
 	full := `{"number":"OP16-080","name":"Teach","set":"OP16","qty":2,"buyBRL":100,"askBRL":150,"listed":true,` +
 		`"ligaListed":true,"ligaQty":2,"ligaPriceBRL":149.99,"status":"sold","sellPrice":300,"sellCurrency":"BRL",` +
 		`"sellDate":"2026-10-25","buyer":"Fulano — Liga #1","notes":"vitrine","photos":["https://x/a.jpg"]}`

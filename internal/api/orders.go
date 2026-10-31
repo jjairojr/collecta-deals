@@ -896,9 +896,10 @@ func (s *Server) applyPayment(ctx context.Context, pay mercadopago.Payment) erro
 				o.Notes = appendNote(o.Notes, fmt.Sprintf("pagamento duplicado %d", pay.ID))
 			}
 			if pay.ID == o.MP.PaymentID && (pay.Status == "refunded" || pay.Status == "charged_back") {
+				from := o.Status
 				o.Status = orders.StatusRefunded
 				o.MP.Status = pay.Status
-				s.returnStock(o, now)
+				s.refundStock(o, from, now)
 			}
 			return nil
 		case orders.StatusOversold, orders.StatusRefunded:
@@ -961,6 +962,36 @@ func (s *Server) settle(o *orders.Order, pay mercadopago.Payment, now time.Time)
 	o.Status = orders.StatusPaid
 	o.PaidAt = now
 	return nil
+}
+
+func (s *Server) handleOrderReturnStock(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	var bad string
+	o, err := s.Checkout.Orders.Transact(r.PathValue("id"), func(o *orders.Order) error {
+		now := time.Now()
+		status := orders.EffectiveStatus(*o, now)
+		if !releasesStock(status) || !o.HoldsStock() {
+			bad = "nada a devolver: só pedido reembolsado ou cancelado que ainda segura estoque"
+			return errors.New(bad)
+		}
+		s.returnStock(o, now)
+		return nil
+	})
+	if errors.Is(err, orders.ErrNotFound) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		if bad != "" {
+			http.Error(w, bad, http.StatusConflict)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, o)
 }
 
 func bySKU(all []trades.Trade, game, sku string) []trades.Trade {
@@ -1049,7 +1080,7 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 			bad = fmt.Sprintf("não dá para mudar de %s para %s", current, *in.Status)
 			return err
 		}
-		if needsStock(current, to) && !o.HoldsStock() {
+		if needsStock(current, to) {
 			plan, short, err := s.planStock(*o)
 			if err != nil {
 				return err
@@ -1069,7 +1100,7 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if releasesStock(to) {
-			s.returnStock(o, now)
+			s.refundStock(o, current, now)
 		}
 		return nil
 	})

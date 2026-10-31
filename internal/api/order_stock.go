@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"opdeals/internal/orders"
@@ -19,6 +20,18 @@ func releasesStock(to orders.Status) bool {
 	return to == orders.StatusRefunded || to == orders.StatusCancelled
 }
 
+const keptAfterShipping = "estoque não devolvido: pedido já enviado, use Devolver ao estoque quando o produto voltar"
+
+func (s *Server) refundStock(o *orders.Order, from orders.Status, now time.Time) {
+	if from != orders.StatusShipped && from != orders.StatusDelivered {
+		s.returnStock(o, now)
+		return
+	}
+	if o.HoldsStock() && !strings.Contains(o.Notes, keptAfterShipping) {
+		o.Notes = appendNote(o.Notes, keptAfterShipping)
+	}
+}
+
 func (s *Server) planStock(o orders.Order) ([][]orders.Pick, string, error) {
 	plan := make([][]orders.Pick, len(o.Lines))
 	for i, l := range o.Lines {
@@ -30,13 +43,37 @@ func (s *Server) planStock(o orders.Order) ([][]orders.Pick, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		picks, ok := orders.Allocate(bySKU(all, l.Game, l.SKU), l.Qty)
+		covered, lost := soldFor(all, l.TradeIDs)
+		if lost != "" {
+			return nil, fmt.Sprintf("venda %s de %s sumiu do estoque: confira antes de mudar o status", lost, l.Name), nil
+		}
+		missing := l.Qty - covered
+		if missing <= 0 {
+			continue
+		}
+		picks, ok := orders.Allocate(bySKU(all, l.Game, l.SKU), missing)
 		if !ok {
-			return nil, fmt.Sprintf("sem estoque para %s x%d", l.Name, l.Qty), nil
+			return nil, fmt.Sprintf("sem estoque para %s x%d", l.Name, missing), nil
 		}
 		plan[i] = picks
 	}
 	return plan, "", nil
+}
+
+func soldFor(all []trades.Trade, ids []string) (int, string) {
+	qty := make(map[string]int, len(all))
+	for _, t := range all {
+		qty[t.ID] = t.Qty
+	}
+	covered := 0
+	for _, id := range ids {
+		q, ok := qty[id]
+		if !ok {
+			return 0, id
+		}
+		covered += q
+	}
+	return covered, ""
 }
 
 func (s *Server) sellStock(o *orders.Order, plan [][]orders.Pick, now time.Time) string {

@@ -45,7 +45,7 @@ Quando o argumento contém `--auto` (execução agendada, ninguém olhando):
 3. **MyP → dashboard + Liga** (`myp-vendas` inteira).
 4. **Fila de sincronização → Liga + MyP**: toda saída de estoque fora da Liga
    (Site, balcão, MyP pago por fora, baixa sem venda) de item marcado "Na Liga"
-   vira tarefa em `GET $OPDEALS_URL/api/syncqueue?status=pending` (header
+   vira tarefa (pedido do MyP com `MyP #N` não vira: a `myp-vendas` já baixa a Liga) em `GET $OPDEALS_URL/api/syncqueue?status=pending` (header
    `X-Admin-Token`; resposta `{"tasks":[...]}` com `game`, `tradeID`, `name`,
    `number`, `variant`, `condition`, `action` `remove`|`restore`, `qty`, `reason`).
    Para cada tarefa: ache a oferta na Liga por número + nome + variante (mesma

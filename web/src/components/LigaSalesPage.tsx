@@ -13,7 +13,15 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { listSales, productIDFromTcgURL, unsellTrade, updateTrade, type SaleChannel, type SaleRow } from "../api";
+import {
+  listSales,
+  productIDFromTcgURL,
+  unsellTrade,
+  updateTrade,
+  type SaleChannel,
+  type SaleRow,
+  type TradePatch,
+} from "../api";
 import { brl0, brl2, dayLabel } from "../format";
 import {
   buildPackages,
@@ -650,7 +658,22 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
     }
     setSaving(true);
     try {
-      await updateTrade(s.id, { sellPrice: total, sellDate: date, buyer: buyer.trim(), channel }, game);
+      const patch: TradePatch = {};
+      if (total !== (s.sellPrice ?? s.valueBRL)) {
+        patch.sellPrice = total;
+      }
+      if (date !== (s.sellDate ?? "")) {
+        patch.sellDate = date;
+      }
+      if (buyer.trim() !== (s.buyer ?? "")) {
+        patch.buyer = buyer.trim();
+      }
+      if (channel !== channelOfSale(s)) {
+        patch.channel = channel;
+      }
+      if (Object.keys(patch).length > 0) {
+        await updateTrade(s.id, patch, game);
+      }
       onSaved();
       onCancel();
     } catch (err: unknown) {

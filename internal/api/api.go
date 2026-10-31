@@ -208,6 +208,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /api/orders", s.handleOrdersList)
 		mux.HandleFunc("GET /api/orders/{id}", s.handleOrderGet)
 		mux.HandleFunc("PATCH /api/orders/{id}", s.handleOrderPatch)
+		mux.HandleFunc("POST /api/orders/{id}/return-stock", s.handleOrderReturnStock)
 		mux.HandleFunc("POST /api/orders/mp-webhook", s.handleMPWebhook)
 	}
 	if s.webDir != "" {

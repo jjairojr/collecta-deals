@@ -56,13 +56,14 @@ items=d if isinstance(d,list) else d.get('trades',d.get('items',[]))
 for t in items:
     if t.get('status')!='holding' or not t.get('qty'): continue
     print('{:<9} qty={:<4} custo={:<9} ask={:<9} {}'.format(
-        (t.get('id') or '')[:8], t.get('qty'), t.get('buyBRL') or '-',
+        (t.get('id') or '')[:8], t.get('qty'), round((t.get('costBRL') or 0)/t['qty'],2) or '-',
         t.get('askBRL') or '-', (t.get('name') or '')[:52]))
 "
 ```
 
-Custo unitário = `buyBRL + shippingBRL / qty`: o frete fica no `shippingBRL` do lote,
-não dentro do `buyBRL`. Confira o `buyBRL` contra a nota do fornecedor: a
+Custo unitário = `buyBRL + (shippingBRL + orderShippingBRL) / qty`: o frete do item fica
+no `shippingBRL` do lote e a parte rateada do frete do pedido no `orderShippingBRL`,
+nunca dentro do `buyBRL`. Confira o `buyBRL` contra a nota do fornecedor: a
 COPAG trabalha **43% off do preço sugerido, flat** em toda a linha — se a razão
 custo/sugerido não der ~0,57 em todos os itens, você entendeu errado a unidade
 de compra (caixa master × unidade de venda).

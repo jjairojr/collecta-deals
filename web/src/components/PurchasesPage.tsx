@@ -48,6 +48,7 @@ import {
   type PurchaseView,
   type QuoteMatch,
   type Trade,
+  type TradePatch,
 } from "../api";
 import { toCSV, downloadCSV } from "../csv";
 import { brl2, dayLabel } from "../format";
@@ -1266,7 +1267,7 @@ function DeliveryToggle({ item, onChanged }: { item: PurchaseItem; onChanged: ()
   const toggle = async () => {
     setSaving(true);
     try {
-      await updateTrade(item.id, { ...item, delivered: !item.delivered }, tradeGame(item));
+      await updateTrade(item.id, { delivered: !item.delivered }, tradeGame(item));
       await onChanged();
     } finally {
       setSaving(false);
@@ -1353,28 +1354,60 @@ function EditItemForm({
       if (moved) {
         await moveTrade(item.id, item.game, game);
       }
-      await updateTrade(
-        item.id,
-        {
-          ...item,
-          kind: accessory ? item.kind : kind === "sealed" ? "sealed" : "single",
-          name,
-          number,
-          set,
-          variant,
-          condition,
-          qty: Number(qty) || 1,
-          buyBRL: num(buyBRL),
-          shippingBRL: num(shipping),
-          store,
-          buyDate,
-          imageURL: imageURL.trim(),
-          notes,
-          gtin: gtin.replace(/\D/g, ""),
-          ...(single ? { refUSD: num(refValue) } : { manualBRL: num(refValue) }),
-        },
-        moved ? game : tradeGame(item),
-      );
+      const patch: TradePatch = {};
+      if (!accessory && kind !== kindOf(item)) {
+        patch.kind = kind === "sealed" ? "sealed" : "single";
+      }
+      if (name !== item.name) {
+        patch.name = name;
+      }
+      if (number !== item.number) {
+        patch.number = number;
+      }
+      if (set !== item.set) {
+        patch.set = set;
+      }
+      if (variant !== (item.variant ?? "")) {
+        patch.variant = variant;
+      }
+      if (condition !== (item.condition ?? "")) {
+        patch.condition = condition;
+      }
+      const nextQty = Number(qty) || 1;
+      if (!item.realized && nextQty !== item.qty) {
+        patch.qty = nextQty;
+      }
+      if (num(buyBRL) !== item.buyBRL) {
+        patch.buyBRL = num(buyBRL);
+      }
+      if (num(shipping) !== (item.shippingBRL || 0)) {
+        patch.shippingBRL = num(shipping);
+      }
+      if (store !== (item.store ?? "")) {
+        patch.store = store;
+      }
+      if (buyDate !== (item.buyDate ?? "")) {
+        patch.buyDate = buyDate;
+      }
+      if (imageURL.trim() !== (item.imageURL ?? "")) {
+        patch.imageURL = imageURL.trim();
+      }
+      if (notes !== (item.notes ?? "")) {
+        patch.notes = notes;
+      }
+      const nextGtin = gtin.replace(/\D/g, "");
+      if (nextGtin !== (item.gtin ?? "")) {
+        patch.gtin = nextGtin;
+      }
+      if (single && num(refValue) !== (item.refUSD || 0)) {
+        patch.refUSD = num(refValue);
+      }
+      if (!single && num(refValue) !== (item.manualBRL || 0)) {
+        patch.manualBRL = num(refValue);
+      }
+      if (Object.keys(patch).length > 0) {
+        await updateTrade(item.id, patch, moved ? game : tradeGame(item));
+      }
       await onSaved();
     } catch (err: unknown) {
       setFailed(err instanceof Error ? err.message : "falha ao salvar");

@@ -444,25 +444,15 @@ func (s *Store) unsell(id string, allowSite bool) (Unsold, error) {
 }
 
 func originOf(all []Trade, sale Trade) int {
-	if sale.SplitFrom != "" {
-		for i := range all {
-			if all[i].ID == sale.SplitFrom && all[i].Status != "sold" {
-				return i
-			}
-		}
+	if sale.SplitFrom == "" {
+		return -1
 	}
-	key := SKU("", sale)
-	best := -1
 	for i := range all {
-		t := all[i]
-		if t.ID == sale.ID || t.Status == "sold" || t.PurchaseID != sale.PurchaseID || SKU("", t) != key {
-			continue
-		}
-		if best < 0 || t.CreatedAt.Before(all[best].CreatedAt) {
-			best = i
+		if all[i].ID == sale.SplitFrom && all[i].Status != "sold" {
+			return i
 		}
 	}
-	return best
+	return -1
 }
 
 func round2(v float64) float64 {

@@ -56,12 +56,16 @@ func TestRefundReturnsStockToOriginLots(t *testing.T) {
 		t.Fatalf("refund: %d %s", rec.Code, rec.Body.String())
 	}
 	units, lots := f.holdingUnits(t)
-	if units != 3 || lots != 1 {
-		t.Fatalf("holding after refund = %d units in %d lots, want 3 merged into 1", units, lots)
+	if units != 3 || lots != 2 {
+		t.Fatalf("holding after refund = %d units in %d lots, want 3 back in the 2 original lots", units, lots)
 	}
 	all, _ := f.store.List()
-	if cost := all[0].BuyBRL*float64(all[0].Qty) + all[0].ShippingBRL; cost < 289.99 || cost > 290.01 {
-		t.Fatalf("merged cost = %.2f, want 290", cost)
+	cost := 0.0
+	for _, tr := range all {
+		cost += tr.BuyBRL*float64(tr.Qty) + tr.ShippingBRL
+	}
+	if cost < 289.99 || cost > 290.01 {
+		t.Fatalf("holding cost = %.2f, want 290", cost)
 	}
 	if sold := f.soldTrades(t); len(sold) != 0 {
 		t.Fatalf("sold after refund = %+v", sold)
