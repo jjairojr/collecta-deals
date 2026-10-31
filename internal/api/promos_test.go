@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"opdeals/internal/orders"
+	"opdeals/internal/promos"
 )
 
 func promoBody(qty int, unitCents int64, code string) map[string]interface{} {
@@ -125,7 +126,7 @@ func TestPromoReusableAfterCancelledOrder(t *testing.T) {
 }
 
 func TestPromoDiscountRoundsDown(t *testing.T) {
-	if got := promoDiscountCents(50066, promos["BEMVINDO"]); got != 2503 {
+	if got := promos.DiscountCents(50066, promos.Seed()[0]); got != 2503 {
 		t.Fatalf("discount = %d", got)
 	}
 }

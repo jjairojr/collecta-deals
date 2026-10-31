@@ -737,6 +737,49 @@ export function retrySync(id: string): Promise<SyncTask> {
   return sendJSON<SyncTask>(`${base}/syncqueue/${id}/retry`, "POST", {});
 }
 
+export type PromoKind = "percent" | "fixed";
+
+export interface PromoInput {
+  code: string;
+  kind: PromoKind;
+  percentBps?: number;
+  valueCents?: number;
+  firstOrderOnly?: boolean;
+  minItemsCents?: number;
+  validFrom?: string;
+  validUntil?: string;
+  maxUses?: number;
+  active: boolean;
+  notes?: string;
+}
+
+export interface Promo extends PromoInput {
+  createdAt: string;
+  updatedAt: string;
+  uses: number;
+  discountBRL: number;
+  revenueBRL: number;
+}
+
+export function listPromos(): Promise<{ promos: Promo[] }> {
+  return getJSON<{ promos: Promo[] }>(`${base}/promos`);
+}
+
+export function createPromo(p: PromoInput): Promise<Promo> {
+  return sendJSON<Promo>(`${base}/promos`, "POST", p);
+}
+
+export function updatePromo(code: string, p: Partial<PromoInput>): Promise<Promo> {
+  return sendJSON<Promo>(`${base}/promos/${encodeURIComponent(code)}`, "PUT", p);
+}
+
+export async function deletePromo(code: string): Promise<void> {
+  const res = await fetch(`${base}/promos/${encodeURIComponent(code)}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw await requestError(res);
+  }
+}
+
 export function getQuote(
   q: string,
   limit = 25,

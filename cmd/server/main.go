@@ -24,6 +24,7 @@ import (
 	"opdeals/internal/logx"
 	"opdeals/internal/model"
 	"opdeals/internal/pipeline"
+	"opdeals/internal/promos"
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
 	"opdeals/internal/store"
@@ -50,6 +51,7 @@ func run() error {
 	quotesPath := flag.String("quotes", "data/quotes.json", "path to the saved buy quotes (orçamentos)")
 	expensesPath := flag.String("expenses", "data/expenses.json", "path to the business expense ledger (despesas — not tied to a game)")
 	purchasesPath := flag.String("purchases", "data/purchases.json", "path to the buy-order ledger (compras — one order mixes games)")
+	promosPath := flag.String("promos", "data/promos.json", "path to the storefront promo-code ledger (cupons da vitrine)")
 	syncQueuePath := flag.String("syncqueue", "data/syncqueue.json", "path to the Liga/MyP propagation queue (saídas de estoque fora da Liga)")
 	ordersPath := flag.String("orders", "data/orders.json", "path to the storefront order ledger (pedidos pagos pelo site)")
 	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
@@ -486,6 +488,7 @@ func run() error {
 		return fmt.Errorf("checkout: %w", err)
 	}
 	srv.Checkout = checkout
+	srv.Checkout.Promos = promos.NewStore(*promosPath)
 	if checkout.Coupons != nil {
 		sweepCtx, stopSweep := context.WithCancel(context.Background())
 		defer stopSweep()

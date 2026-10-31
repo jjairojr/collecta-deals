@@ -21,6 +21,7 @@ import (
 	"opdeals/internal/logx"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/orders"
+	"opdeals/internal/promos"
 	"opdeals/internal/shipping"
 	"opdeals/internal/trades"
 )
@@ -88,6 +89,7 @@ func checkoutServer(t *testing.T) *checkoutFixture {
 	s := &Server{games: map[string]*GameStack{"onepiece": gs}, defaultGame: "onepiece", adminToken: "admin"}
 	s.Checkout = Checkout{
 		Orders:          orders.NewStore(filepath.Join(dir, "orders.json"), logx.New(io.Discard)),
+		Promos:          promos.NewStore(filepath.Join(dir, "promos.json")),
 		Gateway:         gw,
 		Quoter:          quoter,
 		StorefrontToken: testStorefrontToken,

@@ -198,6 +198,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/quotes", s.handleQuotesCreate)
 	mux.HandleFunc("PUT /api/quotes/{id}", s.handleQuotesUpdate)
 	mux.HandleFunc("DELETE /api/quotes/{id}", s.handleQuotesDelete)
+	mux.HandleFunc("GET /api/promos", s.handlePromosList)
+	mux.HandleFunc("POST /api/promos", s.handlePromosCreate)
+	mux.HandleFunc("PUT /api/promos/{code}", s.handlePromosUpdate)
+	mux.HandleFunc("DELETE /api/promos/{code}", s.handlePromosDelete)
 	if s.adminToken != "" {
 		mux.HandleFunc("POST /api/admin/reload", s.handleAdminReload)
 	}

@@ -17,6 +17,7 @@ import {
   Sparkles,
   Store,
   Swords,
+  Ticket,
   Truck,
   Upload,
   Wand2,
@@ -39,7 +40,8 @@ export type View =
   | "buyout"
   | "guialiga"
   | "ligaexport"
-  | "sincronizar";
+  | "sincronizar"
+  | "cupons";
 
 export type Icon = ComponentType<{ className?: string }>;
 
@@ -83,6 +85,7 @@ export const navGroups: NavGroup[] = [
       { key: "financeiro", label: "Financeiro", icon: PiggyBank },
       { key: "vendas", label: "Vendas", icon: ShoppingBag },
       { key: "pedidos", label: "Pedidos", icon: Truck },
+      { key: "cupons", label: "Cupons", icon: Ticket },
       { key: "compras", label: "Estoque e Compras", icon: ShoppingCart },
       { key: "sincronizar", label: "Sincronizar", icon: RefreshCw },
       { key: "importar", label: "Importar / Exportar", icon: Plane },

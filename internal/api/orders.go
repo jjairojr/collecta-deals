@@ -19,6 +19,7 @@ import (
 	"opdeals/internal/logx"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/orders"
+	"opdeals/internal/promos"
 	"opdeals/internal/shipping"
 	"opdeals/internal/trades"
 )
@@ -28,6 +29,7 @@ type Checkout struct {
 	Gateway         mercadopago.Gateway
 	Quoter          shipping.Quoter
 	Coupons         collecta.Client
+	Promos          *promos.Store
 	StorefrontToken string
 	WebhookSecret   string
 	SiteURL         string
@@ -449,7 +451,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	in.CollectaUserID = strings.TrimSpace(in.CollectaUserID)
 	in.PromoCode = normalizePromoCode(in.PromoCode)
-	var promoRule promo
+	var promoRule promos.Promo
 	if in.PromoCode != "" {
 		if in.CollectaUserID == "" {
 			writeError(w, http.StatusBadRequest, map[string]any{"error": "cupom exige login"})
@@ -459,7 +461,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, map[string]any{"error": "coupon_invalid", "message": promoNoStacking})
 			return
 		}
-		rule, ok := lookupPromo(in.PromoCode)
+		rule, ok := s.lookupPromo(in.PromoCode)
 		if !ok {
 			writeError(w, http.StatusConflict, map[string]any{"error": "coupon_invalid", "message": promoUnknown})
 			return
@@ -570,12 +572,12 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		if in.PromoCode == "" {
 			return o, nil
 		}
-		if msg := promoRejection(promoRule, existing, in.CollectaUserID, in.Buyer.CPF, time.Now()); msg != "" {
+		itemCents := itemsCents(res.lines)
+		if msg := promoRejection(promoRule, existing, in.CollectaUserID, in.Buyer.CPF, itemCents, time.Now()); msg != "" {
 			conflict = map[string]any{"error": "coupon_invalid", "message": msg}
 			return orders.Order{}, errors.New("coupon_invalid")
 		}
-		itemCents := itemsCents(res.lines)
-		discount := promoDiscountCents(itemCents, promoRule)
+		discount := promos.DiscountCents(itemCents, promoRule)
 		o.Promo = &orders.Promo{Code: in.PromoCode, PercentBps: promoRule.PercentBps, ValueBRL: brl(discount)}
 		o.Totals.DiscountBRL = brl(discount)
 		o.Totals.TotalBRL = brl(itemCents + cents(ship.PriceBRL) - discount)

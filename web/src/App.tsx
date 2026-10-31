@@ -27,6 +27,7 @@ import QuotePage from "./components/QuotePage";
 import GuiaLigaPage from "./components/GuiaLigaPage";
 import LigaExportPage from "./components/LigaExportPage";
 import SyncQueuePage, { useSyncPending } from "./components/SyncQueuePage";
+import PromosPage from "./components/PromosPage";
 import SelectionTray from "./components/SelectionTray";
 import AppSidebar from "./components/AppSidebar";
 import TopBar from "./components/TopBar";
@@ -97,6 +98,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   ligaexport: {
     title: "Exportar p/ Liga",
     description: "Gera o CSV de importação da LigaMagic a partir do que está à venda em Anúncios.",
+  },
+  cupons: {
+    title: "Cupons",
+    description: "Códigos de desconto da vitrine: criar, limitar, pausar e ver quanto cada um rendeu.",
   },
   sincronizar: {
     title: "Sincronizar",
@@ -269,6 +274,10 @@ export default function App() {
               ) : activeView === "ligaexport" ? (
                 <div className="mt-6">
                   <LigaExportPage />
+                </div>
+              ) : activeView === "cupons" ? (
+                <div className="mt-6">
+                  <PromosPage />
                 </div>
               ) : activeView === "sincronizar" ? (
                 <div className="mt-6">
