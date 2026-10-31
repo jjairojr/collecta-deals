@@ -27,6 +27,7 @@ import (
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
 	"opdeals/internal/store"
+	"opdeals/internal/syncqueue"
 	"opdeals/internal/tracking"
 	"opdeals/internal/trades"
 )
@@ -49,6 +50,7 @@ func run() error {
 	quotesPath := flag.String("quotes", "data/quotes.json", "path to the saved buy quotes (orçamentos)")
 	expensesPath := flag.String("expenses", "data/expenses.json", "path to the business expense ledger (despesas — not tied to a game)")
 	purchasesPath := flag.String("purchases", "data/purchases.json", "path to the buy-order ledger (compras — one order mixes games)")
+	syncQueuePath := flag.String("syncqueue", "data/syncqueue.json", "path to the Liga/MyP propagation queue (saídas de estoque fora da Liga)")
 	ordersPath := flag.String("orders", "data/orders.json", "path to the storefront order ledger (pedidos pagos pelo site)")
 	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
 	setsFlag := flag.String("sets", "", "comma-separated Liga set codes to limit (default all)")
@@ -477,6 +479,7 @@ func run() error {
 	srv := api.New(*webDir, games, opStack.Game.ID, accessoryStore, expenseStore, purchaseStore, *serveOnly, *adminToken)
 	srv.OwnLigaStoreID = *ligaStoreID
 	srv.PhotoDir = *photoDir
+	srv.SyncQueue = syncqueue.NewStore(*syncQueuePath)
 	srv.JPImport = &api.JPImport{Store: jpStore, CardRushPath: *cardRushPath}
 	checkout, err := buildCheckout(*ordersPath, *storefrontToken, *collectaAPI, *collectaStoreToken, logger)
 	if err != nil {

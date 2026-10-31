@@ -43,8 +43,20 @@ Quando o argumento contém `--auto` (execução agendada, ninguém olhando):
    monte os conjuntos de pedidos já baixados (`Liga #`, `MyP #`, `Site #`).
 2. **Liga → dashboard + MyP** (`liga-vendas` inteira, incluindo tirar do MyP).
 3. **MyP → dashboard + Liga** (`myp-vendas` inteira).
-4. **Site → Liga + MyP**: para cada `sold` com `Site #N` e `sellDate` nos
-   últimos 7 dias, aplique a mesma regra de propagação abaixo nos dois canais.
+4. **Fila de sincronização → Liga + MyP**: toda saída de estoque fora da Liga
+   (Site, balcão, MyP pago por fora, baixa sem venda) de item marcado "Na Liga"
+   vira tarefa em `GET $OPDEALS_URL/api/syncqueue?status=pending` (header
+   `X-Admin-Token`; resposta `{"tasks":[...]}` com `game`, `tradeID`, `name`,
+   `number`, `variant`, `condition`, `action` `remove`|`restore`, `qty`, `reason`).
+   Para cada tarefa: ache a oferta na Liga por número + nome + variante (mesma
+   mecânica da Fase 5 da `myp-vendas`), tire (`remove`) ou devolva (`restore`)
+   exatamente `qty` unidades, reduza/aumente o MyP pelas mesmas unidades e
+   confira lendo a oferta de volta. Deu certo → `POST /api/syncqueue/<id>/done`.
+   Não achou, achou mais de uma ou a Liga já está abaixo do esperado →
+   `POST /api/syncqueue/<id>/error` com `{"error":"<motivo>"}` e pendência no
+   relatório; nunca chute. A tela **Sincronizar** do dashboard mostra a fila e
+   o dono pode marcar feita à mão. Vendas `Site #N`/balcão anteriores à fila
+   (sem tarefa) seguem a regra de propagação abaixo, últimos 7 dias.
 5. Releia os ledgers e confira que cada baixa feita está lá (`buyer` certo,
    qty certa). Baixa que não aparecer = pendência.
 

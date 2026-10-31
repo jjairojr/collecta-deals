@@ -979,6 +979,7 @@ func (s *Server) settle(o *orders.Order, pay mercadopago.Payment, now time.Time)
 				return nil
 			}
 			l.TradeIDs = append(l.TradeIDs, sold.ID)
+			s.queueStockExit(l.Game, sold)
 		}
 	}
 	if !o.CouponsReleasedAt.IsZero() {

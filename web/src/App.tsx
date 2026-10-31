@@ -28,6 +28,7 @@ import BrowsePage from "./components/BrowsePage";
 import QuotePage from "./components/QuotePage";
 import GuiaLigaPage from "./components/GuiaLigaPage";
 import LigaExportPage from "./components/LigaExportPage";
+import SyncQueuePage, { useSyncPending } from "./components/SyncQueuePage";
 import SelectionTray from "./components/SelectionTray";
 import AppSidebar from "./components/AppSidebar";
 import TopBar from "./components/TopBar";
@@ -111,6 +112,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     title: "Exportar p/ Liga",
     description: "Gera o CSV de importação da LigaMagic a partir do que está à venda no Estoque.",
   },
+  sincronizar: {
+    title: "Sincronizar",
+    description: "Saídas de estoque fora da Liga que ainda precisam ser acertadas lá.",
+  },
   guialiga: {
     title: "Guia da Liga",
     description: "Como mexer na loja da LigaMagic no dia a dia — passo a passo, com prints.",
@@ -184,6 +189,7 @@ export default function App() {
 
   const activeView: View = view === "deals" && !dealsEnabled ? "tracking" : view;
   const orderAlerts = useOrderAlerts(activeView === "pedidos" && !needsToken);
+  const syncPending = useSyncPending();
   const meta = pageMeta[activeView];
   const ViewIcon = iconOf(activeView);
   const scopeBadge = (
@@ -203,7 +209,7 @@ export default function App() {
           onChangeGame={changeGame}
           dealsEnabled={dealsEnabled}
           status={status}
-          counts={{ pedidos: orderAlerts.toShip }}
+          counts={{ pedidos: orderAlerts.toShip, sincronizar: syncPending }}
         />
         <SidebarInset>
           <TopBar game={game} status={status} onRefresh={onRefresh} dealsEnabled={dealsEnabled} />
@@ -294,6 +300,10 @@ export default function App() {
               ) : activeView === "ligaexport" ? (
                 <div className="mt-6">
                   <LigaExportPage />
+                </div>
+              ) : activeView === "sincronizar" ? (
+                <div className="mt-6">
+                  <SyncQueuePage />
                 </div>
               ) : activeView === "guialiga" ? (
                 <div className="mt-6">

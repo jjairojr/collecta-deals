@@ -24,6 +24,7 @@ import (
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
 	"opdeals/internal/store"
+	"opdeals/internal/syncqueue"
 	"opdeals/internal/tracking"
 	"opdeals/internal/trades"
 )
@@ -61,6 +62,7 @@ type Server struct {
 	OwnLigaStoreID int
 	PhotoDir       string
 	Checkout       Checkout
+	SyncQueue      *syncqueue.Store
 	JPImport       *JPImport
 	imports        *importsCache
 	releasing      sync.Map
@@ -179,6 +181,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/purchases/{id}/items", s.handlePurchaseItemCreate)
 	mux.HandleFunc("POST /api/purchases/{id}/attach", s.handlePurchaseAttach)
 	mux.HandleFunc("POST /api/purchases/detach", s.handlePurchaseDetach)
+	mux.HandleFunc("GET /api/syncqueue", s.handleSyncQueueList)
+	mux.HandleFunc("POST /api/syncqueue/{id}/done", s.handleSyncQueueDone)
+	mux.HandleFunc("POST /api/syncqueue/{id}/error", s.handleSyncQueueError)
+	mux.HandleFunc("POST /api/syncqueue/{id}/retry", s.handleSyncQueueRetry)
 	mux.HandleFunc("GET /api/storefront", s.handleStorefront)
 	mux.HandleFunc("GET /api/storefront/market", s.handleStorefrontMarket)
 	mux.HandleFunc("GET /api/expenses", s.handleExpensesList)

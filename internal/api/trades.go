@@ -340,10 +340,19 @@ func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	if errors.Is(err, trades.ErrAlreadySold) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	game := gs.Game.ID
+	if sold.Kind == trades.KindAccessory {
+		game = accessoryGameID
+	}
+	s.queueStockExit(game, sold)
 	writeJSON(w, sold)
 }
 

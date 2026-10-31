@@ -700,6 +700,42 @@ export function listSales(): Promise<{ sales: SaleRow[] }> {
   return getJSON<{ sales: SaleRow[] }>(`${base}/sales`);
 }
 
+export type SyncStatus = "pending" | "done" | "error";
+
+export interface SyncTask {
+  id: string;
+  game: string;
+  tradeID: string;
+  name: string;
+  number?: string;
+  variant?: string;
+  condition?: string;
+  target: "liga" | "myp";
+  action: "remove" | "restore";
+  qty: number;
+  reason?: string;
+  status: SyncStatus;
+  error?: string;
+  createdAt: string;
+  doneAt?: string;
+}
+
+export function listSyncQueue(status?: SyncStatus): Promise<{ tasks: SyncTask[] }> {
+  const params = new URLSearchParams();
+  if (status) {
+    params.set("status", status);
+  }
+  return getJSON<{ tasks: SyncTask[] }>(`${base}/syncqueue?${params.toString()}`);
+}
+
+export function markSyncDone(id: string): Promise<SyncTask> {
+  return sendJSON<SyncTask>(`${base}/syncqueue/${id}/done`, "POST", {});
+}
+
+export function retrySync(id: string): Promise<SyncTask> {
+  return sendJSON<SyncTask>(`${base}/syncqueue/${id}/retry`, "POST", {});
+}
+
 export function getQuote(
   q: string,
   limit = 25,

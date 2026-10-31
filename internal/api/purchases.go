@@ -287,7 +287,12 @@ func (s *Server) reassign(w http.ResponseWriter, r *http.Request, target string)
 		if ledger == nil {
 			continue
 		}
-		_, err := ledger.Update(ref.ID, func(t *trades.Trade) { t.PurchaseID = target })
+		_, err := ledger.Update(ref.ID, func(t *trades.Trade) {
+			t.PurchaseID = target
+			if target != "" {
+				t.SemLastro = false
+			}
+		})
 		if errors.Is(err, trades.ErrNotFound) {
 			continue
 		}

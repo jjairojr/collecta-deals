@@ -11,6 +11,7 @@ import {
   LineChart,
   Package,
   PiggyBank,
+  RefreshCw,
   Plane,
   Receipt,
   ShoppingBag,
@@ -43,7 +44,8 @@ export type View =
   | "orcamento"
   | "buyout"
   | "guialiga"
-  | "ligaexport";
+  | "ligaexport"
+  | "sincronizar";
 
 export type Icon = ComponentType<{ className?: string }>;
 
@@ -88,6 +90,7 @@ export const navGroups: NavGroup[] = [
       { key: "vendas", label: "Vendas", icon: ShoppingBag },
       { key: "pedidos", label: "Pedidos", icon: Truck },
       { key: "compras", label: "Compras", icon: ShoppingCart },
+      { key: "sincronizar", label: "Sincronizar", icon: RefreshCw },
       { key: "importar", label: "Importar / Exportar", icon: Plane },
       { key: "importarjp", label: "Importar Japão", icon: Plane },
       { key: "despesas", label: "Despesas", icon: Receipt },

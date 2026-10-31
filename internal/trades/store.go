@@ -18,6 +18,8 @@ import (
 
 var ErrNotFound = errors.New("trade not found")
 
+var ErrAlreadySold = errors.New("trade already sold")
+
 type Store struct {
 	path string
 	mu   sync.RWMutex
@@ -280,6 +282,9 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 	for i := range all {
 		if all[i].ID != id {
 			continue
+		}
+		if all[i].Status == "sold" {
+			return Trade{}, ErrAlreadySold
 		}
 		now := time.Now()
 		orig := &all[i]
