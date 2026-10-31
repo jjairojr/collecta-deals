@@ -628,6 +628,9 @@ function OrderCard({
   }).filter((g) => g.items.length > 0);
 
   const remove = async () => {
+    if (!confirm(`Excluir a compra ${order.store || "sem vendedor"}?`)) {
+      return;
+    }
     setFailed(null);
     try {
       await deletePurchase(order.id);
@@ -1016,7 +1019,11 @@ function ItemRow({
             size="sm"
             disabled={busy}
             title="Excluir o item do portfólio"
-            onClick={() => run(() => deleteTrade(item.id, item.game === ACCESSORIES ? undefined : item.game))}
+            onClick={() => {
+              if (confirm(`Excluir ${item.name} do portfólio?`)) {
+                run(() => deleteTrade(item.id, item.game === ACCESSORIES ? undefined : item.game));
+              }
+            }}
           >
             <Trash2 className="h-4 w-4" />
           </Button>

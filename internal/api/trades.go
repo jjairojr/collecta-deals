@@ -206,40 +206,23 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	var in trades.Trade
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	var patch map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	in.Number = model.NormalizeNumber(in.Number)
+	if _, err := patchTrade(trades.Trade{}, patch); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var patchErr error
 	mutate := func(t *trades.Trade) {
-		in.ID = t.ID
-		in.CreatedAt = t.CreatedAt
-		if in.RefUSD == 0 {
-			in.RefUSD = t.RefUSD
+		next, err := patchTrade(*t, patch)
+		if err != nil {
+			patchErr = err
+			return
 		}
-		if in.ManualBRL == 0 {
-			in.ManualBRL = t.ManualBRL
-		}
-		switch in.Kind {
-		case "":
-			in.Kind = t.Kind
-		case trades.KindSingle:
-			in.Kind = ""
-		}
-		if in.PurchaseID == "" {
-			in.PurchaseID = t.PurchaseID
-		}
-		if in.Status == "" {
-			in.Status = t.Status
-		}
-		if in.Photos == nil {
-			in.Photos = t.Photos
-		}
-		if in.ImageURL == "" && len(in.Photos) > 0 {
-			in.ImageURL = in.Photos[0]
-		}
-		*t = in
+		*t = next
 	}
 	updated, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
 		return st.Update(id, mutate)
@@ -248,11 +231,64 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	if err == nil {
+		err = patchErr
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, updated)
+}
+
+func patchTrade(cur trades.Trade, patch map[string]json.RawMessage) (trades.Trade, error) {
+	base, err := json.Marshal(cur)
+	if err != nil {
+		return trades.Trade{}, err
+	}
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(base, &fields); err != nil {
+		return trades.Trade{}, err
+	}
+	for k, v := range patch {
+		fields[k] = v
+	}
+	merged, err := json.Marshal(fields)
+	if err != nil {
+		return trades.Trade{}, err
+	}
+	var next trades.Trade
+	if err := json.Unmarshal(merged, &next); err != nil {
+		return trades.Trade{}, err
+	}
+	next.ID = cur.ID
+	next.CreatedAt = cur.CreatedAt
+	next.Number = model.NormalizeNumber(next.Number)
+	if next.RefUSD == 0 {
+		next.RefUSD = cur.RefUSD
+	}
+	if next.ManualBRL == 0 {
+		next.ManualBRL = cur.ManualBRL
+	}
+	switch next.Kind {
+	case "":
+		next.Kind = cur.Kind
+	case trades.KindSingle:
+		next.Kind = ""
+	}
+	if next.PurchaseID == "" {
+		next.PurchaseID = cur.PurchaseID
+	}
+	if next.Status == "" {
+		next.Status = cur.Status
+	}
+	if next.Photos == nil {
+		next.Photos = cur.Photos
+	}
+	if next.ImageURL == "" && len(next.Photos) > 0 {
+		next.ImageURL = next.Photos[0]
+	}
+	return next, nil
 }
 
 func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {

@@ -1093,3 +1093,49 @@ MP_WEBHOOK_SECRET), token Melhor Envio, envs na Railway (ver memória opdeals-ch
 - Fase 3: `/jogo/:g` 308 → `/singles/:g` (next.config), nav sem "VER TUDO", intro + coleções + FAQ + Breadcrumb/ItemList em `/singles/[g]` e coleções, H1 de coleção com nome, só o jogo atual vai para o cliente. Endpoint público `/api/storefront/market` (piso NM por idioma sem a Collecta, mediana 30d, some > 14 dias, recusa número ambíguo) + bloco na carta. `sync-up.sh --recent N` + `scripts/com.collecta.sync-up.plist` (8h30).
 - Fase 4: `/img` em WebP ≤ 600px (sharp fixado), sitemap com lastModified/imagens/esgotados e sem /jogo, páginas /frete /privacidade /termos /sobre no rodapé, HighScores e specs inventadas removidos, título padrão curto, og sem herdar a home.
 - Pendente do dono: setar `FREE_SHIPPING_MIN_BRL=300` no Railway ANTES do deploy da vitrine; commit/push (backend sobe junto com mudanças antigas da árvore); instalar o plist; rodar captura local (tracking parado em 19/10) e um `sync-up.sh --recent 31`; depois do env, regra de frete grátis no Merchant Center. Não apagados: 4 "produtos" do Perfil da Empresa no MC (são a vitrine do GBP).
+
+---
+
+# Dashboard: estoque, compras e vendas (2026-10-30)
+
+Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em lançar compra e dar baixa. Fonte da verdade: Liga manda em qty e preço de venda; dash manda em custo, compra e lucro. Cada fase: plano aprovado antes de codar, testes, "pronto pra commit?", commit separado. Backup do volume de prod antes de toda migração.
+
+### Fase 1 — proteções
+- [x] `PUT /api/trades/{id}` vira patch: só altera campos enviados (hoje `*t = in` apaga Liga/vitrine/venda num corpo parcial).
+- [x] Confirmação ao excluir item e compra em Compras (hoje sem confirm: `PurchasesPage.tsx` delete do item e da compra).
+
+### Fase 2 — canal da venda
+- [ ] Campo `channel` na venda: `liga` | `myp` | `site` | `balcao` | `outros`; select na baixa; `buyer` fica só com o nome.
+- [ ] `balcao` = toda venda direta (loja física, WhatsApp, pagou por fora); `myp` só pedido do MyPCards.
+- [ ] Migração das vendas antigas pelo texto do buyer (`Liga #`, `MyP #`, `Site #`, `balcão`, `MYP` pago por fora → balcao); vazio → outros.
+- [ ] "Baixa sem venda" com motivo (aberto, perda, brinde, uso próprio): custa, não conta como receita/venda no Financeiro; migrar as baixas simbólicas de R$ 1/un.
+- [ ] Marca `semLastro` nas vendas criadas sem item pela liga-vendas + filtro "Vendas sem lastro" em Vendas para vincular a uma compra.
+- [ ] `ligasales.ts`/`finance.ts` usam `channel` em vez de regex no buyer; pacotes por nº de pedido de Liga, MyP e Site.
+- [ ] Skills liga-vendas, myp-vendas, baixa-vendas, dashboard-cadastrar mandam `channel`; liga-precificar deixa de supor frete dentro do `buyBRL`.
+
+### Fase 3 — fila de propagação
+- [ ] Venda com canal ≠ liga em item `ligaListed` gera pendência "tirar X un. da Liga" (e do MyP se estiver lá).
+- [ ] Desfazer venda de item que estava na Liga gera pendência inversa "devolver X un.".
+- [ ] Tela da fila no dash (pendente/feito); cron baixa-vendas consome e marca feito. Servidor nunca mexe na Liga.
+
+### Fase 4 — lote vendido
+- [ ] Lápis em lote vendido: nome, tipo, jogo, custo, foto (não a venda).
+- [ ] "Desfazer venda": volta ao estoque e junta de volta ao lote de origem quando houver. Bloqueado para canal `site` (caminho é Pedidos → reembolsado/cancelado).
+- [ ] Editor da aba Vendas perde `qty` (fica preço, data, comprador, canal).
+
+### Fase 5 — trocar jogo
+- [ ] Campo Jogo no form de edição: move o item de ledger preservando id, slug, custo, compra, venda e fotos.
+- [ ] Bloqueado com anúncio ativo ou pedido do site aberto, com aviso. Slug mantido, produto aparece no jogo novo na vitrine.
+
+### Fase 6 — rateio do frete do pedido
+- [ ] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado no `shippingBRL` do item; recalcula a cada mudança de frete/itens; lote vendido não é recalculado.
+
+### Fase 7 — estorno do pedido do site
+- [ ] Reembolsado/cancelado depois de pago devolve as unidades ao estoque (lote novo ou junta ao de origem).
+- [ ] Mudança manual de "sem estoque" para pago/enviado dá a baixa que hoje não acontece.
+
+### Fase 8 — juntar telas
+- [ ] Portfólio some (inclusive `?tab=portfolio`, Acessórios e o clique de Todos os jogos); `Kpi`/`Chip` vão para `ui/`.
+- [ ] Compras vira a casa do item: criar avulso, filtro de acessórios, resumo por jogo no topo.
+- [ ] Form de edição único: ganha valor atual R$ (selado/acessório) e GTIN.
+- [ ] Estoque fica só com preço, vitrine e Liga.
