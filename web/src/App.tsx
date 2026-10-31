@@ -62,8 +62,8 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     description: "Pedidos pagos pelo site — endereço, frete escolhido, rastreio e baixa automática no estoque.",
   },
   compras: {
-    title: "Compras",
-    description: "Cada pedido de compra com seus itens, de todos os jogos: lançar, editar, vender e mover cada item.",
+    title: "Estoque e Compras",
+    description: "Tudo o que você tem e quanto pagou, de todos os jogos: lançar compra, editar item, dar baixa e mover cada item.",
   },
   importar: {
     title: "Importar / Exportar",
@@ -83,8 +83,8 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     description: "Gastos do negócio — lançamentos do mês e despesas fixas recorrentes.",
   },
   estoque: {
-    title: "Estoque",
-    description: "Defina preços e escolha o que aparece na vitrine pública.",
+    title: "Anúncios",
+    description: "Preço de venda, vitrine do site e Liga — como cada item está anunciado.",
   },
   orcamento: {
     title: "Orçamento",
@@ -96,7 +96,7 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   },
   ligaexport: {
     title: "Exportar p/ Liga",
-    description: "Gera o CSV de importação da LigaMagic a partir do que está à venda no Estoque.",
+    description: "Gera o CSV de importação da LigaMagic a partir do que está à venda em Anúncios.",
   },
   sincronizar: {
     title: "Sincronizar",

@@ -610,7 +610,7 @@ export default function StockPage() {
       {loading ? (
         <Panel>Carregando estoque…</Panel>
       ) : holdings.length === 0 ? (
-        <Panel>Nenhuma carta em estoque. Lance as compras em Compras para vê-las aqui.</Panel>
+        <Panel>Nenhuma carta em estoque. Lance as compras em Estoque e Compras para vê-las aqui.</Panel>
       ) : visible.length === 0 ? (
         <Panel>Nenhuma carta corresponde à busca.</Panel>
       ) : (
@@ -712,7 +712,7 @@ export default function StockPage() {
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               Vira uma linha só. Mantém o preço, o "à venda" e a identidade da compra mais antiga; some as
-              duplicadas também em Compras. <strong className="text-slate-300">Isto é permanente.</strong>
+              duplicadas também em Estoque e Compras. <strong className="text-slate-300">Isto é permanente.</strong>
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-[10px] border-2 border-outline bg-page px-2 py-3">

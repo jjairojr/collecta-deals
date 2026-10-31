@@ -212,7 +212,7 @@ export default function LigaExportPage() {
     <div className="max-w-5xl space-y-6">
       <div className="sticker rounded-[12px] bg-panel p-5 text-sm leading-relaxed text-slate-200">
         Gera o CSV no formato que a Liga importa, a partir do que está{" "}
-        <strong className="text-fg">à venda</strong> no Estoque. A Liga exige o <em>Carta ID</em> dela em
+        <strong className="text-fg">à venda</strong> em Anúncios. A Liga exige o <em>Carta ID</em> dela em
         cada linha, então primeiro exporte as edições que você quer em{" "}
         <strong className="text-fg">Cards e Produtos → Exportar Cards</strong> e solte os arquivos aqui —
         eu cruzo com o estoque e devolvo o arquivo pronto para{" "}
@@ -254,7 +254,7 @@ export default function LigaExportPage() {
       )}
 
       {!catalogo && elegiveis.length === 0 && (
-        <EmptyState hint="Marque itens como à venda no Estoque para poder exportar.">Nada à venda</EmptyState>
+        <EmptyState hint="Marque itens como à venda em Anúncios para poder exportar.">Nada à venda</EmptyState>
       )}
 
       {catalogo && (
