@@ -2207,7 +2207,7 @@ function ItemsList({
                       title="Selecionar os itens listados desta categoria"
                     />
                   </TableCell>
-                  <TableCell colSpan={3} className="cursor-pointer py-2" onClick={() => toggleGroup(g.kind)}>
+                  <TableCell colSpan={2} className="cursor-pointer py-2" onClick={() => toggleGroup(g.kind)}>
                     <div className="flex items-center gap-2">
                       {g.open ? (
                         <ChevronDown className="h-4 w-4 text-slate-500" />
