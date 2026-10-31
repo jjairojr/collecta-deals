@@ -1104,6 +1104,37 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - [x] `PUT /api/trades/{id}` vira patch: só altera campos enviados (hoje `*t = in` apaga Liga/vitrine/venda num corpo parcial).
 - [x] Confirmação ao excluir item e compra em Compras (hoje sem confirm: `PurchasesPage.tsx` delete do item e da compra).
 
+
+- Nota: vendas antigas não foram reescritas; `trades.ChannelOf`/`WriteOffOf` resolvem na leitura. Baixa sem venda legada = buyer com "aberto/aberta" (a regra antiga de R$ 1/un. pegava venda real de bulk a R$ 0,27). `semLastro` só nas novas: em prod 448 vendas têm buyBRL 0 por causa do wipe de 07/10, então o critério não é seguro para o legado.
+
+### Fase 3 — categorias e conteúdo
+- [x] `/jogo/[g]` 301 → `/singles/[g]` com intro, coleções e FAQ; H1 de coleção com nome.
+- [x] Bloco "Preço de mercado no Brasil" (sem fonte, some com dado > 14 dias), só cartas do catálogo.
+- [ ] `sync-up.sh` diário dos snapshots no launchd.
+### Fase 4 — performance e confiança
+- [x] `/img` WebP redimensionado, catálogo fatiado no cliente, sitemap com lastModified + imagens.
+- [x] Privacidade, Termos, Frete, Sobre (razão social + CNPJ); remover HighScores mock, specs inventadas de selado, texto "finalize pelo WhatsApp".
+### Dono
+- Credenciamento de loja oficial de torneio; link do site em todos os perfis.
+
+## Review (2026-10-24)
+- Fase 0: gate de `X-Admin-Token` em toda `/api` privada (`internal/api/api.go` `gate`), públicas: storefront(+market), card-image, image, item-photos, orders, shipping, admin. Dashboard instala wrapper de fetch e pede o token num card quando recebe 401. Scripts Python, `cmd/floors` e 8 skills mandam o header (token de `scripts/deploy.env`). Teste local: sem token 401, com token 200, vitrine 200.
+- Fase 1: `Trade.Slug` congelado (Add grava, Update preserva), `/api/storefront` devolve `slug` + `soldOut` (vendidos listados e itens zerados por reserva). Vitrine: página de esgotado 200 + OutOfStock + "Avise-me no WhatsApp", 31 redirects 308 de slugs pré-wipe (`lib/legacy-slugs.json`, inclui o Darkrai) e 464 páginas de esgotado do backup pré-wipe (`lib/legacy-sold.json`; arte só quando não é variante, `noArt`). Gerador em `tasks/seo-2026-10-24/legacy.py`. Slug Go = slug JS nos 623 itens de prod.
+- Fase 2: JSON-LD com `shippingDetails` (R$ 25 / grátis ≥ R$ 300 / 1–2 + 2–10 dias), devolução também na Organization, `sku` = id do feed, marca = fabricante, legalName/taxID. Bing: sitemap enviado (site já existia). Merchant Center já tinha frete por peso e devolução 7 dias em 618 produtos; 611 aprovados, 140 cliques/28d.
+- Fase 3: `/jogo/:g` 308 → `/singles/:g` (next.config), nav sem "VER TUDO", intro + coleções + FAQ + Breadcrumb/ItemList em `/singles/[g]` e coleções, H1 de coleção com nome, só o jogo atual vai para o cliente. Endpoint público `/api/storefront/market` (piso NM por idioma sem a Collecta, mediana 30d, some > 14 dias, recusa número ambíguo) + bloco na carta. `sync-up.sh --recent N` + `scripts/com.collecta.sync-up.plist` (8h30).
+- Fase 4: `/img` em WebP ≤ 600px (sharp fixado), sitemap com lastModified/imagens/esgotados e sem /jogo, páginas /frete /privacidade /termos /sobre no rodapé, HighScores e specs inventadas removidos, título padrão curto, og sem herdar a home.
+- Pendente do dono: setar `FREE_SHIPPING_MIN_BRL=300` no Railway ANTES do deploy da vitrine; commit/push (backend sobe junto com mudanças antigas da árvore); instalar o plist; rodar captura local (tracking parado em 19/10) e um `sync-up.sh --recent 31`; depois do env, regra de frete grátis no Merchant Center. Não apagados: 4 "produtos" do Perfil da Empresa no MC (são a vitrine do GBP).
+
+---
+
+# Dashboard: estoque, compras e vendas (2026-10-30)
+
+Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em lançar compra e dar baixa. Fonte da verdade: Liga manda em qty e preço de venda; dash manda em custo, compra e lucro. Cada fase: plano aprovado antes de codar, testes, "pronto pra commit?", commit separado. Backup do volume de prod antes de toda migração.
+
+### Fase 1 — proteções
+- [x] `PUT /api/trades/{id}` vira patch: só altera campos enviados (hoje `*t = in` apaga Liga/vitrine/venda num corpo parcial).
+- [x] Confirmação ao excluir item e compra em Compras (hoje sem confirm: `PurchasesPage.tsx` delete do item e da compra).
+
 ### Fase 2 — canal da venda
 - [ ] Campo `channel` na venda: `liga` | `myp` | `site` | `balcao` | `outros`; select na baixa; `buyer` fica só com o nome.
 - [ ] `balcao` = toda venda direta (loja física, WhatsApp, pagou por fora); `myp` só pedido do MyPCards.

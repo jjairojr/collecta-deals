@@ -187,7 +187,7 @@ B=https://collecta-deals-production.up.railway.app
 T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
 curl -s -X POST -H "X-Admin-Token: $T" "$B/api/trades/<id>/sell?game=<game>" \
   -H 'Content-Type: application/json' \
-  -d '{"qty":2,"sellPrice":260.0,"sellCurrency":"BRL","sellDate":"2026-08-01","buyer":"Fulano — Liga #11542408"}'
+  -d '{"qty":2,"sellPrice":260.0,"sellCurrency":"BRL","sellDate":"2026-08-01","buyer":"Fulano — Liga #11542408","channel":"liga"}'
 ```
 
 - `qty` = unidades vendidas no pedido.
@@ -195,6 +195,8 @@ curl -s -X POST -H "X-Admin-Token: $T" "$B/api/trades/<id>/sell?game=<game>" \
 - `sellDate` = data do pedido (YYYY-MM-DD), não a de hoje.
 - `buyer` = `"<Nome do comprador> — Liga #<pedido>"` — o `Liga #N` é a chave
   de dedup da regra 1; sem ele a próxima execução baixa de novo.
+- `channel` = `"liga"` sempre. O canal é campo próprio; o servidor só deduz o canal
+  pelo buyer em vendas antigas que não têm `channel`.
 
 Comportamento do servidor: venda parcial faz split (nasce um registro novo
 `status:"sold"` com id novo; o original perde `qty`); venda total marca o
@@ -573,8 +575,8 @@ desse conhecimento.
 - **Admin da loja agora em `www.ligacollectatcg.com.br`** (mesmos paths `?view=ecom/admin/...`).
   Em `www.ligamagic.com.br` o admin responde "Você não está logado" mesmo com a sessão ativa.
 - Item vendido "sem lastro" nunca entrava na aba Vendas, então o faturamento ficava menor.
-  Correção: `POST /api/trades` com `status:"sold"`, `buyBRL 0`, `sellPrice`/`sellDate`/`buyer`
-  do pedido e nota "Venda da Liga sem registro no estoque do dashboard". Não mexe em holding:
+  Correção: `POST /api/trades` com `status:"sold"`, `buyBRL 0`, `channel:"liga"`, `semLastro:true`,
+  `sellPrice`/`sellDate`/`buyer` do pedido e nota "Venda da Liga sem registro no estoque do dashboard". Não mexe em holding:
   a Liga já tinha descontado essas unidades. Lançados 38 registros (10 pedidos).
 - Auditoria completa: detalhe de todos os pedidos pagos em `window.__det` (8 s entre fetches),
   `JSON.stringify` → clipboard → `pbpaste`, parser linha a linha e casamento por nome contra

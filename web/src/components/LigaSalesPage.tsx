@@ -12,7 +12,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { listSales, productIDFromTcgURL, updateTrade, type SaleRow } from "../api";
+import { listSales, productIDFromTcgURL, updateTrade, type SaleChannel, type SaleRow } from "../api";
 import { brl0, brl2, dayLabel } from "../format";
 import {
   buildPackages,
@@ -21,9 +21,10 @@ import {
   channelOfSale,
   channels,
   dailySeries,
-  isSymbolic,
+  isWriteOff,
   orderNumber,
   totalsOf,
+  writeOffLabels,
   type Channel,
   type SalesPackage,
 } from "../ligasales";
@@ -34,6 +35,7 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
+import { Select } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ChartContainer, ChartTooltip, axisTick, chartColors, tooltipCursor } from "./ui/chart";
 
@@ -49,8 +51,6 @@ const periodLabels: Record<Period, string> = {
   90: "90 dias",
   0: "Tudo",
 };
-
-const DEFAULT_CHANNELS: Channel[] = ["liga", "sem-marca", "shopee", "outros"];
 
 type SortKey = "date" | "revenue" | "profit" | "margin";
 
@@ -151,8 +151,9 @@ export default function LigaSalesPage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<SalesView>("items");
   const [period, setPeriod] = useState<Period>(30);
-  const [selected, setSelected] = useState<Channel[]>(DEFAULT_CHANNELS);
-  const [hideSymbolic, setHideSymbolic] = useState(true);
+  const [selected, setSelected] = useState<Channel[]>(channels);
+  const [hideWriteOff, setHideWriteOff] = useState(true);
+  const [onlySemLastro, setOnlySemLastro] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortState>({ key: "date", dir: "desc" });
   const [open, setOpen] = useState<string | null>(null);
@@ -201,10 +202,11 @@ export default function LigaSalesPage() {
   const beforeChannel = useMemo(
     () =>
       sales
-        .filter((s) => (hideSymbolic ? !isSymbolic(s) : true))
+        .filter((s) => (hideWriteOff ? !isWriteOff(s) : true))
+        .filter((s) => (onlySemLastro ? Boolean(s.semLastro) : true))
         .filter((s) => (from ? (s.sellDate ?? "") >= from : true))
         .filter((s) => matches(s, q)),
-    [sales, hideSymbolic, from, q],
+    [sales, hideWriteOff, onlySemLastro, from, q],
   );
   const counts = useMemo(() => {
     const c = new Map<Channel, number>();
@@ -307,11 +309,15 @@ export default function LigaSalesPage() {
           ))}
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
-          <Checkbox checked={hideSymbolic} onChange={(e) => setHideSymbolic(e.target.checked)} />
-          Ocultar baixas de R$ 1/un. (abertura de caixa)
+          <Checkbox checked={hideWriteOff} onChange={(e) => setHideWriteOff(e.target.checked)} />
+          Ocultar baixas sem venda (aberto, perda, brinde, uso)
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+          <Checkbox checked={onlySemLastro} onChange={(e) => setOnlySemLastro(e.target.checked)} />
+          Só vendas sem lastro
         </label>
         <span className="ml-auto text-[11px] text-slate-500">
-          “Sem marca” são baixas feitas à mão, sem nº de pedido — quase sempre vendas da Liga.
+          Sem lastro é venda lançada sem item no estoque: vincule a uma compra para o custo aparecer.
         </span>
       </div>
 
@@ -472,10 +478,16 @@ function SaleRowLine({ s, onSaved }: { s: SaleRow; onSaved: () => void }) {
         </div>
       </TableCell>
       <TableCell className="max-w-[16rem]">
-        <div className="truncate text-[12px] text-slate-300">
-          {who || channelLabels[channelOfSale(s)]}
+        <div className="truncate text-[12px] text-slate-300">{who || "sem comprador"}</div>
+        <div className="truncate text-[10px] text-slate-500">
+          {[
+            s.writeOff ? `Baixa sem venda · ${writeOffLabels[s.writeOff]}` : channelLabels[channelOfSale(s)],
+            order ? `#${order}` : "",
+            s.semLastro ? "sem lastro" : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
-        {order && <div className="text-[10px] text-slate-500">Liga #{order}</div>}
       </TableCell>
       <TableCell className="text-right tabular-nums text-slate-400">{s.qty}</TableCell>
       <TableCell className="text-right font-semibold tabular-nums text-slate-100">{brl2(s.valueBRL)}</TableCell>
@@ -521,7 +533,7 @@ function PackageRows({
             )}
             <div className="min-w-0">
               <div className="truncate font-medium text-slate-100">
-                {p.order ? `Pedido #${p.order}` : p.buyer || "Sem nº de pedido"}
+                {p.order ? `${channelLabels[p.channel]} #${p.order}` : p.buyer || "Sem nº de pedido"}
               </div>
               <div className="truncate text-[10px] text-slate-500">
                 {[p.order ? p.buyer : "", p.games.join(" · ")].filter(Boolean).join(" — ")}
@@ -622,6 +634,7 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
   const [price, setPrice] = useState(String(s.sellPrice ?? s.valueBRL));
   const [date, setDate] = useState(s.sellDate ?? "");
   const [buyer, setBuyer] = useState(s.buyer ?? "");
+  const [channel, setChannel] = useState<SaleChannel>(channelOfSale(s));
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -636,7 +649,7 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
     try {
       await updateTrade(
         s.id,
-        { ...s, qty: units, sellPrice: total, sellDate: date, buyer: buyer.trim() },
+        { ...s, qty: units, sellPrice: total, sellDate: date, buyer: buyer.trim(), channel },
         s.game === "acessorios" ? undefined : s.game,
       );
       onSaved();
@@ -669,13 +682,19 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
           <FieldLabel>Data</FieldLabel>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
+        <label className="w-[8rem]">
+          <FieldLabel>Canal</FieldLabel>
+          <Select value={channel} onChange={(e) => setChannel(channels.find((c) => c === e.target.value) ?? "outros")}>
+            {channels.map((c) => (
+              <option key={c} value={c}>
+                {channelLabels[c]}
+              </option>
+            ))}
+          </Select>
+        </label>
         <label className="min-w-[12rem] flex-1">
-          <FieldLabel>Comprador / canal</FieldLabel>
-          <Input
-            value={buyer}
-            onChange={(e) => setBuyer(e.target.value)}
-            placeholder="ex.: Fulano — Liga #11641862, shopee, balcão"
-          />
+          <FieldLabel>Comprador</FieldLabel>
+          <Input value={buyer} onChange={(e) => setBuyer(e.target.value)} placeholder="ex.: Fulano — Liga #11641862" />
         </label>
         <div className="flex items-center gap-1">
           <Button variant="primary" size="sm" onClick={save} disabled={saving}>
@@ -687,8 +706,8 @@ function SaleEditor({ s, onCancel, onSaved }: { s: SaleRow; onCancel: () => void
         </div>
       </div>
       <p className="mt-1 text-[10px] text-slate-500">
-        Venda total é o valor do item inteiro (unitário × unidades), sem frete. O comprador define o canal:
-        “Liga #nº” marca pedido da Liga, vazio conta como venda sem marca.
+        Venda total é o valor do item inteiro (unitário × unidades), sem frete. O nº do pedido fica no comprador
+        (“— Liga #nº”, “— MyP #nº”, “— Site #nº”) e agrupa a venda no pacote.
       </p>
       {failed && <p className="mt-1 text-[11px] text-rose-300">{failed}</p>}
     </div>

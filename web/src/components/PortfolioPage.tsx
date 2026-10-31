@@ -66,6 +66,7 @@ const DEFAULT_VARIANTS = [
 ];
 import CardArt from "./CardArt";
 import ShareList from "./ShareList";
+import SaleExitSelect, { DEFAULT_EXIT, exitFields, type SaleExit } from "./SaleExitSelect";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -1110,8 +1111,10 @@ function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
   const [currency, setCurrency] = useState<"BRL" | "USD">("BRL");
   const [date, setDate] = useState("");
   const [buyer, setBuyer] = useState("");
+  const [exit, setExit] = useState<SaleExit>(DEFAULT_EXIT);
   const [saving, setSaving] = useState(false);
 
+  const writeOff = exit.kind === "writeOff";
   const sellQty = Math.min(Math.max(Number(qty) || 0, 1), t.qty);
   const each = Number(priceEach) || 0;
   const total = each * sellQty;
@@ -1123,10 +1126,11 @@ function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
     try {
       await sellTrade(t.id, {
         qty: sellQty,
-        sellPrice: total,
+        sellPrice: writeOff ? 0 : total,
         sellCurrency: currency,
         sellDate: date,
         buyer,
+        ...exitFields(exit),
       });
       onDone();
     } finally {
@@ -1148,25 +1152,32 @@ function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
           />
         </Field>
       )}
-      <Field label={t.qty > 1 ? "Price each" : "Sell price"}>
-        <Input
-          type="number"
-          value={priceEach}
-          onChange={(e) => setPriceEach(e.target.value)}
-          className="w-32"
-          placeholder="0,00"
-        />
+      <Field label="Canal">
+        <SaleExitSelect value={exit} onChange={setExit} className="w-44" />
       </Field>
-      <Field label="Currency">
-        <ToggleGroup
-          value={currency}
-          onChange={(v) => setCurrency(v === "USD" ? "USD" : "BRL")}
-          options={[
-            { value: "BRL", label: "R$" },
-            { value: "USD", label: "US$" },
-          ]}
-        />
-      </Field>
+      {!writeOff && (
+        <>
+          <Field label={t.qty > 1 ? "Price each" : "Sell price"}>
+            <Input
+              type="number"
+              value={priceEach}
+              onChange={(e) => setPriceEach(e.target.value)}
+              className="w-32"
+              placeholder="0,00"
+            />
+          </Field>
+          <Field label="Currency">
+            <ToggleGroup
+              value={currency}
+              onChange={(v) => setCurrency(v === "USD" ? "USD" : "BRL")}
+              options={[
+                { value: "BRL", label: "R$" },
+                { value: "USD", label: "US$" },
+              ]}
+            />
+          </Field>
+        </>
+      )}
       <Field label="Date">
         <Input
           type="date"
@@ -1183,14 +1194,14 @@ function SellForm({ t, onDone }: { t: TradeView; onDone: () => void }) {
           placeholder="P2P buyer"
         />
       </Field>
-      {t.qty > 1 && each > 0 && (
+      {t.qty > 1 && each > 0 && !writeOff && (
         <div className="pb-2 text-xs text-slate-400">
           Total{" "}
           <span className="font-semibold text-slate-200">{money(total)}</span>
           {partial ? ` · ${t.qty - sellQty} stay holding` : ""}
         </div>
       )}
-      <Button onClick={submit} disabled={saving || !each}>
+      <Button onClick={submit} disabled={saving || (!writeOff && !each)}>
         {saving ? "Saving…" : partial ? `Sell ${sellQty}` : "Mark sold"}
       </Button>
     </div>

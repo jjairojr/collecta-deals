@@ -1,65 +1,50 @@
-import type { SaleRow } from "./api";
+import type { SaleChannel, SaleRow, WriteOffReason } from "./api";
 
-// Sales are labelled by hand in the buyer field, so the channel has to be read
-// back out of it. The liga-vendas skill writes "<nome> — Liga #<pedido>"; a baixa
-// done by hand in the dashboard often leaves the field empty, and those are Liga
-// sales too — they just lost their order number, hence a channel of their own
-// instead of being lumped with a named buyer.
-export type Channel = "liga" | "sem-marca" | "shopee" | "outros" | "tcgplayer";
+export type Channel = SaleChannel;
 
-export const channels: Channel[] = ["liga", "sem-marca", "shopee", "outros", "tcgplayer"];
+export const channels: Channel[] = ["liga", "myp", "site", "balcao", "outros"];
 
 export const channelLabels: Record<Channel, string> = {
   liga: "Liga",
-  "sem-marca": "Sem marca",
-  shopee: "Shopee",
+  myp: "MyP",
+  site: "Site",
+  balcao: "Balcão",
   outros: "Outros",
-  tcgplayer: "TCGplayer (US$)",
 };
 
-export function channelOf(buyer: string | undefined): Channel {
-  const b = (buyer ?? "").trim();
-  if (b === "") {
-    return "sem-marca";
-  }
-  if (/liga/i.test(b)) {
-    return "liga";
-  }
-  if (/shopee/i.test(b)) {
-    return "shopee";
-  }
-  return "outros";
-}
+export const writeOffs: WriteOffReason[] = ["aberto", "perda", "brinde", "uso"];
+
+export const writeOffLabels: Record<WriteOffReason, string> = {
+  aberto: "Aberto",
+  perda: "Perda",
+  brinde: "Brinde",
+  uso: "Uso próprio",
+};
+
+const ORDER_SUFFIX = /\s*—?\s*(Liga|MyP|Site) #(\d+)\s*$/i;
 
 export function orderNumber(buyer: string | undefined): string {
-  return (buyer ?? "").match(/Liga #(\d+)/i)?.[1] ?? "";
+  return (buyer ?? "").match(ORDER_SUFFIX)?.[2] ?? "";
 }
 
-// buyerName drops the "— Liga #<pedido>" suffix so the order number is shown once.
 export function buyerName(buyer: string | undefined): string {
   return (buyer ?? "")
-    .replace(/—?\s*Liga #\d+/i, "")
+    .replace(ORDER_SUFFIX, "")
+    .replace(/\s*—\s*Liga\s*$/i, "")
     .replace(/[—-]\s*$/, "")
     .trim();
 }
 
-// A sale priced at a token R$ 1 per unit is bookkeeping, not revenue: it is how
-// opening a sealed case is written off the ledger (four ME5 boxes "sold" for
-// R$ 4). Left in, a single one of these shows up as a R$ 311 loss.
-export function isSymbolic(s: SaleRow): boolean {
-  const units = s.qty > 0 ? s.qty : 1;
-  return s.valueBRL / units <= 1;
+export function isWriteOff(s: SaleRow): boolean {
+  return Boolean(s.writeOff);
 }
 
-// Sales in USD are the TCGplayer side of the business, not the Liga store — a
-// channel of their own instead of a hidden slice, so nothing disappears from the
-// page without saying so.
 export function isBRL(s: SaleRow): boolean {
   return s.sellCurrency !== "USD";
 }
 
 export function channelOfSale(s: SaleRow): Channel {
-  return s.sellCurrency === "USD" ? "tcgplayer" : channelOf(s.buyer);
+  return s.channel ?? "outros";
 }
 
 export interface SalesPackage {
@@ -83,7 +68,7 @@ export interface SalesPackage {
 function packageKey(s: SaleRow): string {
   const order = orderNumber(s.buyer);
   if (order) {
-    return `pedido:${order}`;
+    return `pedido:${channelOfSale(s)}:${order}`;
   }
   return `${buyerName(s.buyer).toLowerCase()}|${s.sellDate ?? ""}`;
 }
@@ -99,7 +84,7 @@ export function buildPackages(sales: SaleRow[]): SalesPackage[] {
         order: orderNumber(s.buyer),
         buyer: buyerName(s.buyer),
         date: s.sellDate ?? "",
-        channel: channelOf(s.buyer),
+        channel: channelOfSale(s),
         games: [],
         units: 0,
         revenueBRL: 0,
@@ -116,7 +101,7 @@ export function buildPackages(sales: SaleRow[]): SalesPackage[] {
     if (!p.games.includes(s.gameName)) {
       p.games.push(s.gameName);
     }
-    p.units += s.qty > 0 ? s.qty : 1;
+    p.units += isWriteOff(s) ? 0 : s.qty > 0 ? s.qty : 1;
     p.revenueBRL += s.valueBRL;
     p.costBRL += s.costBRL;
     p.profitBRL += s.profitBRL;

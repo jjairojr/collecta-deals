@@ -971,6 +971,7 @@ func (s *Server) settle(o *orders.Order, pay mercadopago.Payment, now time.Time)
 				SellCurrency: "BRL",
 				SellDate:     date,
 				Buyer:        buyer,
+				Channel:      trades.ChannelSite,
 			})
 			if err != nil {
 				o.Status = orders.StatusOversold

@@ -266,6 +266,8 @@ type Sale struct {
 	SellCurrency string
 	SellDate     string
 	Buyer        string
+	Channel      string
+	WriteOff     string
 }
 
 func (s *Store) Sell(id string, sale Sale) (Trade, error) {
@@ -290,6 +292,8 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 			orig.SellCurrency = sale.SellCurrency
 			orig.SellDate = sale.SellDate
 			orig.Buyer = sale.Buyer
+			orig.Channel = sale.Channel
+			orig.WriteOff = sale.WriteOff
 			orig.UpdatedAt = now
 			result := *orig
 			if err := s.persist(all); err != nil {
@@ -307,6 +311,8 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 		sold.SellCurrency = sale.SellCurrency
 		sold.SellDate = sale.SellDate
 		sold.Buyer = sale.Buyer
+		sold.Channel = sale.Channel
+		sold.WriteOff = sale.WriteOff
 		sold.UpdatedAt = now
 		orig.Qty -= sale.Qty
 		orig.ShippingBRL = round2(orig.ShippingBRL - soldShip)

@@ -44,6 +44,7 @@ import { brl2, dayLabel } from "../format";
 import CardArt from "./CardArt";
 import EmptyState from "./EmptyState";
 import { PhotoButton, PhotoStrip, PhotoViewer, photosOf } from "./ItemPhotos";
+import SaleExitSelect, { DEFAULT_EXIT, exitFields, type SaleExit } from "./SaleExitSelect";
 import { Chip, Kpi } from "./PortfolioPage";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -1276,9 +1277,11 @@ function SellItemForm({
   const [currency, setCurrency] = useState<"BRL" | "USD">("BRL");
   const [date, setDate] = useState(today());
   const [buyer, setBuyer] = useState("");
+  const [exit, setExit] = useState<SaleExit>(DEFAULT_EXIT);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
+  const writeOff = exit.kind === "writeOff";
   const units = Math.min(Math.max(Number(qty) || 0, 1), item.qty);
   const each = num(priceEach);
   const total = each * units;
@@ -1290,7 +1293,14 @@ function SellItemForm({
     try {
       await sellTrade(
         item.id,
-        { qty: units, sellPrice: total, sellCurrency: currency, sellDate: date, buyer: buyer.trim() },
+        {
+          qty: units,
+          sellPrice: writeOff ? 0 : total,
+          sellCurrency: currency,
+          sellDate: date,
+          buyer: buyer.trim(),
+          ...exitFields(exit),
+        },
         tradeGame(item),
       );
       await onSold();
@@ -1317,47 +1327,55 @@ function SellItemForm({
             />
           </Field>
         )}
-        <Field label={item.qty > 1 ? "Preço por un." : "Preço de venda"}>
-          <Input
-            value={priceEach}
-            onChange={(e) => setPriceEach(e.target.value)}
-            inputMode="decimal"
-            placeholder="0,00"
-            className="w-32"
-          />
+        <Field label="Canal">
+          <SaleExitSelect value={exit} onChange={setExit} className="w-44" />
         </Field>
-        <Field label="Moeda">
-          <Select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value === "USD" ? "USD" : "BRL")}
-            className="w-24"
-          >
-            <option value="BRL">R$</option>
-            <option value="USD">US$</option>
-          </Select>
-        </Field>
+        {!writeOff && (
+          <>
+            <Field label={item.qty > 1 ? "Preço por un." : "Preço de venda"}>
+              <Input
+                value={priceEach}
+                onChange={(e) => setPriceEach(e.target.value)}
+                inputMode="decimal"
+                placeholder="0,00"
+                className="w-32"
+              />
+            </Field>
+            <Field label="Moeda">
+              <Select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value === "USD" ? "USD" : "BRL")}
+                className="w-24"
+              >
+                <option value="BRL">R$</option>
+                <option value="USD">US$</option>
+              </Select>
+            </Field>
+          </>
+        )}
         <Field label="Data">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
         </Field>
-        <Field label="Comprador / canal">
+        <Field label="Comprador">
           <Input
             value={buyer}
             onChange={(e) => setBuyer(e.target.value)}
-            placeholder="ex.: Liga #11641862, balcão"
+            placeholder="nome do comprador"
             className="w-52"
           />
         </Field>
-        <Button variant="primary" size="sm" onClick={submit} disabled={saving || each <= 0}>
-          {saving ? "Salvando…" : partial ? `Vender ${units}` : "Dar baixa"}
+        <Button variant="primary" size="sm" onClick={submit} disabled={saving || (!writeOff && each <= 0)}>
+          {saving ? "Salvando…" : partial ? `Baixar ${units}` : "Dar baixa"}
         </Button>
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
           <X className="h-4 w-4" />
         </Button>
       </div>
       <p className="text-[10px] text-slate-500">
-        {currency === "USD" ? "US$ " : "R$ "}
-        {(total || 0).toFixed(2)} no total{partial ? ` · ${item.qty - units} ficam em estoque` : ""}. O
-        comprador define o canal: “Liga #nº” marca pedido da Liga.
+        {writeOff
+          ? "Baixa sem venda: o custo sai do estoque e não entra como receita"
+          : `${currency === "USD" ? "US$ " : "R$ "}${(total || 0).toFixed(2)} no total`}
+        {partial ? ` · ${item.qty - units} ficam em estoque` : ""}.
       </p>
       {failed && <p className="text-[11px] text-rose-300">{failed}</p>}
     </div>

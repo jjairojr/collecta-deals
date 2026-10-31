@@ -31,6 +31,7 @@ import {
   type MonthRow,
   type Side,
 } from "../finance";
+import { channelLabels, channelOfSale, writeOffLabels } from "../ligasales";
 import EmptyState from "./EmptyState";
 import { Chip, Kpi } from "./PortfolioPage";
 import { Button } from "./ui/button";
@@ -106,8 +107,6 @@ export default function FinanceiroPage() {
   const [games, setGames] = useState<string[]>([]);
   const [selectedKinds, setSelectedKinds] = useState<Kind[]>([]);
   const [selectedSides, setSelectedSides] = useState<Side[]>([]);
-  const [unmarkedIsLiga, setUnmarkedIsLiga] = useState(true);
-  const [hideSymbolic, setHideSymbolic] = useState(true);
   const [includeUSD, setIncludeUSD] = useState(true);
 
   useEffect(() => {
@@ -124,7 +123,7 @@ export default function FinanceiroPage() {
   }, []);
 
   const known = useMemo(() => {
-    const months = [...saleMonths(eligibleSales(sales, false)), ...expenseMonths(expenses)].sort();
+    const months = [...saleMonths(sales), ...expenseMonths(expenses)].sort();
     return { first: months[0] ?? currentMonth(), last: months[months.length - 1] ?? currentMonth() };
   }, [sales, expenses]);
 
@@ -147,22 +146,20 @@ export default function FinanceiroPage() {
       games,
       kinds: selectedKinds,
       sides: selectedSides,
-      unmarkedIsLiga,
-      hideSymbolic,
       includeUSD,
     }),
-    [from, to, games, selectedKinds, selectedSides, unmarkedIsLiga, hideSymbolic, includeUSD],
+    [from, to, games, selectedKinds, selectedSides, includeUSD],
   );
 
   const months = useMemo(() => monthRange(from, to), [from, to]);
   const visible = useMemo(() => filterSales(sales, filters), [sales, filters]);
   const totals = useMemo(() => totalsOf(visible), [visible]);
-  const bySide = useMemo(() => groupTotals(visible, (s) => sideOf(s, unmarkedIsLiga)), [visible, unmarkedIsLiga]);
+  const bySide = useMemo(() => groupTotals(visible, sideOf), [visible]);
   const byKind = useMemo(() => groupTotals(visible, kindOf), [visible]);
   const byGame = useMemo(() => groupTotals(visible, (s) => s.gameName), [visible]);
   const series = useMemo(
-    () => monthlySeries(visible, expenses, months, unmarkedIsLiga),
-    [visible, expenses, months, unmarkedIsLiga],
+    () => monthlySeries(visible, expenses, months),
+    [visible, expenses, months],
   );
   const expenseTotal = useMemo(() => expensesInRange(expenses, months), [expenses, months]);
   const categories = useMemo(() => expensesByCategory(expenses, months), [expenses, months]);
@@ -175,13 +172,13 @@ export default function FinanceiroPage() {
 
   const gameOptions = useMemo(() => {
     const found = new Map<string, string>();
-    for (const s of eligibleSales(sales, hideSymbolic, includeUSD)) {
+    for (const s of eligibleSales(sales, includeUSD)) {
       if (kindOf(s) !== "accessory") {
         found.set(s.game, s.gameName);
       }
     }
     return [...found.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [sales, hideSymbolic, includeUSD]);
+  }, [sales, includeUSD]);
 
   const net = totals.grossBRL - expenseTotal;
   const liga = bySide.get("liga");
@@ -266,19 +263,12 @@ export default function FinanceiroPage() {
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
           <label className="flex cursor-pointer items-center gap-2">
-            <Checkbox checked={unmarkedIsLiga} onChange={(e) => setUnmarkedIsLiga(e.target.checked)} />
-            Contar baixas sem comprador como Liga
-          </label>
-          <label className="flex cursor-pointer items-center gap-2">
-            <Checkbox checked={hideSymbolic} onChange={(e) => setHideSymbolic(e.target.checked)} />
-            Ocultar baixas simbólicas (R$ 1/un.)
-          </label>
-          <label className="flex cursor-pointer items-center gap-2">
             <Checkbox checked={includeUSD} onChange={(e) => setIncludeUSD(e.target.checked)} />
             Incluir vendas em US$ (TCGplayer), convertidas
           </label>
           <span className="text-[11px] text-slate-500">
-            Venda em US$ entra sempre como fora da Liga. Despesa recorrente conta uma vez por mês do período.
+            Venda em US$ entra sempre como fora da Liga. Baixa sem venda soma só no custo. Despesa recorrente
+            conta uma vez por mês do período.
           </span>
         </div>
 
@@ -440,7 +430,7 @@ export default function FinanceiroPage() {
       )}
 
       {visible.length > 0 && (
-        <TopSales sales={visible} unmarkedIsLiga={unmarkedIsLiga} />
+        <TopSales sales={visible} />
       )}
 
       {visible.length === 0 ? (
@@ -562,7 +552,7 @@ const RANK_ORDER = [
   { value: "bottom", label: "Maiores prejuízos" },
 ];
 
-function TopSales({ sales, unmarkedIsLiga }: { sales: SaleRow[]; unmarkedIsLiga: boolean }) {
+function TopSales({ sales }: { sales: SaleRow[] }) {
   const [order, setOrder] = useState("top");
   const [limit, setLimit] = useState(10);
 
@@ -613,7 +603,7 @@ function TopSales({ sales, unmarkedIsLiga }: { sales: SaleRow[]; unmarkedIsLiga:
                   {s.sellDate ? dayLabel(s.sellDate) : "—"}
                 </TableCell>
                 <TableCell className="px-2 text-[11px] text-slate-400">
-                  <div>{sideLabels[sideOf(s, unmarkedIsLiga)]}</div>
+                  <div>{s.writeOff ? `Baixa sem venda · ${writeOffLabels[s.writeOff]}` : channelLabels[channelOfSale(s)]}</div>
                   <div className="truncate text-[10px] text-slate-500">
                     {isUSD(s) ? `TCGplayer · US$ ${(s.sellPrice ?? 0).toFixed(2)}` : s.buyer || "sem comprador"}
                   </div>

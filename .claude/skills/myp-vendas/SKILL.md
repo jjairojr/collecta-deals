@@ -142,7 +142,7 @@ Gere as chamadas em Python (`urllib`), não em `curl -d '<json>'` (apóstrofo em
 nome quebra o shell). Toda chamada ao prod leva o header `X-Admin-Token` (valor de `ADMIN_TOKEN` em `scripts/deploy.env`).
 
 ```python
-body={"qty":q,"sellPrice":round(unit*q,2),"sellCurrency":"BRL","sellDate":"<AAAA-MM-DD do pedido>","buyer":f"{nick} — MyP #{pedido}"}
+body={"qty":q,"sellPrice":round(unit*q,2),"sellCurrency":"BRL","sellDate":"<AAAA-MM-DD do pedido>","buyer":f"{nick} — MyP #{pedido}","channel":"myp"}
 POST f"{B}/api/trades/{id}/sell?game={game}"
 ```
 

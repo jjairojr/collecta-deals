@@ -187,6 +187,13 @@ func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if !trades.ValidChannel(t.Channel) || !trades.ValidWriteOff(t.WriteOff) {
+		http.Error(w, "unknown channel or writeOff", http.StatusBadRequest)
+		return
+	}
+	if t.Status == "sold" {
+		t.SemLastro = true
+	}
 	created, err := s.addTrade(gs, t)
 	if errors.Is(err, errNoIdentity) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -303,10 +310,19 @@ func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
 		SellCurrency string  `json:"sellCurrency"`
 		SellDate     string  `json:"sellDate"`
 		Buyer        string  `json:"buyer"`
+		Channel      string  `json:"channel"`
+		WriteOff     string  `json:"writeOff"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if !trades.ValidChannel(in.Channel) || !trades.ValidWriteOff(in.WriteOff) {
+		http.Error(w, "unknown channel or writeOff", http.StatusBadRequest)
+		return
+	}
+	if in.WriteOff != "" {
+		in.SellPrice = 0
 	}
 	sale := trades.Sale{
 		Qty:          in.Qty,
@@ -314,6 +330,8 @@ func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
 		SellCurrency: in.SellCurrency,
 		SellDate:     in.SellDate,
 		Buyer:        in.Buyer,
+		Channel:      in.Channel,
+		WriteOff:     in.WriteOff,
 	}
 	sold, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
 		return st.Sell(r.PathValue("id"), sale)

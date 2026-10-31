@@ -1,5 +1,5 @@
 import type { Expense, SaleRow } from "./api";
-import { channelOf, isBRL, isSymbolic } from "./ligasales";
+import { channelOfSale, isBRL, isWriteOff } from "./ligasales";
 
 export type Side = "liga" | "fora";
 export type Kind = "single" | "sealed" | "accessory";
@@ -26,18 +26,8 @@ export function isUSD(sale: SaleRow): boolean {
   return !isBRL(sale);
 }
 
-export function sideOf(sale: SaleRow, unmarkedIsLiga: boolean): Side {
-  if (isUSD(sale)) {
-    return "fora";
-  }
-  const channel = channelOf(sale.buyer);
-  if (channel === "liga") {
-    return "liga";
-  }
-  if (channel === "sem-marca") {
-    return unmarkedIsLiga ? "liga" : "fora";
-  }
-  return "fora";
+export function sideOf(sale: SaleRow): Side {
+  return !isUSD(sale) && channelOfSale(sale) === "liga" ? "liga" : "fora";
 }
 
 export function monthOf(date: string): string {
@@ -84,8 +74,6 @@ export interface FinanceFilters {
   games: string[];
   kinds: Kind[];
   sides: Side[];
-  unmarkedIsLiga: boolean;
-  hideSymbolic: boolean;
   includeUSD: boolean;
 }
 
@@ -111,9 +99,8 @@ export function expenseMonths(expenses: Expense[]): string[] {
   return [...found].sort();
 }
 
-export function eligibleSales(sales: SaleRow[], hideSymbolic: boolean, includeUSD = true): SaleRow[] {
-  const kept = includeUSD ? sales : sales.filter(isBRL);
-  return hideSymbolic ? kept.filter((s) => !isSymbolic(s)) : kept;
+export function eligibleSales(sales: SaleRow[], includeUSD = true): SaleRow[] {
+  return includeUSD ? sales : sales.filter(isBRL);
 }
 
 export function matchesScope(s: SaleRow, f: FinanceFilters): boolean {
@@ -123,11 +110,11 @@ export function matchesScope(s: SaleRow, f: FinanceFilters): boolean {
   if (f.kinds.length > 0 && !f.kinds.includes(kindOf(s))) {
     return false;
   }
-  return f.sides.length === 0 || f.sides.includes(sideOf(s, f.unmarkedIsLiga));
+  return f.sides.length === 0 || f.sides.includes(sideOf(s));
 }
 
 export function filterSales(sales: SaleRow[], f: FinanceFilters): SaleRow[] {
-  return eligibleSales(sales, f.hideSymbolic, f.includeUSD).filter((s) => {
+  return eligibleSales(sales, f.includeUSD).filter((s) => {
     const month = monthOf(s.sellDate ?? "");
     if (!month || monthIndex(month) < monthIndex(f.from) || monthIndex(month) > monthIndex(f.to)) {
       return false;
@@ -137,7 +124,7 @@ export function filterSales(sales: SaleRow[], f: FinanceFilters): SaleRow[] {
 }
 
 export function undatedSales(sales: SaleRow[], f: FinanceFilters): SaleRow[] {
-  return eligibleSales(sales, f.hideSymbolic, f.includeUSD).filter(
+  return eligibleSales(sales, f.includeUSD).filter(
     (s) => !monthOf(s.sellDate ?? "") && matchesScope(s, f),
   );
 }
@@ -202,9 +189,11 @@ export function emptyTotals(): Totals {
 }
 
 function addSale(t: Totals, s: SaleRow): void {
-  t.items += 1;
-  t.units += s.qty > 0 ? s.qty : 1;
-  t.revenueBRL += s.valueBRL;
+  if (!isWriteOff(s)) {
+    t.items += 1;
+    t.units += s.qty > 0 ? s.qty : 1;
+    t.revenueBRL += s.valueBRL;
+  }
   t.costBRL += s.costBRL;
   t.grossBRL += s.profitBRL;
   t.marginPct = t.revenueBRL > 0 ? (t.grossBRL / t.revenueBRL) * 100 : 0;
@@ -247,7 +236,6 @@ export function monthlySeries(
   sales: SaleRow[],
   expenses: Expense[],
   months: string[],
-  unmarkedIsLiga: boolean,
 ): MonthRow[] {
   const rows = new Map<string, MonthRow>();
   for (const month of months) {
@@ -270,7 +258,7 @@ export function monthlySeries(
     row.revenueBRL += s.valueBRL;
     row.costBRL += s.costBRL;
     row.grossBRL += s.profitBRL;
-    if (sideOf(s, unmarkedIsLiga) === "liga") {
+    if (sideOf(s) === "liga") {
       row.ligaBRL += s.valueBRL;
     } else {
       row.foraBRL += s.valueBRL;

@@ -14,6 +14,11 @@ Orquestra três fontes de venda sobre o mesmo estoque:
 | MyP | `/CollectaTCG/vendas` | `MyP #N` | `myp-vendas` |
 | Site | já entra no dashboard pelo webhook do Mercado Pago | `Site #N` | — |
 
+Toda baixa manda `channel` no `/sell` (`liga`, `myp`, `site`, `balcao`, `outros`); a venda
+direta (balcão, live, WhatsApp, pagou por fora) é `balcao`. Venda antiga sem `channel` tem o
+canal deduzido do buyer na leitura (`/api/sales` já devolve resolvido): filtre pelo `channel`
+em vez de regex no buyer.
+
 Leia **inteiras** `.claude/skills/liga-vendas/SKILL.md` e
 `.claude/skills/myp-vendas/SKILL.md` antes de começar: regras duras, URLs,
 formatos e aprendizados estão lá e valem aqui sem exceção.

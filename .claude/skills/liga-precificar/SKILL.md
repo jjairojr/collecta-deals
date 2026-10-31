@@ -61,7 +61,8 @@ for t in items:
 "
 ```
 
-`buyBRL` já inclui rateio de frete. Confira contra a nota do fornecedor: a
+Custo unitário = `buyBRL + shippingBRL / qty`: o frete fica no `shippingBRL` do lote,
+não dentro do `buyBRL`. Confira o `buyBRL` contra a nota do fornecedor: a
 COPAG trabalha **43% off do preço sugerido, flat** em toda a linha — se a razão
 custo/sugerido não der ~0,57 em todos os itens, você entendeu errado a unidade
 de compra (caixa master × unidade de venda).

@@ -55,6 +55,9 @@ type Trade struct {
 	SellCurrency string  `json:"sellCurrency,omitempty"` // "BRL" | "USD"
 	SellDate     string  `json:"sellDate,omitempty"`
 	Buyer        string  `json:"buyer,omitempty"`
+	Channel      string  `json:"channel,omitempty"`
+	WriteOff     string  `json:"writeOff,omitempty"`
+	SemLastro    bool    `json:"semLastro,omitempty"`
 
 	Notes     string    `json:"notes,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`

@@ -564,6 +564,10 @@ export async function exportImage(cards: { set: string; number: string }[]): Pro
   return await res.blob();
 }
 
+export type SaleChannel = "liga" | "myp" | "site" | "balcao" | "outros";
+
+export type WriteOffReason = "aberto" | "perda" | "brinde" | "uso";
+
 export interface Trade {
   id: string;
   kind?: "sealed" | "accessory";
@@ -597,6 +601,9 @@ export interface Trade {
   sellCurrency?: "BRL" | "USD";
   sellDate?: string;
   buyer?: string;
+  channel?: SaleChannel;
+  writeOff?: WriteOffReason;
+  semLastro?: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -1014,6 +1021,8 @@ export interface SellTradeInput {
   sellCurrency: "BRL" | "USD";
   sellDate?: string;
   buyer?: string;
+  channel?: SaleChannel;
+  writeOff?: WriteOffReason;
 }
 
 export function sellTrade(id: string, sale: SellTradeInput, game?: string): Promise<Trade> {

@@ -13,7 +13,9 @@ func BuildPortfolio(all []Trade, pct, fxRate float64, lookup PriceLookup) Portfo
 		v := value(t, pct, fxRate, lookup)
 		resp.Trades = append(resp.Trades, v)
 		if v.Realized {
-			sum.Sold++
+			if v.WriteOff == "" {
+				sum.Sold++
+			}
 			sum.CostOfSoldBRL += v.CostBRL
 			sum.ProceedsBRL += v.ValueBRL
 		} else {
@@ -50,6 +52,8 @@ func value(t Trade, pct, fxRate float64, lookup PriceLookup) TradeView {
 
 	if t.Status == "sold" {
 		v.Realized = true
+		v.Channel = ChannelOf(t)
+		v.WriteOff = WriteOffOf(t)
 		v.ValueBRL = proceedsBRL(t, fxRate)
 	} else if t.Kind != "" {
 		v.ValueBRL = t.ManualBRL * float64(v.Qty)
