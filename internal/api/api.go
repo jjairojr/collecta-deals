@@ -183,6 +183,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/purchases/{id}/items", s.handlePurchaseItemCreate)
 	mux.HandleFunc("POST /api/purchases/{id}/attach", s.handlePurchaseAttach)
 	mux.HandleFunc("POST /api/purchases/detach", s.handlePurchaseDetach)
+	mux.HandleFunc("POST /api/purchases/reallocate", s.handlePurchasesReallocate)
 	mux.HandleFunc("GET /api/syncqueue", s.handleSyncQueueList)
 	mux.HandleFunc("POST /api/syncqueue/{id}/done", s.handleSyncQueueDone)
 	mux.HandleFunc("POST /api/syncqueue/{id}/error", s.handleSyncQueueError)

@@ -20,11 +20,12 @@ type Trade struct {
 	GTIN      string `json:"gtin,omitempty"`
 	Qty       int    `json:"qty"`
 
-	BuyBRL      float64 `json:"buyBRL"`
-	ShippingBRL float64 `json:"shippingBRL"`
-	Store       string  `json:"store,omitempty"`
-	BuyDate     string  `json:"buyDate,omitempty"`
-	Delivered   bool    `json:"delivered,omitempty"`
+	BuyBRL           float64 `json:"buyBRL"`
+	ShippingBRL      float64 `json:"shippingBRL"`
+	OrderShippingBRL float64 `json:"orderShippingBRL,omitempty"`
+	Store            string  `json:"store,omitempty"`
+	BuyDate          string  `json:"buyDate,omitempty"`
+	Delivered        bool    `json:"delivered,omitempty"`
 
 	// PurchaseID links this item to the buy order it came in, kept in the shared
 	// purchases ledger. Empty means the item was logged on its own, which is how

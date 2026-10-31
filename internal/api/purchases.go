@@ -105,7 +105,7 @@ func (s *Server) handlePurchases(w http.ResponseWriter, r *http.Request) {
 		view := purchaseView{Purchase: p, Items: items, TotalBRL: p.ShippingBRL}
 		for _, it := range items {
 			view.Units += it.Qty
-			view.ItemsCostBRL += it.CostBRL
+			view.ItemsCostBRL += it.CostBRL - it.OrderShippingBRL
 			if it.Realized {
 				view.Sold++
 				view.ProceedsBRL += it.ValueBRL
@@ -152,6 +152,9 @@ func (s *Server) handlePurchasesUpdate(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, purchases.ErrNotFound) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
+	}
+	if err == nil {
+		err = s.reallocateOrderShipping(updated.ID)
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -229,6 +232,9 @@ func (s *Server) handlePurchaseItemCreate(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if err == nil {
+		err = s.reallocateOrderShipping(id)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -279,6 +285,7 @@ func (s *Server) reassign(w http.ResponseWriter, r *http.Request, target string)
 		return
 	}
 	updated := 0
+	touched := []string{target}
 	for _, ref := range in.Items {
 		ledger := s.accessories
 		if gs, ok := s.games[ref.Game]; ok && gs.Trades != nil {
@@ -288,7 +295,9 @@ func (s *Server) reassign(w http.ResponseWriter, r *http.Request, target string)
 			continue
 		}
 		_, err := ledger.Update(ref.ID, func(t *trades.Trade) {
+			touched = append(touched, t.PurchaseID)
 			t.PurchaseID = target
+			t.OrderShippingBRL = 0
 			if target != "" {
 				t.SemLastro = false
 			}
@@ -301,6 +310,10 @@ func (s *Server) reassign(w http.ResponseWriter, r *http.Request, target string)
 			return
 		}
 		updated++
+	}
+	if err := s.reallocateOrders(touched...); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	writeJSON(w, map[string]int{"updated": updated})
 }

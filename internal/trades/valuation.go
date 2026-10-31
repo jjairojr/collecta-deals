@@ -36,7 +36,7 @@ func value(t Trade, pct, fxRate float64, lookup PriceLookup) TradeView {
 	if v.Qty <= 0 {
 		v.Qty = 1
 	}
-	v.CostBRL = float64(v.Qty)*t.BuyBRL + t.ShippingBRL
+	v.CostBRL = float64(v.Qty)*t.BuyBRL + t.ShippingBRL + t.OrderShippingBRL
 
 	market, ok := 0.0, false
 	if t.Kind == "" {

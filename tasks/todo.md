@@ -1161,7 +1161,7 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - [x] Bloqueado com anúncio ativo ou pedido do site aberto, com aviso. Slug base mantido, produto aparece no jogo novo na vitrine (a URL pública ganha o prefixo do jogo novo). Também bloqueia acessório e item com pendência aberta na fila de sincronização.
 
 ### Fase 6 — rateio do frete do pedido
-- [ ] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado no `shippingBRL` do item; recalcula a cada mudança de frete/itens; lote vendido não é recalculado.
+- [x] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado no `shippingBRL` do item; recalcula a cada mudança de frete/itens; lote vendido não é recalculado.
 
 ### Fase 7 — estorno do pedido do site
 - [ ] Reembolsado/cancelado depois de pago devolve as unidades ao estoque (lote novo ou junta ao de origem).

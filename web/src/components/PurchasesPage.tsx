@@ -350,8 +350,8 @@ export default function PurchasesPage() {
     <div className="space-y-6">
       <p className="max-w-2xl text-sm text-slate-400">
         Cada compra é um pedido: você abre com a data, o vendedor e o frete, e vai lançando os itens dentro
-        dela — de qualquer jogo. O item entra no portfólio do jogo que você escolher, e o total aqui já soma o
-        frete do pedido.
+        dela — de qualquer jogo. O item entra no portfólio do jogo que você escolher, e o frete do pedido é
+        rateado nos itens em estoque pelo valor pago, entrando no custo de cada um.
       </p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -949,6 +949,7 @@ function ItemRow({
                 item.set,
                 item.variant,
                 kindLabels[kindOf(item)],
+                item.orderShippingBRL ? `frete rateado ${brl2(item.orderShippingBRL)}` : "",
                 showOrigin && item.buyDate ? dayLabel(item.buyDate) : "",
                 showOrigin ? item.store : "",
               ]

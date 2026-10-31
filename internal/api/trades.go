@@ -199,6 +199,9 @@ func (s *Server) handleTradesCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if err == nil {
+		err = s.reallocateOrderShipping(created.PurchaseID)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -223,7 +226,9 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var patchErr error
+	prevPurchase := ""
 	mutate := func(t *trades.Trade) {
+		prevPurchase = t.PurchaseID
 		next, err := patchTrade(*t, patch)
 		if err != nil {
 			patchErr = err
@@ -241,11 +246,28 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = patchErr
 	}
+	if err == nil && touchesOrderShipping(patch) {
+		err = s.reallocateOrders(prevPurchase, updated.PurchaseID)
+		if err == nil {
+			updated, err = onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
+				return st.Update(id, func(*trades.Trade) {})
+			})
+		}
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, updated)
+}
+
+func touchesOrderShipping(patch map[string]json.RawMessage) bool {
+	for _, k := range []string{"qty", "buyBRL", "purchaseID", "status"} {
+		if _, ok := patch[k]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func patchTrade(cur trades.Trade, patch map[string]json.RawMessage) (trades.Trade, error) {
@@ -270,6 +292,7 @@ func patchTrade(cur trades.Trade, patch map[string]json.RawMessage) (trades.Trad
 	}
 	next.ID = cur.ID
 	next.CreatedAt = cur.CreatedAt
+	next.OrderShippingBRL = cur.OrderShippingBRL
 	next.Number = model.NormalizeNumber(next.Number)
 	if next.RefUSD == 0 {
 		next.RefUSD = cur.RefUSD
@@ -382,6 +405,10 @@ func (s *Server) handleTradesUnsell(w http.ResponseWriter, r *http.Request) {
 		game = accessoryGameID
 	}
 	s.queueStockReturn(game, res.Sale)
+	if err := s.reallocateOrderShipping(res.Restored.PurchaseID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	writeJSON(w, res.Restored)
 }
 
@@ -391,12 +418,20 @@ func (s *Server) handleTradesDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "trades store unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	_, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (struct{}, error) {
+	owners, err := s.purchaseIDsOf([]string{r.PathValue("id")})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, err = onLedger(s.ledgersFor(gs), func(st *trades.Store) (struct{}, error) {
 		return struct{}{}, st.Delete(r.PathValue("id"))
 	})
 	if errors.Is(err, trades.ErrNotFound) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
+	}
+	if err == nil {
+		err = s.reallocateOrders(owners...)
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -422,6 +457,11 @@ func (s *Server) handleTradesMerge(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	owners, err := s.purchaseIDsOf(in.IDs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	merged, err := onLedger(s.ledgersFor(gs), func(st *trades.Store) (trades.Trade, error) {
 		return st.Merge(in.IDs)
 	})
@@ -431,6 +471,10 @@ func (s *Server) handleTradesMerge(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.reallocateOrders(owners...); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, merged)

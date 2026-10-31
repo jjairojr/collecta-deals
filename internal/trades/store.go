@@ -266,6 +266,34 @@ func (s *Store) SetLigaState(updates map[string]LigaState) (int, error) {
 	return n, nil
 }
 
+func (s *Store) SetOrderShipping(shares map[string]float64) (int, error) {
+	if len(shares) == 0 {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all, err := s.load()
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for i := range all {
+		v, ok := shares[all[i].ID]
+		if !ok || all[i].OrderShippingBRL == v {
+			continue
+		}
+		all[i].OrderShippingBRL = v
+		n++
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	if err := s.persist(all); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 type Sale struct {
 	Qty          int
 	SellPrice    float64
@@ -311,10 +339,12 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 			return result, nil
 		}
 		soldShip := round2(orig.ShippingBRL * float64(sale.Qty) / float64(orig.Qty))
+		soldOrderShip := round2(orig.OrderShippingBRL * float64(sale.Qty) / float64(orig.Qty))
 		sold := *orig
 		sold.ID = newID()
 		sold.Qty = sale.Qty
 		sold.ShippingBRL = soldShip
+		sold.OrderShippingBRL = soldOrderShip
 		sold.Status = "sold"
 		sold.SellPrice = sale.SellPrice
 		sold.SellCurrency = sale.SellCurrency
@@ -326,6 +356,7 @@ func (s *Store) Sell(id string, sale Sale) (Trade, error) {
 		sold.UpdatedAt = now
 		orig.Qty -= sale.Qty
 		orig.ShippingBRL = round2(orig.ShippingBRL - soldShip)
+		orig.OrderShippingBRL = round2(orig.OrderShippingBRL - soldOrderShip)
 		orig.UpdatedAt = now
 		all = append(all, sold)
 		if err := s.persist(all); err != nil {
@@ -394,6 +425,7 @@ func (s *Store) Unsell(id string) (Unsold, error) {
 	o.BuyBRL = round2((float64(o.Qty)*o.BuyBRL + float64(back.Qty)*back.BuyBRL) / float64(qty))
 	o.Qty = qty
 	o.ShippingBRL = round2(o.ShippingBRL + back.ShippingBRL)
+	o.OrderShippingBRL = round2(o.OrderShippingBRL + back.OrderShippingBRL)
 	o.UpdatedAt = now
 	restored := *o
 	out := append(all[:at:at], all[at+1:]...)
@@ -476,6 +508,7 @@ func (s *Store) Merge(ids []string) (Trade, error) {
 	totalQty := 0
 	weightedBuy := 0.0
 	shipping := 0.0
+	orderShipping := 0.0
 	delivered := true
 	notes := make([]string, 0, len(parts))
 	seenNotes := make(map[string]bool, len(parts))
@@ -487,6 +520,7 @@ func (s *Store) Merge(ids []string) (Trade, error) {
 		totalQty += qty
 		weightedBuy += float64(qty) * t.BuyBRL
 		shipping += t.ShippingBRL
+		orderShipping += t.OrderShippingBRL
 		if !t.Delivered {
 			delivered = false
 		}
@@ -509,6 +543,7 @@ func (s *Store) Merge(ids []string) (Trade, error) {
 	merged.Qty = totalQty
 	merged.BuyBRL = round2(weightedBuy / float64(totalQty))
 	merged.ShippingBRL = round2(shipping)
+	merged.OrderShippingBRL = round2(orderShipping)
 	merged.Delivered = delivered
 	merged.CreatedAt = primary.CreatedAt
 	merged.UpdatedAt = time.Now()

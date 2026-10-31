@@ -580,6 +580,7 @@ export interface Trade {
   qty: number;
   buyBRL: number;
   shippingBRL: number;
+  orderShippingBRL?: number;
   store?: string;
   buyDate?: string;
   delivered?: boolean;
