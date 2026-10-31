@@ -202,3 +202,34 @@ func TestUpdateKeepsPurchaseLink(t *testing.T) {
 		t.Fatalf("purchaseID = %q after edit, want %q", out.PurchaseID, order.ID)
 	}
 }
+
+func TestUpdateSwitchesKindBetweenSingleAndSealed(t *testing.T) {
+	s, _, _ := purchaseServer(t)
+	order := newOrder(t, s, `{"date":"2026-10-22","store":"Copag"}`)
+	item := addItem(t, s, order.ID, "onepiece", `{"name":"Double Pack 30 Anos","qty":19,"buyBRL":66.49}`)
+
+	put := func(body string) trades.Trade {
+		req := httptest.NewRequest(http.MethodPut, "/api/trades/"+item.ID+"?game=onepiece", strings.NewReader(body))
+		req.SetPathValue("id", item.ID)
+		rec := httptest.NewRecorder()
+		s.handleTradesUpdate(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("update status = %d: %s", rec.Code, rec.Body.String())
+		}
+		var out trades.Trade
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	if got := put(`{"kind":"sealed","name":"Double Pack 30 Anos","set":"SEALED","qty":19,"buyBRL":66.49}`); got.Kind != "sealed" {
+		t.Fatalf("kind = %q, want sealed", got.Kind)
+	}
+	if got := put(`{"name":"Double Pack 30 Anos","set":"SEALED","qty":19,"buyBRL":66.49}`); got.Kind != "sealed" {
+		t.Fatalf("kind = %q after edit without kind, want sealed kept", got.Kind)
+	}
+	if got := put(`{"kind":"single","name":"Double Pack 30 Anos","qty":19,"buyBRL":66.49}`); got.Kind != "" {
+		t.Fatalf("kind = %q, want empty for a card", got.Kind)
+	}
+}

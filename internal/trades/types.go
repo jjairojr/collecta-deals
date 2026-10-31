@@ -6,6 +6,8 @@ import "time"
 // playmats…). Those live in a single shared ledger instead of a per-game one.
 const KindAccessory = "accessory"
 
+const KindSingle = "single"
+
 type Trade struct {
 	ID        string `json:"id"`
 	Slug      string `json:"slug,omitempty"`

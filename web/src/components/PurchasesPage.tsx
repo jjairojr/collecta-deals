@@ -1124,7 +1124,9 @@ function EditItemForm({
   onReload: () => Promise<void> | void;
   onSaved: () => Promise<void> | void;
 }) {
-  const single = kindOf(item) === "single";
+  const accessory = kindOf(item) === "accessory";
+  const [kind, setKind] = useState<ItemKind>(kindOf(item));
+  const single = kind === "single";
   const [name, setName] = useState(item.name);
   const [number, setNumber] = useState(item.number);
   const [set, setSet] = useState(item.set);
@@ -1144,6 +1146,15 @@ function EditItemForm({
     setImageURL(item.imageURL ?? "");
   }, [item.imageURL]);
 
+  const changeKind = (next: ItemKind) => {
+    setKind(next);
+    if (next === "sealed") {
+      setSet("SEALED");
+    } else if (set === "SEALED") {
+      setSet("");
+    }
+  };
+
   const submit = async () => {
     setSaving(true);
     setFailed(null);
@@ -1152,6 +1163,7 @@ function EditItemForm({
         item.id,
         {
           ...item,
+          kind: accessory ? item.kind : kind === "sealed" ? "sealed" : "single",
           name,
           number,
           set,
@@ -1181,6 +1193,14 @@ function EditItemForm({
         <Field label="Nome">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
+        {!accessory && (
+          <Field label="Tipo">
+            <Select value={kind} onChange={(e) => changeKind(e.target.value === "sealed" ? "sealed" : "single")}>
+              <option value="single">Carta</option>
+              <option value="sealed">Selado</option>
+            </Select>
+          </Field>
+        )}
         {single && (
           <>
             <Field label="Número">

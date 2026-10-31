@@ -994,7 +994,13 @@ export function createTrade(t: Partial<Trade>): Promise<Trade> {
   return sendJSON<Trade>(`${base}/trades?${gp(new URLSearchParams()).toString()}`, "POST", t);
 }
 
-export function updateTrade(id: string, t: Partial<Trade>, game?: string): Promise<Trade> {
+export type TradeKindInput = Trade["kind"] | "single";
+
+export function updateTrade(
+  id: string,
+  t: Omit<Partial<Trade>, "kind"> & { kind?: TradeKindInput },
+  game?: string,
+): Promise<Trade> {
   const params = gp(new URLSearchParams());
   if (game) {
     params.set("game", game);

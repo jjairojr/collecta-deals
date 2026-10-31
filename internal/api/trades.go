@@ -221,8 +221,11 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 		if in.ManualBRL == 0 {
 			in.ManualBRL = t.ManualBRL
 		}
-		if in.Kind == "" {
+		switch in.Kind {
+		case "":
 			in.Kind = t.Kind
+		case trades.KindSingle:
+			in.Kind = ""
 		}
 		if in.PurchaseID == "" {
 			in.PurchaseID = t.PurchaseID
