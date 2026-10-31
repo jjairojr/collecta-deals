@@ -1164,8 +1164,8 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - [x] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado no `shippingBRL` do item; recalcula a cada mudança de frete/itens; lote vendido não é recalculado.
 
 ### Fase 7 — estorno do pedido do site
-- [ ] Reembolsado/cancelado depois de pago devolve as unidades ao estoque (lote novo ou junta ao de origem).
-- [ ] Mudança manual de "sem estoque" para pago/enviado dá a baixa que hoje não acontece.
+- [x] Reembolsado/cancelado depois de pago devolve as unidades ao estoque (lote novo ou junta ao de origem).
+- [x] Mudança manual de "sem estoque" para pago/enviado dá a baixa que hoje não acontece.
 
 ### Fase 8 — juntar telas
 - [ ] Portfólio some (inclusive `?tab=portfolio`, Acessórios e o clique de Todos os jogos); `Kpi`/`Chip` vão para `ui/`.

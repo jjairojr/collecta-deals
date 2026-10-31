@@ -1319,6 +1319,7 @@ export interface OrderLine {
   unitBRL: number;
   imageURL?: string;
   tradeIDs?: string[];
+  returnedTradeIDs?: string[];
 }
 
 export interface OrderBuyer {
@@ -1379,6 +1380,7 @@ export interface Order {
   paidAt: string;
   shippedAt: string;
   deliveredAt: string;
+  stockReturnedAt?: string;
 }
 
 export interface OrderPatch {

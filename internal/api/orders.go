@@ -898,6 +898,7 @@ func (s *Server) applyPayment(ctx context.Context, pay mercadopago.Payment) erro
 			if pay.ID == o.MP.PaymentID && (pay.Status == "refunded" || pay.Status == "charged_back") {
 				o.Status = orders.StatusRefunded
 				o.MP.Status = pay.Status
+				s.returnStock(o, now)
 			}
 			return nil
 		case orders.StatusOversold, orders.StatusRefunded:
@@ -939,48 +940,19 @@ func (s *Server) settle(o *orders.Order, pay mercadopago.Payment, now time.Time)
 		o.Notes = appendNote(o.Notes, fmt.Sprintf("valor pago %.2f difere do total %.2f", pay.AmountBRL, o.Totals.TotalBRL))
 		return nil
 	}
-	plan := make([][]orders.Pick, len(o.Lines))
-	for i, l := range o.Lines {
-		st := s.ledgerForGame(l.Game)
-		if st == nil {
-			o.Status = orders.StatusOversold
-			o.Notes = appendNote(o.Notes, "ledger desconhecido para "+l.Game)
-			return nil
-		}
-		all, err := st.List()
-		if err != nil {
-			return err
-		}
-		picks, ok := orders.Allocate(bySKU(all, l.Game, l.SKU), l.Qty)
-		if !ok {
-			o.Status = orders.StatusOversold
-			o.Notes = appendNote(o.Notes, fmt.Sprintf("sem estoque para %s x%d", l.Name, l.Qty))
-			return nil
-		}
-		plan[i] = picks
+	plan, short, err := s.planStock(*o)
+	if err != nil {
+		return err
 	}
-	buyer := fmt.Sprintf("%s — Site #%d", o.Buyer.Name, o.Number)
-	date := now.In(saoPaulo).Format("2006-01-02")
-	for i, picks := range plan {
-		l := &o.Lines[i]
-		st := s.ledgerForGame(l.Game)
-		for _, p := range picks {
-			sold, err := st.Sell(p.TradeID, trades.Sale{
-				Qty:          p.Qty,
-				SellPrice:    round2(float64(p.Qty) * l.UnitBRL),
-				SellCurrency: "BRL",
-				SellDate:     date,
-				Buyer:        buyer,
-				Channel:      trades.ChannelSite,
-			})
-			if err != nil {
-				o.Status = orders.StatusOversold
-				o.Notes = appendNote(o.Notes, fmt.Sprintf("baixa falhou em %s: %v", p.TradeID, err))
-				return nil
-			}
-			l.TradeIDs = append(l.TradeIDs, sold.ID)
-			s.queueStockExit(l.Game, sold)
-		}
+	if short != "" {
+		o.Status = orders.StatusOversold
+		o.Notes = appendNote(o.Notes, short)
+		return nil
+	}
+	if failed := s.sellStock(o, plan, now); failed != "" {
+		o.Status = orders.StatusOversold
+		o.Notes = appendNote(o.Notes, failed)
+		return nil
 	}
 	if !o.CouponsReleasedAt.IsZero() {
 		o.Notes = appendNote(o.Notes, "cupons liberados antes do pagamento")
@@ -1059,7 +1031,7 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var bad string
+	var bad, partial string
 	o, err := s.Checkout.Orders.Transact(r.PathValue("id"), func(o *orders.Order) error {
 		if in.TrackingCode != nil {
 			o.TrackingCode = strings.TrimSpace(*in.TrackingCode)
@@ -1072,9 +1044,32 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 		}
 		now := time.Now()
 		current := orders.EffectiveStatus(*o, now)
-		if err := orders.SetStatus(o, orders.Status(*in.Status), now); err != nil {
+		to := orders.Status(*in.Status)
+		if err := orders.CanSetStatus(*o, to, now); err != nil {
 			bad = fmt.Sprintf("não dá para mudar de %s para %s", current, *in.Status)
 			return err
+		}
+		if needsStock(current, to) && !o.HoldsStock() {
+			plan, short, err := s.planStock(*o)
+			if err != nil {
+				return err
+			}
+			if short != "" {
+				bad = short + ": dê entrada no estoque antes de marcar o pedido como " + string(to)
+				return errors.New(bad)
+			}
+			if failed := s.sellStock(o, plan, now); failed != "" {
+				o.Notes = appendNote(o.Notes, failed)
+				partial = failed
+				return nil
+			}
+			o.StockReturnedAt = time.Time{}
+		}
+		if err := orders.SetStatus(o, to, now); err != nil {
+			return err
+		}
+		if releasesStock(to) {
+			s.returnStock(o, now)
 		}
 		return nil
 	})
@@ -1092,6 +1087,10 @@ func (s *Server) handleOrderPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Status != nil {
 		s.releaseLater(r.Context(), o)
+	}
+	if partial != "" {
+		http.Error(w, partial, http.StatusConflict)
+		return
 	}
 	writeJSON(w, o)
 }

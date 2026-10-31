@@ -42,6 +42,8 @@ type Line struct {
 	UnitBRL  float64  `json:"unitBRL"`
 	ImageURL string   `json:"imageURL,omitempty"`
 	TradeIDs []string `json:"tradeIDs,omitempty"`
+
+	ReturnedTradeIDs []string `json:"returnedTradeIDs,omitempty"`
 }
 
 type Buyer struct {
@@ -123,6 +125,17 @@ type Order struct {
 	PaidAt      time.Time `json:"paidAt,omitempty"`
 	ShippedAt   time.Time `json:"shippedAt,omitempty"`
 	DeliveredAt time.Time `json:"deliveredAt,omitempty"`
+
+	StockReturnedAt time.Time `json:"stockReturnedAt,omitempty"`
+}
+
+func (o Order) HoldsStock() bool {
+	for _, l := range o.Lines {
+		if len(l.TradeIDs) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func EffectiveStatus(o Order, now time.Time) Status {
@@ -149,20 +162,25 @@ func ManualTargets(from Status) []Status {
 	return manualTargets[from]
 }
 
-func SetStatus(o *Order, to Status, now time.Time) error {
-	current := EffectiveStatus(*o, now)
+func CanSetStatus(o Order, to Status, now time.Time) error {
+	current := EffectiveStatus(o, now)
 	if to == current {
 		return nil
 	}
-	allowed := false
 	for _, s := range manualTargets[current] {
 		if s == to {
-			allowed = true
-			break
+			return nil
 		}
 	}
-	if !allowed {
-		return ErrTransition
+	return ErrTransition
+}
+
+func SetStatus(o *Order, to Status, now time.Time) error {
+	if err := CanSetStatus(*o, to, now); err != nil {
+		return err
+	}
+	if to == EffectiveStatus(*o, now) {
+		return nil
 	}
 	o.Status = to
 	switch to {

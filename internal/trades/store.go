@@ -373,6 +373,14 @@ type Unsold struct {
 }
 
 func (s *Store) Unsell(id string) (Unsold, error) {
+	return s.unsell(id, false)
+}
+
+func (s *Store) UnsellSiteSale(id string) (Unsold, error) {
+	return s.unsell(id, true)
+}
+
+func (s *Store) unsell(id string, allowSite bool) (Unsold, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all, err := s.load()
@@ -393,7 +401,7 @@ func (s *Store) Unsell(id string) (Unsold, error) {
 	if sale.Status != "sold" {
 		return Unsold{}, ErrNotSold
 	}
-	if ChannelOf(sale) == ChannelSite {
+	if ChannelOf(sale) == ChannelSite && !allowSite {
 		return Unsold{}, ErrSiteSale
 	}
 	now := time.Now()

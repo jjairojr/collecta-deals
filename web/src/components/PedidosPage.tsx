@@ -96,6 +96,10 @@ const manualTargets: Record<OrderStatus, OrderStatus[]> = {
 
 const fulfilled: OrderStatus[] = ["paid", "shipped", "delivered"];
 
+function holdsStock(o: Order): boolean {
+  return o.lines.some((l) => (l.tradeIDs ?? []).length > 0);
+}
+
 function isStatus(value: string): value is OrderStatus {
   return filterStatuses.all.some((s) => s === value);
 }
@@ -437,7 +441,11 @@ function OrderRow({
   const changeStatus = () => {
     if (
       (target === "cancelled" || target === "refunded") &&
-      !window.confirm(`Mudar o pedido #${order.number} para "${statusLabels[target]}"?`)
+      !window.confirm(
+        holdsStock(order)
+          ? `Mudar o pedido #${order.number} para "${statusLabels[target]}"? Os itens vendidos voltam para o estoque.`
+          : `Mudar o pedido #${order.number} para "${statusLabels[target]}"?`,
+      )
     ) {
       return;
     }
@@ -448,7 +456,9 @@ function OrderRow({
   const targets = manualTargets[order.status];
   const shipped = order.status === "shipped" || order.status === "delivered";
   const canShip = order.status === "paid";
-  const noStockMove = order.status === "oversold" && fulfilled.includes(target);
+  const takesStock =
+    (order.status === "oversold" || order.status === "refunded") && fulfilled.includes(target) && !holdsStock(order);
+  const returnsStock = (target === "cancelled" || target === "refunded") && holdsStock(order);
   const whatsapp = `https://wa.me/55${order.buyer.phone}`;
 
   return (
@@ -533,6 +543,7 @@ function OrderRow({
                   <Stamp label="Pago" value={order.paidAt} />
                   <Stamp label="Enviado" value={order.shippedAt} />
                   <Stamp label="Entregue" value={order.deliveredAt} />
+                  <Stamp label="Estoque devolvido" value={order.stockReturnedAt ?? ""} />
                   {order.status === "pending" && <Stamp label="Expira" value={order.expiresAt} />}
                 </dl>
               </section>
@@ -653,9 +664,14 @@ function OrderRow({
                 Salvar notas
               </Button>
             </div>
-            {noStockMove && (
+            {takesStock && (
               <p className="mt-2 text-[11px] text-amber-300">
-                Mudar o status não dá baixa no estoque: confira se os itens já saíram do dashboard.
+                Mudar o status dá baixa no estoque dos itens deste pedido; sem estoque suficiente, o status não muda.
+              </p>
+            )}
+            {returnsStock && (
+              <p className="mt-2 text-[11px] text-amber-300">
+                Mudar o status devolve ao estoque os itens já baixados deste pedido.
               </p>
             )}
             {failed && <p className="mt-2 text-[11px] text-rose-300">{failed}</p>}
