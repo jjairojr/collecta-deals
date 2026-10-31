@@ -13,8 +13,6 @@ import {
 import { brandFor, iconOf, isView, ligaLabels, scopeOf, type View } from "./brand";
 import DealsPage from "./components/DealsPage";
 import TrackingPage from "./components/TrackingPage";
-import PortfolioPage from "./components/PortfolioPage";
-import AllPortfolioPage from "./components/AllPortfolioPage";
 import LigaSalesPage from "./components/LigaSalesPage";
 import PedidosPage, { TokenCard } from "./components/PedidosPage";
 import PurchasesPage from "./components/PurchasesPage";
@@ -55,14 +53,6 @@ const pageMeta: Record<View, { title: string; description: string }> = {
     title: "Selados",
     description: "Produtos selados — tendência de preço e vendas inferidas.",
   },
-  portfolio: {
-    title: "Portfólio",
-    description: "Suas compras e vendas — quanto investiu e quanto já vendeu.",
-  },
-  allportfolio: {
-    title: "Todos os jogos",
-    description: "Portfólio somado de todos os jogos.",
-  },
   vendas: {
     title: "Vendas",
     description: "O que já vendeu, da mais recente para a mais antiga — receita, custo e lucro de cada item.",
@@ -73,7 +63,7 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   },
   compras: {
     title: "Compras",
-    description: "Cada pedido de compra com seus itens — de todos os jogos, no mesmo lugar.",
+    description: "Cada pedido de compra com seus itens, de todos os jogos: lançar, editar, vender e mover cada item.",
   },
   importar: {
     title: "Importar / Exportar",
@@ -87,10 +77,6 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   financeiro: {
     title: "Financeiro",
     description: "Quanto entrou, quanto veio da Liga e o que sobrou depois das despesas.",
-  },
-  acessorios: {
-    title: "Acessórios",
-    description: "Sleeves, deckboxes, playmats — estoque único, o mesmo em todos os jogos.",
   },
   despesas: {
     title: "Despesas",
@@ -244,19 +230,6 @@ export default function App() {
                 <div className="mt-6">
                   <TrackingPage key="sealed" mode="sealed" />
                 </div>
-              ) : activeView === "portfolio" ? (
-                <div className="mt-6">
-                  <PortfolioPage />
-                </div>
-              ) : activeView === "allportfolio" ? (
-                <div className="mt-6">
-                  <AllPortfolioPage
-                    onOpenGame={(id) => {
-                      changeGame(id);
-                      setView("portfolio");
-                    }}
-                  />
-                </div>
               ) : activeView === "vendas" ? (
                 <div className="mt-6">
                   <LigaSalesPage />
@@ -280,10 +253,6 @@ export default function App() {
               ) : activeView === "financeiro" ? (
                 <div className="mt-6">
                   <FinanceiroPage />
-                </div>
-              ) : activeView === "acessorios" ? (
-                <div className="mt-6">
-                  <PortfolioPage lockedSection="accessories" />
                 </div>
               ) : activeView === "despesas" ? (
                 <div className="mt-6">
@@ -332,8 +301,24 @@ function useUnauthorized(): boolean {
   return hit;
 }
 
+const legacyViews: Record<string, { view: View; jogo?: string }> = {
+  portfolio: { view: "compras" },
+  allportfolio: { view: "compras" },
+  acessorios: { view: "compras", jogo: "acessorios" },
+};
+
 function readView(): View {
-  const value = new URLSearchParams(window.location.search).get("tab") ?? "";
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get("tab") ?? "";
+  const legacy = legacyViews[value];
+  if (legacy) {
+    params.set("tab", legacy.view);
+    if (legacy.jogo) {
+      params.set("jogo", legacy.jogo);
+    }
+    window.history.replaceState(null, "", `?${params.toString()}`);
+    return legacy.view;
+  }
   return isView(value) ? value : "deals";
 }
 

@@ -33,7 +33,8 @@ import {
 } from "../finance";
 import { channelLabels, channelOfSale, writeOffLabels } from "../ligasales";
 import EmptyState from "./EmptyState";
-import { Chip, Kpi } from "./PortfolioPage";
+import { Chip } from "./ui/chip";
+import { Kpi } from "./ui/kpi";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";

@@ -1136,13 +1136,13 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - [x] Confirmação ao excluir item e compra em Compras (hoje sem confirm: `PurchasesPage.tsx` delete do item e da compra).
 
 ### Fase 2 — canal da venda
-- [ ] Campo `channel` na venda: `liga` | `myp` | `site` | `balcao` | `outros`; select na baixa; `buyer` fica só com o nome.
-- [ ] `balcao` = toda venda direta (loja física, WhatsApp, pagou por fora); `myp` só pedido do MyPCards.
-- [ ] Migração das vendas antigas pelo texto do buyer (`Liga #`, `MyP #`, `Site #`, `balcão`, `MYP` pago por fora → balcao); vazio → outros.
-- [ ] "Baixa sem venda" com motivo (aberto, perda, brinde, uso próprio): custa, não conta como receita/venda no Financeiro; migrar as baixas simbólicas de R$ 1/un.
-- [ ] Marca `semLastro` nas vendas criadas sem item pela liga-vendas + filtro "Vendas sem lastro" em Vendas para vincular a uma compra.
-- [ ] `ligasales.ts`/`finance.ts` usam `channel` em vez de regex no buyer; pacotes por nº de pedido de Liga, MyP e Site.
-- [ ] Skills liga-vendas, myp-vendas, baixa-vendas, dashboard-cadastrar mandam `channel`; liga-precificar deixa de supor frete dentro do `buyBRL`.
+- [x] Campo `channel` na venda: `liga` | `myp` | `site` | `balcao` | `outros`; select na baixa; `buyer` fica só com o nome.
+- [x] `balcao` = toda venda direta (loja física, WhatsApp, pagou por fora); `myp` só pedido do MyPCards.
+- [x] Migração das vendas antigas pelo texto do buyer (`Liga #`, `MyP #`, `Site #`, `balcão`, `MYP` pago por fora → balcao); vazio → outros. (feito na leitura, sem reescrever prod)
+- [x] "Baixa sem venda" com motivo (aberto, perda, brinde, uso próprio): custa, não conta como receita/venda no Financeiro; migrar as baixas simbólicas de R$ 1/un. (desvio: legado só vira "aberto" com "aberto/aberta" no comprador; a regra de R$ 1 pegava ~90 vendas reais de bulk)
+- [x] Marca `semLastro` nas vendas criadas sem item pela liga-vendas + filtro "Vendas sem lastro" em Vendas para vincular a uma compra. (desvio: só vendas novas; 448 de 499 vendas de prod têm custo 0 pelo wipe de 07/10)
+- [x] `ligasales.ts`/`finance.ts` usam `channel` em vez de regex no buyer; pacotes por nº de pedido de Liga, MyP e Site.
+- [x] Skills liga-vendas, myp-vendas, baixa-vendas, dashboard-cadastrar mandam `channel` (dashboard-cadastrar não dá baixa, ficou igual); liga-precificar deixa de supor frete dentro do `buyBRL`.
 
 ### Fase 3 — fila de propagação
 - [x] Venda com canal ≠ liga em item `ligaListed` gera pendência "tirar X un. da Liga" (`internal/syncqueue`, `data/syncqueue.json`; cobre `/sell` e o pagamento do site; baixa sem venda também gera). O Trade não tem flag de MyP, então a tarefa é só da Liga e a skill acerta o MyP pelas mesmas unidades. `/sell` em lote já vendido agora dá 409.
@@ -1161,14 +1161,26 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - [x] Bloqueado com anúncio ativo ou pedido do site aberto, com aviso. Slug base mantido, produto aparece no jogo novo na vitrine (a URL pública ganha o prefixo do jogo novo). Também bloqueia acessório e item com pendência aberta na fila de sincronização.
 
 ### Fase 6 — rateio do frete do pedido
-- [x] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado no `shippingBRL` do item; recalcula a cada mudança de frete/itens; lote vendido não é recalculado.
+- [x] `Purchase.ShippingBRL` rateado nos itens proporcional ao valor pago, gravado em `orderShippingBRL` (separado do frete digitado no item); recalcula a cada mudança de frete/itens; lote vendido não é recalculado.
 
 ### Fase 7 — estorno do pedido do site
 - [x] Reembolsado/cancelado depois de pago devolve as unidades ao estoque (lote novo ou junta ao de origem).
 - [x] Mudança manual de "sem estoque" para pago/enviado dá a baixa que hoje não acontece.
 
 ### Fase 8 — juntar telas
-- [ ] Portfólio some (inclusive `?tab=portfolio`, Acessórios e o clique de Todos os jogos); `Kpi`/`Chip` vão para `ui/`.
-- [ ] Compras vira a casa do item: criar avulso, filtro de acessórios, resumo por jogo no topo.
-- [ ] Form de edição único: ganha valor atual R$ (selado/acessório) e GTIN.
-- [ ] Estoque fica só com preço, vitrine e Liga.
+- [x] Portfólio some (`PortfolioPage.tsx` e `AllPortfolioPage.tsx` apagados); `?tab=portfolio` e `?tab=allportfolio` abrem Compras, `?tab=acessorios` abre Compras com `?jogo=acessorios`; `Kpi`/`Chip` em `ui/kpi.tsx` e `ui/chip.tsx`.
+- [x] Compras vira a casa do item: "Novo item avulso" nas abas Itens/Avulsos (compra opcional "Sem compra (avulso)" no form de item, com loja e data), filtro de acessórios via jogo, resumo por jogo no topo (clique filtra o jogo), Exportar CSV na aba Itens.
+- [x] Form de edição único: ganha valor atual R$ (selado/acessório), referência de mercado (carta) e GTIN (selado/acessório).
+- [x] Estoque fica só com preço, vitrine e Liga; a "Lista em inglês" (variante portfolio do ShareList, para comprador dos EUA) mudou do Portfólio para o Estoque, ao lado de Compartilhar.
+
+## Review (2026-10-30)
+- Fase 1 `0a16340`: PUT do item é patch (`patchTrade`); vazio/zero em kind, refUSD, manualBRL, purchaseID, status, photos mantém o valor. Confirmação ao excluir item e compra.
+- Fase 2 `6b030e6`: `channel`, `writeOff`, `semLastro` no Trade; canal das vendas antigas deduzido do comprador na leitura (`trades.ChannelOf`), sem reescrever prod. Front e skills usam o canal.
+- Fase 3 `0a4ad41`: fila `internal/syncqueue` + tela Sincronizar + etapa 4 da baixa-vendas. Revenda de lote vendido dá 409.
+- Fase 4 `3dc0bbe`: `POST /api/trades/{id}/unsell`, `splitFrom` nas vendas parciais, lápis em lote vendido, editor de Vendas sem qtd.
+- Fase 5 `41347d7`: `POST /api/trades/{id}/move`; a URL pública da vitrine muda de prefixo ao trocar o jogo; mover só o lote vendido e depois desfazer a venda deixa o lote no jogo novo, separado da origem.
+- Fase 6 `182734b`: `orderShippingBRL` rateado pelos ledgers de jogo + acessórios; `POST /api/purchases/reallocate` para aplicar nos dados antigos.
+- Fase 7 `9c15b09`: reembolso/cancelamento (PATCH e webhook refunded/charged_back) devolve o estoque via `UnsellSiteSale`, idempotente por `ReturnedTradeIDs`/`StockReturnedAt`; oversold → pago dá a baixa ou 409 sem estoque.
+- Fase 8: Portfólio apagado, Compras como casa do item, form único, Estoque só preço/vitrine/Liga.
+- Desvios do plano: regras de legado da Fase 2 (acima); rateio grava campo próprio em vez de `shippingBRL`; worker da Liga fora do escopo.
+- Pendências: (1) worker que executa a fila na Liga sem o Claude — decidir Railway (teste do admin via `railway ssh` deu 403 com UA do wget; falta repetir com UA de Chrome) ou mini PC na loja; (2) depois do deploy, backup do volume e `POST /api/purchases/reallocate` em prod (o frete inteiro de cada compra vai para os itens ainda em estoque); (3) custos dos 591 lotes sem custo em `custos-pendentes-2026-10-30.csv`; (4) a flag nova `-syncqueue` tem padrão `data/syncqueue.json`, dentro do volume de prod; (5) nada foi testado clicando na tela.

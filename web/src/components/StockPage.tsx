@@ -230,7 +230,7 @@ export default function StockPage() {
   const [imgEditId, setImgEditId] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>({ key: "total", dir: "desc" });
   const [onlyMissingOnLiga, setOnlyMissingOnLiga] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [sharing, setSharing] = useState<"none" | "stock" | "us">("none");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -292,6 +292,8 @@ export default function StockPage() {
   // The share panel posts exactly what is on screen, priced with the draft
   // edits: you can tweak a price for the post and send it before deciding
   // whether to save it to the ledger.
+  const usItems = useMemo(() => visible.filter((t) => !t.kind), [visible]);
+
   const shareItems = useMemo(
     () =>
       visible.map((t) => ({
@@ -570,29 +572,45 @@ export default function StockPage() {
             Ocultar todas
           </Button>
           <Button
-            variant={sharing ? "accent" : "outline"}
-            onClick={() => setSharing((v) => !v)}
+            variant={sharing === "stock" ? "accent" : "outline"}
+            onClick={() => setSharing((v) => (v === "stock" ? "none" : "stock"))}
             disabled={visible.length === 0}
             title="Montar a lista do que está à venda para postar nos grupos"
           >
             <Share2 /> Compartilhar
           </Button>
+          <Button
+            variant={sharing === "us" ? "accent" : "outline"}
+            onClick={() => setSharing((v) => (v === "us" ? "none" : "us"))}
+            disabled={usItems.length === 0}
+            title="Lista das cartas em inglês, com preço pelo mercado americano, para comprador dos EUA"
+          >
+            <Share2 /> Lista em inglês
+          </Button>
         </div>
       </div>
 
-      {sharing && shareItems.length > 0 && (
+      {sharing === "stock" && shareItems.length > 0 && (
         <ShareList
           variant="stock"
           holdings={shareItems}
           fxRate={fx}
-          onClose={() => setSharing(false)}
+          onClose={() => setSharing("none")}
+        />
+      )}
+      {sharing === "us" && usItems.length > 0 && (
+        <ShareList
+          variant="portfolio"
+          holdings={usItems}
+          fxRate={fx}
+          onClose={() => setSharing("none")}
         />
       )}
 
       {loading ? (
         <Panel>Carregando estoque…</Panel>
       ) : holdings.length === 0 ? (
-        <Panel>Nenhuma carta em estoque. Adicione compras no Portfolio para vê-las aqui.</Panel>
+        <Panel>Nenhuma carta em estoque. Lance as compras em Compras para vê-las aqui.</Panel>
       ) : visible.length === 0 ? (
         <Panel>Nenhuma carta corresponde à busca.</Panel>
       ) : (
@@ -694,7 +712,7 @@ export default function StockPage() {
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               Vira uma linha só. Mantém o preço, o "à venda" e a identidade da compra mais antiga; some as
-              duplicadas também no Portfolio. <strong className="text-slate-300">Isto é permanente.</strong>
+              duplicadas também em Compras. <strong className="text-slate-300">Isto é permanente.</strong>
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-[10px] border-2 border-outline bg-page px-2 py-3">

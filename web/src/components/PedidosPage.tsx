@@ -25,7 +25,7 @@ import {
 import { brl2, fullStamp } from "../format";
 import { isNewOrder } from "../orderAlerts";
 import EmptyState from "./EmptyState";
-import { Kpi } from "./PortfolioPage";
+import { Kpi } from "./ui/kpi";
 import { Badge, type BadgeProps } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";

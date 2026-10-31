@@ -3,7 +3,7 @@ import { Check, RotateCcw } from "lucide-react";
 import { listSyncQueue, markSyncDone, retrySync, type SyncStatus, type SyncTask } from "../api";
 import { dayLabel } from "../format";
 import EmptyState from "./EmptyState";
-import { Chip } from "./PortfolioPage";
+import { Chip } from "./ui/chip";
 import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 

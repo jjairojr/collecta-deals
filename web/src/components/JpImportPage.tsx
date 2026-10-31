@@ -4,7 +4,7 @@ import { cardImageURL, getJpImport, type JpImportResponse, type JpImportRow, typ
 import { brl0, stampLabel } from "../format";
 import CardArt from "./CardArt";
 import EmptyState from "./EmptyState";
-import { Kpi } from "./PortfolioPage";
+import { Kpi } from "./ui/kpi";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";

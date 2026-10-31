@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Coins,
+  Download,
   FolderInput,
   HandCoins,
   Link2,
@@ -24,9 +25,11 @@ import {
   addPurchaseItem,
   attachPurchaseItems,
   createPurchase,
+  createTrade,
   deletePurchase,
   deleteTrade,
   detachPurchaseItems,
+  getAllPortfolio,
   getGames,
   getQuote,
   listPurchases,
@@ -37,18 +40,23 @@ import {
   unsellTrade,
   updatePurchase,
   updateTrade,
+  type AllPortfolioResponse,
   type GameInfo,
   type ItemRef,
+  type PortfolioSummary,
   type PurchaseItem,
   type PurchaseView,
   type QuoteMatch,
+  type Trade,
 } from "../api";
+import { toCSV, downloadCSV } from "../csv";
 import { brl2, dayLabel } from "../format";
 import CardArt from "./CardArt";
 import EmptyState from "./EmptyState";
 import { PhotoButton, PhotoStrip, PhotoViewer, photosOf } from "./ItemPhotos";
 import SaleExitSelect, { DEFAULT_EXIT, exitFields, type SaleExit } from "./SaleExitSelect";
-import { Chip, Kpi } from "./PortfolioPage";
+import { Chip } from "./ui/chip";
+import { Kpi } from "./ui/kpi";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
@@ -217,8 +225,11 @@ export default function PurchasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"orders" | "items" | "loose">("orders");
   const [query, setQuery] = useState("");
-  const [gameFilter, setGameFilter] = useState<string>("all");
+  const [gameFilter, setGameFilter] = useState<string>(
+    () => new URLSearchParams(window.location.search).get("jogo") ?? "all",
+  );
   const [creating, setCreating] = useState(false);
+  const [addingLoose, setAddingLoose] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusFilter>("holding");
   const [kinds, setKinds] = useState<Set<ItemKind>>(new Set());
@@ -310,7 +321,7 @@ export default function PurchasesPage() {
   );
   const visibleLoose = useMemo(() => loose.filter(keep), [loose, keep]);
   // A aba Itens é o estoque inteiro numa lista só, venha o item de um pedido ou
-  // não — é a visão que o Portfólio dava e que some quando tudo vira compra.
+  // não.
   const allItems = useMemo(() => [...orders.flatMap((o) => o.items), ...loose], [orders, loose]);
   const visibleAll = useMemo(() => allItems.filter(keep), [allItems, keep]);
 
@@ -350,8 +361,9 @@ export default function PurchasesPage() {
     <div className="space-y-6">
       <p className="max-w-2xl text-sm text-slate-400">
         Cada compra é um pedido: você abre com a data, o vendedor e o frete, e vai lançando os itens dentro
-        dela — de qualquer jogo. O item entra no portfólio do jogo que você escolher, e o frete do pedido é
-        rateado nos itens em estoque pelo valor pago, entrando no custo de cada um.
+        dela — de qualquer jogo. O item entra no estoque do jogo que você escolher, e o frete do pedido é
+        rateado nos itens em estoque pelo valor pago, entrando no custo de cada um. Item comprado fora de um
+        pedido entra como avulso.
       </p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -381,6 +393,8 @@ export default function PurchasesPage() {
         />
       </div>
 
+      <GameSummary active={gameFilter} onPick={setGameFilter} />
+
       <div className="flex flex-wrap items-center gap-2">
         <Chip active={tab === "orders"} onClick={() => setTab("orders")}>
           Compras · {orders.length}
@@ -408,10 +422,26 @@ export default function PurchasesPage() {
               ))}
             </Select>
           </div>
-          {tab === "orders" && (
+          {tab === "items" && (
+            <Button
+              variant="outline"
+              onClick={() => exportItems(visibleAll)}
+              disabled={visibleAll.length === 0}
+              title="Baixar a lista filtrada como planilha"
+            >
+              <Download className="h-4 w-4" />
+              Exportar CSV
+            </Button>
+          )}
+          {tab === "orders" ? (
             <Button variant="primary" onClick={() => setCreating((v) => !v)}>
               {creating ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {creating ? "Cancelar" : "Nova compra"}
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => setAddingLoose((v) => !v)}>
+              {addingLoose ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {addingLoose ? "Fechar" : "Novo item avulso"}
             </Button>
           )}
         </div>
@@ -453,6 +483,17 @@ export default function PurchasesPage() {
         />
       )}
 
+      {tab !== "orders" && addingLoose && (
+        <AddItemForm
+          defaultTarget=""
+          defaultGame={gameFilter === "all" ? undefined : gameFilter}
+          orders={orders}
+          games={gameOptions}
+          onCancel={() => setAddingLoose(false)}
+          onSaved={load}
+        />
+      )}
+
       {tab === "items" ? (
         <ItemsList
           items={visibleAll}
@@ -485,6 +526,111 @@ export default function PurchasesPage() {
       ) : (
         <ItemsList items={visibleLoose} orders={orders} games={gameOptions} total={loose.length} onChanged={load} />
       )}
+    </div>
+  );
+}
+
+const CSV_HEADERS = [
+  "status",
+  "jogo",
+  "tipo",
+  "numero",
+  "nome",
+  "colecao",
+  "variante",
+  "condicao",
+  "qtd",
+  "loja",
+  "data_compra",
+  "entregue",
+  "custo_brl",
+  "vendido_brl",
+  "data_venda",
+  "canal",
+  "comprador",
+];
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function exportItems(items: PurchaseItem[]) {
+  const rows = items.map((it) => [
+    it.realized ? "vendido" : "estoque",
+    it.gameName,
+    kindLabels[kindOf(it)],
+    it.number,
+    it.name,
+    it.set,
+    it.variant ?? "",
+    it.condition ?? "",
+    it.qty,
+    it.store ?? "",
+    it.buyDate ?? "",
+    it.realized ? "" : it.delivered ? "sim" : "não",
+    round2(it.costBRL),
+    it.realized ? round2(it.valueBRL) : "",
+    it.sellDate ?? "",
+    it.channel ?? "",
+    it.buyer ?? "",
+  ]);
+  downloadCSV(`itens-${today()}.csv`, toCSV(CSV_HEADERS, rows));
+}
+
+const totalInvested = (s: PortfolioSummary) => s.investedBRL + s.costOfSoldBRL;
+
+function GameSummary({ active, onPick }: { active: string; onPick: (id: string) => void }) {
+  const [data, setData] = useState<AllPortfolioResponse | null>(null);
+
+  useEffect(() => {
+    getAllPortfolio(90)
+      .then(setData)
+      .catch(() => setData(null));
+  }, []);
+
+  if (!data) {
+    return null;
+  }
+  const rows: { id: string; name: string; summary: PortfolioSummary }[] = data.games.map((g) => ({
+    id: g.game.id,
+    name: g.game.name,
+    summary: g.summary,
+  }));
+  if (data.accessories) {
+    rows.push({ id: ACCESSORIES, name: "Acessórios", summary: data.accessories });
+  }
+  rows.push({ id: "all", name: "Todos os jogos", summary: data.total });
+
+  return (
+    <div className="sticker sticker-sm overflow-x-auto rounded-[12px] bg-panel">
+      <Table className="min-w-[640px]">
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>Jogo</TableHead>
+            <TableHead className="text-right">Em estoque</TableHead>
+            <TableHead className="text-right">Investido em estoque</TableHead>
+            <TableHead className="text-right">Custo do vendido</TableHead>
+            <TableHead className="text-right">Vendido</TableHead>
+            <TableHead className="text-right">Investido total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow
+              key={row.id}
+              onClick={() => onPick(row.id)}
+              className={`cursor-pointer ${active === row.id ? "bg-brand/10" : ""} ${row.id === "all" ? "font-semibold" : ""}`}
+            >
+              <TableCell className="text-slate-100">{row.name}</TableCell>
+              <TableCell className="text-right tabular-nums text-slate-400">{row.summary.holdings}</TableCell>
+              <TableCell className="text-right tabular-nums text-slate-300">{brl2(row.summary.investedBRL)}</TableCell>
+              <TableCell className="text-right tabular-nums text-slate-400">{brl2(row.summary.costOfSoldBRL)}</TableCell>
+              <TableCell className="text-right tabular-nums text-emerald-300">{brl2(row.summary.proceedsBRL)}</TableCell>
+              <TableCell className="text-right tabular-nums text-slate-200">{brl2(totalInvested(row.summary))}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -809,7 +955,7 @@ function OrderCard({
 
           {adding ? (
             <AddItemForm
-              order={order}
+              defaultTarget={order.id}
               orders={orders}
               games={games}
               onCancel={() => setAdding(false)}
@@ -1048,9 +1194,9 @@ function ItemRow({
             variant="ghost"
             size="sm"
             disabled={busy}
-            title="Excluir o item do portfólio"
+            title="Excluir o item do estoque"
             onClick={() => {
-              if (confirm(`Excluir ${item.name} do portfólio?`)) {
+              if (confirm(`Excluir ${item.name} do estoque?`)) {
                 run(() => deleteTrade(item.id, item.game === ACCESSORIES ? undefined : item.game));
               }
             }}
@@ -1179,6 +1325,10 @@ function EditItemForm({
   const [buyDate, setBuyDate] = useState(item.buyDate ?? "");
   const [imageURL, setImageURL] = useState(item.imageURL ?? "");
   const [notes, setNotes] = useState(item.notes ?? "");
+  const [refValue, setRefValue] = useState(
+    String((kindOf(item) === "single" ? item.refUSD : item.manualBRL) || ""),
+  );
+  const [gtin, setGtin] = useState(item.gtin ?? "");
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -1220,6 +1370,8 @@ function EditItemForm({
           buyDate,
           imageURL: imageURL.trim(),
           notes,
+          gtin: gtin.replace(/\D/g, ""),
+          ...(single ? { refUSD: num(refValue) } : { manualBRL: num(refValue) }),
         },
         moved ? game : tradeGame(item),
       );
@@ -1291,6 +1443,24 @@ function EditItemForm({
         <Field label="Comprado em">
           <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
         </Field>
+        <Field label={single ? "Referência de mercado" : "Valor atual R$ (un.)"}>
+          <Input
+            value={refValue}
+            onChange={(e) => setRefValue(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+          />
+        </Field>
+        {!single && (
+          <Field label="GTIN / código de barras">
+            <Input
+              value={gtin}
+              onChange={(e) => setGtin(e.target.value)}
+              inputMode="numeric"
+              placeholder="0 00000 00000 0"
+            />
+          </Field>
+        )}
         <Field label="Imagem (URL)">
           <Input value={imageURL} onChange={(e) => setImageURL(e.target.value)} placeholder="https://…" />
         </Field>
@@ -1476,13 +1646,15 @@ function MoveItem({
 }
 
 function AddItemForm({
-  order,
+  defaultTarget,
+  defaultGame,
   orders,
   games,
   onCancel,
   onSaved,
 }: {
-  order: PurchaseView;
+  defaultTarget: string;
+  defaultGame?: string;
   orders: PurchaseView[];
   games: { id: string; name: string }[];
   onCancel: () => void;
@@ -1490,8 +1662,10 @@ function AddItemForm({
 }) {
   // The item lands in the order it was opened from, but a lot bought in one go
   // often gets typed in from another order's card — so the target is a field.
-  const [target, setTarget] = useState(order.id);
-  const [game, setGame] = useState(games[0]?.id ?? "onepiece");
+  const [target, setTarget] = useState(defaultTarget);
+  const [game, setGame] = useState(defaultGame ?? games[0]?.id ?? "onepiece");
+  const [store, setStore] = useState("");
+  const [buyDate, setBuyDate] = useState(today());
   const [kind, setKind] = useState<ItemKind>("single");
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<QuoteMatch[]>([]);
@@ -1561,7 +1735,7 @@ function AddItemForm({
     setFailed(null);
     try {
       const manual = kind !== "single";
-      await addPurchaseItem(target, game, {
+      const body: Partial<Trade> = {
         kind: kind === "single" ? undefined : kind === "sealed" ? "sealed" : "accessory",
         number,
         name,
@@ -1574,7 +1748,15 @@ function AddItemForm({
         refUSD: manual ? 0 : num(refValue),
         manualBRL: manual ? num(refValue) : 0,
         status: "holding",
-      });
+      };
+      if (target) {
+        await addPurchaseItem(target, game, body);
+      } else {
+        await createTrade(
+          { ...body, store: store.trim(), buyDate },
+          game === ACCESSORIES ? undefined : game,
+        );
+      }
       reset();
       await onSaved();
     } catch (err: unknown) {
@@ -1591,6 +1773,7 @@ function AddItemForm({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Field label="Compra">
           <Select value={target} onChange={(e) => setTarget(e.target.value)}>
+            <option value="">Sem compra (avulso)</option>
             {orders.map((o) => (
               <option key={o.id} value={o.id}>
                 {[o.date, o.store || "sem vendedor"].filter(Boolean).join(" · ")}
@@ -1710,6 +1893,16 @@ function AddItemForm({
             placeholder="0,00"
           />
         </Field>
+        {!target && (
+          <>
+            <Field label="Vendedor / loja">
+              <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="ex.: Legends" />
+            </Field>
+            <Field label="Comprado em">
+              <Input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />
+            </Field>
+          </>
+        )}
       </div>
 
       {failed && <p className="text-[11px] text-rose-300">{failed}</p>}
@@ -1722,9 +1915,10 @@ function AddItemForm({
         </Button>
       </div>
       <p className="text-[10px] text-slate-500">
-        O item entra no portfólio de {games.find((g) => g.id === game)?.name ?? game}, dentro da compra
-        escolhida acima, e herda a data e o vendedor dela. Depois de salvar, o formulário fica aberto para o
-        próximo item.
+        {target
+          ? `O item entra no estoque de ${games.find((g) => g.id === game)?.name ?? game}, dentro da compra escolhida acima, e herda a data e o vendedor dela.`
+          : `O item entra no estoque de ${games.find((g) => g.id === game)?.name ?? game} como avulso, fora de qualquer compra.`}{" "}
+        Depois de salvar, o formulário fica aberto para o próximo item.
       </p>
     </Card>
   );

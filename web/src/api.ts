@@ -1034,8 +1034,12 @@ export function setLigaState(items: LigaInput[]): Promise<{ updated: number }> {
   );
 }
 
-export function createTrade(t: Partial<Trade>): Promise<Trade> {
-  return sendJSON<Trade>(`${base}/trades?${gp(new URLSearchParams()).toString()}`, "POST", t);
+export function createTrade(t: Partial<Trade>, game?: string): Promise<Trade> {
+  const params = gp(new URLSearchParams());
+  if (game) {
+    params.set("game", game);
+  }
+  return sendJSON<Trade>(`${base}/trades?${params.toString()}`, "POST", t);
 }
 
 export type TradeKindInput = Trade["kind"] | "single";

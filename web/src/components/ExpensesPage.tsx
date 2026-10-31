@@ -20,7 +20,7 @@ import {
 } from "../api";
 import { brl2, dayLabel } from "../format";
 import EmptyState from "./EmptyState";
-import { Kpi } from "./PortfolioPage";
+import { Kpi } from "./ui/kpi";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";

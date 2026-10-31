@@ -6,10 +6,8 @@ import {
   Boxes,
   FileText,
   HandCoins,
-  Layers,
   LayoutGrid,
   LineChart,
-  Package,
   PiggyBank,
   RefreshCw,
   Plane,
@@ -21,7 +19,6 @@ import {
   Swords,
   Truck,
   Upload,
-  Wallet,
   Wand2,
 } from "lucide-react";
 
@@ -30,15 +27,12 @@ export type View =
   | "browse"
   | "tracking"
   | "sealed"
-  | "portfolio"
-  | "allportfolio"
   | "vendas"
   | "pedidos"
   | "compras"
   | "importar"
   | "importarjp"
   | "financeiro"
-  | "acessorios"
   | "despesas"
   | "estoque"
   | "orcamento"
@@ -50,7 +44,7 @@ export type View =
 export type Icon = ComponentType<{ className?: string }>;
 
 // A view is either scoped to the game picked in the switcher or business-wide
-// (financeiro, vendas, despesas, acessórios): the sidebar groups them apart so
+// (financeiro, vendas, despesas, compras): the sidebar groups them apart so
 // the switcher never looks like it drives a screen it has no say over.
 export type NavScope = "game" | "global";
 
@@ -94,8 +88,6 @@ export const navGroups: NavGroup[] = [
       { key: "importar", label: "Importar / Exportar", icon: Plane },
       { key: "importarjp", label: "Importar Japão", icon: Plane },
       { key: "despesas", label: "Despesas", icon: Receipt },
-      { key: "acessorios", label: "Acessórios", icon: Package },
-      { key: "allportfolio", label: "Todos os jogos", icon: Layers },
     ],
   },
   {
@@ -110,29 +102,16 @@ export const navGroups: NavGroup[] = [
 
 export const navItems: NavItem[] = navGroups.flatMap((group) => group.items);
 
-// Views that answer to a URL but are no longer in the menu. Portfólio was
-// replaced by Compras, which does the same per item; the old screen stays
-// reachable by link while the new one settles.
-const hiddenViews: { key: View; label: string; icon: Icon; scope: NavScope }[] = [
-  { key: "portfolio", label: "Portfólio", icon: Wallet, scope: "game" },
-];
-
 export function isView(value: string): value is View {
-  return navItems.some((item) => item.key === value) || hiddenViews.some((v) => v.key === value);
+  return navItems.some((item) => item.key === value);
 }
 
 export function iconOf(view: View): Icon | undefined {
-  return (
-    navItems.find((item) => item.key === view)?.icon ?? hiddenViews.find((v) => v.key === view)?.icon
-  );
+  return navItems.find((item) => item.key === view)?.icon;
 }
 
 export function scopeOf(view: View): NavScope {
-  const group = navGroups.find((g) => g.items.some((item) => item.key === view));
-  if (group) {
-    return group.scope;
-  }
-  return hiddenViews.find((v) => v.key === view)?.scope ?? "game";
+  return navGroups.find((g) => g.items.some((item) => item.key === view))?.scope ?? "game";
 }
 
 export interface Brand {

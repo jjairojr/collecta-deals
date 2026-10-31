@@ -18,7 +18,7 @@ import { brl, pct, stampLabel, usd } from "../format";
 import { brandFor } from "../brand";
 import CardArt from "./CardArt";
 import { BrSupply, UsTrust } from "./DealDepth";
-import { Kpi } from "./PortfolioPage";
+import { Kpi } from "./ui/kpi";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
