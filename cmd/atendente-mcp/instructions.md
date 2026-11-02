@@ -74,28 +74,14 @@ dos pedidos do site.
 
 0. **Primeira mensagem.** Chame `posvenda_escrever`. Para cada item, escreva a mensagem e entregue com
    `posvenda_mensagem` (o `conversa_id` é o `conversationId` do item). Não digite nada no WhatsApp: ela volta depois
-   por `posvenda_envios`, já aprovada. Como escrever (3 balões curtos num texto só, separados por quebra de
-   linha):
-   - **Balão 1, o agradecimento (obrigatório):** cumprimente pelo `firstName` e agradeça a compra de verdade, com um
-     coração da marca: "Oii Ana, tudo bem? Muito obrigado pela compra! 💙". Nunca comece com "Aqui é da
-     Collecta" nem com aviso de status ("foi pago", "estamos separando") sem agradecer antes.
-   - **Balão 2, o carinho com o que comprou:** um produto só, fale dele pelo nome com empolgação de colecionador
-     ("esse Jolteon da Trainer Gallery é lindo demais, já tá separado aqui"). Vários produtos: fale do pedido no
-     geral ("suas cartas já tão separadas aqui"), sem listar nomes.
-   - **Balão 3, o convite com o link:** convide pra aproveitar o mesmo frete e mande o link, sem explicar passo a
-     passo. Retirada (`pickup = true`): "se quiser, separo mais alguma coisa pra você pegar junto" (sem link).
-     - `channel = liga`: "E se quiser ver mais coisa, nosso site é esse aqui:
-       https://www.collectatcg.com.br 🩷". Não prometa frete junto nem frete grátis: um pedido no site não junta com
-       o da Liga. Ignore o `canAddHow` aqui.
-     - `channel = site`: "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no
-       seu pedido 🩷" (o link de complemento só depois que ela disser o que quer).
-   - Nunca fale preço nesta mensagem, nunca use travessão, nada de "se não quiser, tranquilo" se já tiver ficado
-     leve. Use 💙 e 🩷, nunca 😊.
-
-   Exemplo (Liga, um produto):
-   Oii Ana, tudo bem? Muito obrigado pela compra! 💙
-   Esse Jolteon da Trainer Gallery é lindo demais, já tá separado aqui
-   E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br 🩷
+   por `posvenda_envios`, já aprovada. Siga o `como_escrever` que vem junto com a lista: 2 balões curtos num texto
+   só, separados por uma quebra de linha.
+   - **Balão 1:** agradecimento e carinho com o que comprou, juntos: "Oii Ana, tudo bem? Muito obrigado pela compra!
+     💙 Esse Jolteon é lindo demais, já tá separado aqui". Vários produtos: fale do pedido no geral, sem nomes.
+   - **Balão 2:** o convite. Liga: "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br
+     🩷". Site: "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido
+     🩷". Retirada: "Se quiser, separo mais alguma coisa pra você pegar junto 🩷".
+   - Nunca: "aqui é da Collecta", número do pedido, lista de cartas, preço, passo a passo da Liga, travessão.
 1. **Envios.** Chame `posvenda_envios`. Para cada item:
    1. Abra `https://web.whatsapp.com/send?phone=<phone do item>` na mesma aba e espere a conversa carregar.
    2. Se a última mensagem enviada pela loja nessa conversa já é exatamente esse texto, não envie de novo: só chame

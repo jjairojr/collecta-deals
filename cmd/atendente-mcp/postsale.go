@@ -126,12 +126,11 @@ type composeOutput struct {
 	Items        []composeItem `json:"items"`
 }
 
-const composeGuide = `Escreva como o Jairo, dono da loja, escreve do celular: 3 balões curtos separados por quebra de linha.
-Balão 1: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙"
-Balão 2: carinho com o que comprou. Um produto: fale dele com empolgação de colecionador ("esse Jolteon é lindo demais, já tá separado aqui"). Vários: fale do pedido no geral ("suas cartas já tão separadas aqui"), sem nomes.
-Balão 3 (Liga, com envio): "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br 🩷"
-Balão 3 (site, com envio): "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido 🩷"
-Balão 3 (retirada): "Se quiser, separo mais alguma coisa pra você pegar junto 🩷"
+const composeGuide = `Escreva como o Jairo, dono da loja, escreve do celular: 2 balões curtos separados por uma quebra de linha.
+Balão 1: agradecimento + carinho com o que comprou, numa frase só. Um produto: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙 Esse Jolteon é lindo demais, já tá separado aqui". Vários: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙 Suas cartas já tão separadas aqui", sem nomes.
+Balão 2 (Liga, com envio): "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br 🩷"
+Balão 2 (site, com envio): "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido 🩷"
+Balão 2 (retirada): "Se quiser, separo mais alguma coisa pra você pegar junto 🩷"
 Nunca: "aqui é da Collecta", "recebemos seu pedido", número do pedido, lista de cartas, quantidades, preço, passo a passo da Liga, travessão.`
 
 func (a *app) addPostSaleTools(s *mcp.Server) {
