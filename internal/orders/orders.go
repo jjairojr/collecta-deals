@@ -136,8 +136,12 @@ type Order struct {
 	CouponsReleasedAt time.Time `json:"couponsReleasedAt,omitempty"`
 	Promo             *Promo    `json:"promo,omitempty"`
 
-	TrackingCode string `json:"trackingCode,omitempty"`
-	Notes        string `json:"notes,omitempty"`
+	MarketingOptIn bool `json:"marketingOptIn,omitempty"`
+
+	TrackingCode       string    `json:"trackingCode,omitempty"`
+	TrackingNotified   string    `json:"trackingNotified,omitempty"`
+	TrackingNotifiedAt time.Time `json:"trackingNotifiedAt,omitempty"`
+	Notes              string    `json:"notes,omitempty"`
 
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`

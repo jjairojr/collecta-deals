@@ -19,7 +19,7 @@ AIR_ARGS := $(if $(MYP),-build.args_bin "-web= $(MYP)")
 ARGS     ?=
 
 .DEFAULT_GOAL := dev
-.PHONY: dev server web cli build web-build cfgate cfgate-once test tidy clean ensure-air help
+.PHONY: dev server web cli build web-build cfgate cfgate-once atendente test tidy clean ensure-air help
 
 ## dev: Go server (air) + Vite web dev, together; Ctrl-C stops both.
 dev: web/node_modules ensure-air
@@ -57,6 +57,10 @@ cfgate:
 ## cfgate-once: refresh the clearance cookies now and exit.
 cfgate-once:
 	go run ./cmd/cfgate -once
+
+## atendente: build the WhatsApp attendant MCP and install it under /Users/Shared/collecta-bot (see bot/atendente/SETUP.md).
+atendente:
+	sh bot/atendente/install.sh
 
 web-build: web/node_modules
 	cd web && npm run build

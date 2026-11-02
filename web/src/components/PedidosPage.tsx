@@ -23,8 +23,9 @@ import {
   type OrderPatch,
   type OrderStatus,
 } from "../api";
-import { brl2, fullStamp, shipsFromLabel } from "../format";
+import { brl2, fullStamp, hasTime, shipsFromLabel } from "../format";
 import { isNewOrder } from "../orderAlerts";
+import { useOrderFollowUps } from "./ConversasPage";
 import EmptyState from "./EmptyState";
 import { Kpi } from "./ui/kpi";
 import { Badge, type BadgeProps } from "./ui/badge";
@@ -107,10 +108,6 @@ function isStatus(value: string): value is OrderStatus {
 
 function isFilter(value: string): value is Filter {
   return FILTER_ORDER.some((f) => f === value);
-}
-
-function hasTime(iso: string): boolean {
-  return Boolean(iso) && !iso.startsWith("0001-");
 }
 
 function phoneLabel(digits: string): string {
@@ -226,6 +223,8 @@ export default function PedidosPage({ since, onChanged }: { since: number; onCha
 
   const filter: Filter = picked ?? (counts.byStatus.paid > 0 ? "paid" : "all");
 
+  const followUps = useOrderFollowUps(counts.byStatus.paid > 0);
+
   const visible = useMemo(
     () => orders.filter((o) => filterStatuses[filter].includes(o.status)),
     [orders, filter],
@@ -337,6 +336,7 @@ export default function PedidosPage({ since, onChanged }: { since: number; onCha
                   key={o.id}
                   order={o}
                   fresh={isNewOrder(o, since)}
+                  followUp={o.status === "paid" ? followUps[o.id] : undefined}
                   open={open === o.id}
                   onToggle={() => setOpen((k) => (k === o.id ? null : o.id))}
                   onChanged={replace}
@@ -394,6 +394,7 @@ export function TokenCard({ onSaved, onCancel }: { onSaved: () => void; onCancel
 function OrderRow({
   order,
   fresh,
+  followUp,
   open,
   onToggle,
   onChanged,
@@ -401,6 +402,7 @@ function OrderRow({
 }: {
   order: Order;
   fresh: boolean;
+  followUp?: string;
   open: boolean;
   onToggle: () => void;
   onChanged: (o: Order) => void;
@@ -514,6 +516,7 @@ function OrderRow({
               Pré-venda · {shipsFromLabel(preorder)}
             </Badge>
           )}
+          {followUp && <div className="mt-1 whitespace-nowrap text-[10px] font-medium text-amber-300">{followUp}</div>}
         </TableCell>
         <TableCell className="text-right font-semibold tabular-nums text-slate-200">
           {brl2(order.totals.totalBRL)}

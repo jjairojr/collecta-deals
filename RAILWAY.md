@@ -100,6 +100,25 @@ back down (backing up the local copies to `data/.sync-bak/` first).
 
 ---
 
+## Post-sale over WhatsApp Web (OpenBot)
+
+Post-sale is off until these env vars are set. With `POSTSALE_TRANSPORT=openbot` the server never sends WhatsApp
+messages nor calls Claude: it queues offers, approved replies and tracking notices, and the OpenBot agent on the
+owner's Mac delivers them through WhatsApp Web via `cmd/atendente-mcp` (setup in `bot/atendente/SETUP.md`).
+
+```sh
+railway variable set "POSTSALE_TRANSPORT=openbot"
+railway variable set "POSTSALE_AGENT_TOKEN=$(openssl rand -hex 32)"   # also goes in the OpenBot MCP env
+railway variable set "NTFY_TOPIC=<owner topic>"                       # drafts, handoffs, "OpenBot parado"
+```
+
+- The agent token must be 32+ characters and different from `ADMIN_TOKEN`, otherwise post-sale stays off (see the
+  `POSVENDA` log line at boot). It only opens `/api/postsale/agent/*`.
+- `POSTSALE_AUTOSEND=true` skips the owner's approval of AI replies. Leave it unset at first.
+- Leaving `POSTSALE_TRANSPORT` unset keeps the Cloud API mode (`WHATSAPP_*`, `ANTHROPIC_API_KEY`).
+
+---
+
 ## Transport notes / gotchas
 
 - **`railway volume files` needs a registered SSH key** (`railway ssh keys add`)

@@ -79,6 +79,7 @@ type orderCreateInput struct {
 	CollectaUserID string   `json:"collectaUserId"`
 	CouponIDs      []string `json:"couponIds"`
 	PromoCode      string   `json:"promoCode"`
+	MarketingOptIn bool     `json:"marketingOptIn"`
 	PaymentMethod  string   `json:"paymentMethod"`
 }
 
@@ -598,6 +599,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 			Shipping:       ship,
 			Totals:         orders.Totals{ItemsBRL: items, ShippingBRL: ship.PriceBRL, TotalBRL: round2(items + ship.PriceBRL)},
 			CollectaUserID: in.CollectaUserID,
+			MarketingOptIn: in.MarketingOptIn,
 			PaymentMethod:  method,
 		}
 		if in.PromoCode == "" {

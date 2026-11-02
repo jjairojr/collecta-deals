@@ -1,0 +1,1 @@
+Faça uma rodada de atendimento do WhatsApp da Collecta seguindo as instruções do servidor collecta-loja. Comece chamando a ferramenta modo. Se não houver conversa para responder, encerre sem fazer mais nada.

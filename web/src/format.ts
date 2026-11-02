@@ -51,6 +51,45 @@ export function fullStamp(iso: string): string {
   });
 }
 
+export function hasTime(iso: string): boolean {
+  return Boolean(iso) && !iso.startsWith("0001-");
+}
+
+const spTime = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const spDay = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+});
+
+export function spClock(iso: string, now: number): string {
+  const d = new Date(iso);
+  if (!hasTime(iso) || Number.isNaN(d.getTime())) {
+    return "";
+  }
+  const day = spDay.format(d);
+  const time = spTime.format(d);
+  return day === spDay.format(new Date(now)) ? time : `${day} ${time}`;
+}
+
+export function timeLeft(iso: string, now: number): string {
+  const ms = new Date(iso).getTime() - now;
+  if (!hasTime(iso) || Number.isNaN(ms) || ms <= 0) {
+    return "";
+  }
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) {
+    return `${minutes}min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h${String(minutes % 60).padStart(2, "0")}`;
+}
+
 export function timeAgo(iso: string): string {
   if (!iso) {
     return "nunca";

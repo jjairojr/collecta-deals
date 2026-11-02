@@ -8,6 +8,7 @@ import {
   curatedSingle,
   sealedBySlug,
 } from "@/lib/mock";
+import { sealedToCartLine, singleToCartLine } from "@/lib/cart-lines";
 import { gameSurface } from "@/lib/games";
 import { setsOf } from "@/lib/sets";
 import LEGACY_SLUGS from "@/lib/legacy-slugs.json";
@@ -15,6 +16,7 @@ import LEGACY_SOLD from "@/lib/legacy-sold.json";
 import type {
   Accessory,
   AccessoryDetail,
+  CartLine,
   Game,
   Sealed,
   SealedDetail,
@@ -471,6 +473,24 @@ export function findBySku(
     catalog.accessories.find((c) => c.sku === sku) ??
     null
   );
+}
+
+export async function resolveCartLines(
+  lines: { sku: string; qty: number }[],
+): Promise<{ lines: CartLine[]; missing: number }> {
+  const catalog = await loadCatalog();
+  const resolved: CartLine[] = [];
+  let missing = 0;
+  for (const line of lines) {
+    const product = findBySku(catalog, line.sku);
+    if (!product || product.qty <= 0) {
+      missing += 1;
+      continue;
+    }
+    const base = product.kind === "single" ? singleToCartLine(product) : sealedToCartLine(product, product.qty);
+    resolved.push({ ...base, qty: Math.min(line.qty, product.qty) });
+  }
+  return { lines: resolved, missing };
 }
 
 function productRedirects(

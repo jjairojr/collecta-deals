@@ -8,6 +8,7 @@ import {
   HandCoins,
   LayoutGrid,
   LineChart,
+  MessageCircle,
   PiggyBank,
   RefreshCw,
   Plane,
@@ -30,6 +31,7 @@ export type View =
   | "sealed"
   | "vendas"
   | "pedidos"
+  | "conversas"
   | "compras"
   | "importar"
   | "importarjp"
@@ -85,6 +87,7 @@ export const navGroups: NavGroup[] = [
       { key: "financeiro", label: "Financeiro", icon: PiggyBank },
       { key: "vendas", label: "Vendas", icon: ShoppingBag },
       { key: "pedidos", label: "Pedidos", icon: Truck },
+      { key: "conversas", label: "Conversas", icon: MessageCircle },
       { key: "cupons", label: "Cupons", icon: Ticket },
       { key: "compras", label: "Estoque e Compras", icon: ShoppingCart },
       { key: "sincronizar", label: "Sincronizar", icon: RefreshCw },

@@ -1454,3 +1454,111 @@ export function updateOrder(id: string, patch: OrderPatch): Promise<Order> {
 export function returnOrderStock(id: string): Promise<Order> {
   return sendJSON<Order>(`${base}/orders/${id}/return-stock`, "POST", {}, adminHeaders());
 }
+
+export type ConversationState = "compose" | "draft" | "queued" | "waiting" | "active" | "human" | "closed";
+
+export type ConversationChannel = "site" | "liga";
+
+export interface ConversationItem {
+  name: string;
+  qty: number;
+}
+
+export type ConversationOutcome = "" | "declined" | "expired" | "complemented" | "skipped" | "failed";
+
+export type ConversationRole = "customer" | "assistant" | "owner" | "system";
+
+export type ConversationMessageStatus = "draft" | "queued" | "sent" | "failed" | "received";
+
+export interface ConversationMessage {
+  id: string;
+  role: ConversationRole;
+  text: string;
+  at: string;
+  status: ConversationMessageStatus;
+  error: string;
+  kind?: "offer" | "reply";
+  claimedAt?: string;
+}
+
+export interface ConversationOffer {
+  sku: string;
+  name: string;
+  meta: string;
+  unitBRL: number;
+  imageURL: string;
+}
+
+export interface Conversation {
+  id: string;
+  channel?: ConversationChannel;
+  phone: string;
+  name: string;
+  orderID: string;
+  orderNumber: number;
+  pickup?: boolean;
+  items?: ConversationItem[];
+  state: ConversationState;
+  outcome: ConversationOutcome;
+  offer: ConversationOffer | null;
+  pitch: string;
+  opening?: string;
+  sentAt: string;
+  windowEndsAt: string;
+  lastInboundAt: string;
+  complementOrder: number;
+  complementBRL: number;
+  messages: ConversationMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationMetrics {
+  offersSent: number;
+  replies: number;
+  complements: number;
+  revenueBRL: number;
+  pendingDrafts: number;
+}
+
+export type ConversationTransport = "cloud" | "openbot";
+
+export interface ConversationsResponse {
+  conversations: Conversation[];
+  metrics: ConversationMetrics;
+  transport: ConversationTransport;
+  agentSeenAt?: string;
+}
+
+export function listConversations(): Promise<ConversationsResponse> {
+  return getJSON<ConversationsResponse>(`${base}/conversations`, adminHeaders());
+}
+
+function conversationAction(id: string, action: string, body: object): Promise<Conversation> {
+  return sendJSON<Conversation>(
+    `${base}/conversations/${encodeURIComponent(id)}/${action}`,
+    "POST",
+    body,
+    adminHeaders(),
+  );
+}
+
+export function approveConversation(id: string, text?: string): Promise<Conversation> {
+  return conversationAction(id, "approve", text === undefined ? {} : { text });
+}
+
+export function discardConversationDraft(id: string): Promise<Conversation> {
+  return conversationAction(id, "discard", {});
+}
+
+export function replyConversation(id: string, text: string): Promise<Conversation> {
+  return conversationAction(id, "reply", { text });
+}
+
+export function releaseConversation(id: string): Promise<Conversation> {
+  return conversationAction(id, "release", {});
+}
+
+export function closeConversation(id: string): Promise<Conversation> {
+  return conversationAction(id, "close", {});
+}

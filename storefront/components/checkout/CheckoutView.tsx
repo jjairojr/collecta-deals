@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import Container from "@/components/ui/Container";
 import Field from "@/components/checkout/Field";
 import UFSelect from "@/components/checkout/UFSelect";
@@ -96,7 +97,7 @@ async function quote(cep: string, lines: OrderLineInput[], paymentMethod: Paymen
   return data.services ?? [];
 }
 
-export default function CheckoutView() {
+export default function CheckoutView({ joinOrder: initialJoin }: { joinOrder?: string }) {
   const { lines, reprice, cap } = useCart();
   const [payment, setPayment] = useState<PaymentMethod>("pix");
   const pixCents = lines.reduce((s, l) => s + unitPriceFor(l, "pix") * l.qty, 0);
@@ -117,14 +118,15 @@ export default function CheckoutView() {
   const [buyerErrors, setBuyerErrors] = useState<BuyerErrors>({});
   const [addressErrors, setAddressErrors] = useState<AddressErrors>({});
   const [cepLoading, setCepLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>("ship");
+  const [mode, setMode] = useState<Mode>(initialJoin ? "join" : "ship");
   const [local, setLocal] = useState<ShippingOption[]>([]);
   const [carriers, setCarriers] = useState<ShippingOption[] | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [carrierID, setCarrierID] = useState<number | null>(null);
-  const [joinOrder, setJoinOrder] = useState("");
+  const [joinOrder, setJoinOrder] = useState(initialJoin ?? "");
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const begun = useRef(false);
@@ -189,12 +191,17 @@ export default function CheckoutView() {
     quote("", payloadLines, payment)
       .then((services) => {
         if (!cancelled) {
-          setLocal(services.filter((s) => s.serviceID < 0));
+          const found = services.filter((s) => s.serviceID < 0);
+          setLocal(found);
+          if (!found.some((s) => isJoin(s.serviceID))) {
+            setMode((m) => (m === "join" ? "ship" : m));
+          }
         }
       })
       .catch(() => {
         if (!cancelled) {
           setLocal([]);
+          setMode((m) => (m === "join" ? "ship" : m));
         }
       });
     return () => {
@@ -402,6 +409,7 @@ export default function CheckoutView() {
           },
           couponIds: promo ? [] : activeCoupons.map((c) => c.id),
           promoCode: promo?.code ?? "",
+          marketingOptIn,
           paymentMethod: payment,
         }),
       });
@@ -538,6 +546,23 @@ export default function CheckoutView() {
                 inputMode="numeric"
                 placeholder="000.000.000-00"
               />
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={marketingOptIn}
+                onClick={() => setMarketingOptIn((v) => !v)}
+                className="flex items-center gap-3 text-left text-sm text-[#c9c9d1] transition-colors hover:text-white sm:col-span-2"
+              >
+                <span
+                  aria-hidden
+                  className={`sticker flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] [--sh:2px] ${
+                    marketingOptIn ? "bg-brand text-white" : "bg-outline"
+                  }`}
+                >
+                  {marketingOptIn && <Check size={14} strokeWidth={3} />}
+                </span>
+                Quero receber ofertas da Collecta pelo WhatsApp
+              </button>
             </div>
           </Section>
 

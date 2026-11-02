@@ -1,0 +1,11 @@
+# Ferramentas que o atendente pode usar. Uma expressão regular por linha, comparada com o nome inteiro.
+# Qualquer outra ferramenta é bloqueada pelo guard.sh e anotada em ~/.collecta-atendente/bloqueios.log.
+
+mcp__collecta-loja__.*
+TodoWrite
+ToolSearch
+
+# OpenBot: busca e descrição de ferramentas (só listam). O tool_call do navegador é checado à parte no guard.sh:
+# só openbot_browser.*, sem upload, script, senha ou download, e só em https://web.whatsapp.com.
+mcp__openbot__tool_search
+mcp__openbot__tool_describe

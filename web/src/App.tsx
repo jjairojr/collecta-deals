@@ -28,6 +28,7 @@ import GuiaLigaPage from "./components/GuiaLigaPage";
 import LigaExportPage from "./components/LigaExportPage";
 import SyncQueuePage, { useSyncPending } from "./components/SyncQueuePage";
 import PromosPage from "./components/PromosPage";
+import ConversasPage from "./components/ConversasPage";
 import SelectionTray from "./components/SelectionTray";
 import AppSidebar from "./components/AppSidebar";
 import TopBar from "./components/TopBar";
@@ -61,6 +62,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   pedidos: {
     title: "Pedidos",
     description: "Pedidos pagos pelo site — endereço, frete escolhido, rastreio e baixa automática no estoque.",
+  },
+  conversas: {
+    title: "Conversas",
+    description: "Pós-venda no WhatsApp: a IA oferece um complemento antes do envio e você aprova cada mensagem.",
   },
   compras: {
     title: "Estoque e Compras",
@@ -242,6 +247,10 @@ export default function App() {
               ) : activeView === "pedidos" ? (
                 <div className="mt-6">
                   <PedidosPage since={orderAlerts.since} onChanged={orderAlerts.refresh} />
+                </div>
+              ) : activeView === "conversas" ? (
+                <div className="mt-6">
+                  <ConversasPage onOpenOrder={() => setView("pedidos")} />
                 </div>
               ) : activeView === "compras" ? (
                 <div className="mt-6">

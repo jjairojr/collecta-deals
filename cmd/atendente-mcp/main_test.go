@@ -1,0 +1,426 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+const storefrontJSON = `{
+  "items": [
+    {"sku":"op|shanks-op09","slug":"onepiece-shanks-op09-004-manga-nm","game":"onepiece","featured":true,"addedAt":"2026-10-01T10:00:00Z","gameLabel":"One Piece","number":"OP09-004","name":"Shanks","set":"OP09","variant":"Manga","condition":"NM","qty":1,"askBRL":1234.5},
+    {"sku":"op|shanks-op01","slug":"onepiece-shanks-op01-120-nm","game":"onepiece","addedAt":"2026-10-20T10:00:00Z","gameLabel":"One Piece","number":"OP01-120","name":"Shanks","set":"OP01","condition":"NM","qty":3,"askBRL":45},
+    {"sku":"pkm|bb","slug":"pokemon-booster-box-rivais-predestinados","game":"pokemon","addedAt":"2026-10-25T10:00:00Z","gameLabel":"Pokémon","kind":"sealed","name":"Booster Box Rivais Predestinados","qty":2,"askBRL":899.9},
+    {"sku":"acc|sleeve","slug":"acessorios-sleeve-dragon-shield","gameLabel":"Acessórios","kind":"accessory","name":"Sleeve Dragon Shield","qty":10,"askBRL":79}
+  ],
+  "soldOut": [
+    {"sku":"op|nami","slug":"onepiece-nami-op01-016-nm","gameLabel":"One Piece","number":"OP01-016","name":"Nami","set":"OP01","condition":"NM","qty":0,"askBRL":20}
+  ]
+}`
+
+type ntfyCall struct {
+	title    string
+	priority string
+	body     string
+}
+
+type fixture struct {
+	app        *app
+	session    *mcp.ClientSession
+	now        time.Time
+	storeHits  atomic.Int32
+	storeFails atomic.Bool
+	mu         sync.Mutex
+	pushes     []ntfyCall
+}
+
+func newFixture(t *testing.T, mode string) *fixture {
+	t.Helper()
+	return newFixtureWith(t, mode, "", nil)
+}
+
+func newFixtureWith(t *testing.T, mode, agentToken string, agent http.HandlerFunc) *fixture {
+	t.Helper()
+	f := &fixture{now: time.Date(2026, 11, 2, 15, 0, 0, 0, saoPaulo)}
+	store := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if agent != nil && strings.HasPrefix(r.URL.Path, "/api/postsale/agent/") {
+			agent(w, r)
+			return
+		}
+		if r.URL.Path != "/api/storefront" {
+			http.NotFound(w, r)
+			return
+		}
+		f.storeHits.Add(1)
+		if f.storeFails.Load() {
+			http.Error(w, "down", http.StatusBadGateway)
+			return
+		}
+		_, _ = io.WriteString(w, storefrontJSON)
+	}))
+	t.Cleanup(store.Close)
+	ntfy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.pushes = append(f.pushes, ntfyCall{title: r.Header.Get("Title"), priority: r.Header.Get("Priority"), body: string(body)})
+		f.mu.Unlock()
+	}))
+	t.Cleanup(ntfy.Close)
+	cfg := config{
+		OpdealsURL: store.URL,
+		SiteURL:    "https://www.collectatcg.com.br",
+		NtfyURL:    ntfy.URL + "/topico",
+		Mode:       mode,
+		TestPhones: map[string]bool{"6288887777": true},
+		DataDir:    t.TempDir(),
+		AgentToken: agentToken,
+		NewsPath:   filepath.Join(t.TempDir(), "novidades.md"),
+	}
+	f.app = newApp(cfg, http.DefaultClient, func() time.Time { return f.now })
+	ctx := context.Background()
+	serverSide, clientSide := mcp.NewInMemoryTransports()
+	if _, err := f.app.server().Connect(ctx, serverSide, nil); err != nil {
+		t.Fatal(err)
+	}
+	session, err := mcp.NewClient(&mcp.Implementation{Name: "teste"}, nil).Connect(ctx, clientSide, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+	f.session = session
+	return f
+}
+
+func (f *fixture) pushed() []ntfyCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]ntfyCall(nil), f.pushes...)
+}
+
+func callTool[T any](t *testing.T, f *fixture, name string, args map[string]string) (T, string) {
+	t.Helper()
+	var out T
+	res, err := f.session.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+	if err != nil {
+		t.Fatalf("%s: %v", name, err)
+	}
+	if res.IsError {
+		text := ""
+		if len(res.Content) > 0 {
+			if tc, ok := res.Content[0].(*mcp.TextContent); ok {
+				text = tc.Text
+			}
+		}
+		return out, text
+	}
+	data, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out, ""
+}
+
+func TestLoadConfig(t *testing.T) {
+	env := func(m map[string]string) func(string) string {
+		return func(k string) string { return m[k] }
+	}
+	cfg, err := loadConfig(env(map[string]string{"NTFY_TOPIC": "abc", "ATENDENTE_DADOS": "/tmp/x"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Mode != modeDraft || cfg.NtfyURL != "https://ntfy.sh/abc" || cfg.OpdealsURL != "https://collecta-deals-production.up.railway.app" {
+		t.Fatalf("defaults = %+v", cfg)
+	}
+	if _, err := loadConfig(env(map[string]string{})); err == nil {
+		t.Fatal("missing NTFY_TOPIC accepted")
+	}
+	if _, err := loadConfig(env(map[string]string{"NTFY_TOPIC": "abc", "ATENDENTE_MODO": "ligado"})); err == nil {
+		t.Fatal("invalid mode accepted")
+	}
+	if _, err := loadConfig(env(map[string]string{"NTFY_TOPIC": "abc", "ATENDENTE_MODO": "teste"})); err == nil {
+		t.Fatal("test mode without phones accepted")
+	}
+	cfg, err = loadConfig(env(map[string]string{"NTFY_TOPIC": "abc", "ATENDENTE_DADOS": "/tmp/x", "ATENDENTE_MODO": "teste", "ATENDENTE_TESTE_TELEFONES": "+55 (62) 98888-7777, 62 3333-4444"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.TestPhones["6288887777"] || !cfg.TestPhones["6233334444"] || len(cfg.TestPhones) != 2 {
+		t.Fatalf("test phones = %v", cfg.TestPhones)
+	}
+}
+
+func TestToolsAndInstructions(t *testing.T) {
+	f := newFixture(t, modeLive)
+	res, err := f.session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, tool := range res.Tools {
+		names = append(names, tool.Name)
+	}
+	sort.Strings(names)
+	want := "autorizar_envio,buscar_estoque,chamar_humano,destaques,historico_bot,modo,novidades,registrar_origem"
+	if got := strings.Join(names, ","); got != want {
+		t.Fatalf("tools = %s, want %s", got, want)
+	}
+	if !strings.Contains(f.session.InitializeResult().Instructions, "autorizar_envio") {
+		t.Fatal("instructions missing from initialize")
+	}
+}
+
+func TestModeReportsVersionAndTime(t *testing.T) {
+	f := newFixture(t, modeTest)
+	out, errText := callTool[modeOutput](t, f, "modo", nil)
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	if out.Modo != modeTest || out.Agora != "segunda 02/11 15:00" || len(out.Versao) != 8 {
+		t.Fatalf("modo = %+v", out)
+	}
+}
+
+func TestSearchLinksByKindAndPrice(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "Shanks manga"})
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	if len(out.Exatos) != 1 || out.Exatos[0].Link != "https://www.collectatcg.com.br/carta/onepiece-shanks-op09-004-manga-nm" || out.Exatos[0].Preco != "R$ 1.234,50" {
+		t.Fatalf("exatos = %+v", out.Exatos)
+	}
+	if len(out.Parecidos) != 1 || out.Parecidos[0].Numero != "OP01-120" {
+		t.Fatalf("parecidos = %+v", out.Parecidos)
+	}
+	out, _ = callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "booster box rivais"})
+	if len(out.Exatos) != 1 || out.Exatos[0].Link != "https://www.collectatcg.com.br/selado/pokemon-booster-box-rivais-predestinados" {
+		t.Fatalf("sealed = %+v", out.Exatos)
+	}
+	out, _ = callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "sleeve dragon"})
+	if len(out.Exatos) != 1 || out.Exatos[0].Link != "https://www.collectatcg.com.br/acessorio/acessorios-sleeve-dragon-shield" {
+		t.Fatalf("accessory = %+v", out.Exatos)
+	}
+}
+
+func TestSearchFindsSoldOutByNumber(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, _ := callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "OP01-016"})
+	if len(out.Exatos) != 0 {
+		t.Fatalf("sold-out card listed as in stock: %+v", out.Exatos)
+	}
+	if len(out.Esgotados) != 1 || out.Esgotados[0].Nome != "Nami" || out.Esgotados[0].Disponivel != 0 {
+		t.Fatalf("esgotados = %+v", out.Esgotados)
+	}
+}
+
+func TestCatalogCacheAndStaleFallback(t *testing.T) {
+	f := newFixture(t, modeLive)
+	callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "shanks"})
+	callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "nami"})
+	if hits := f.storeHits.Load(); hits != 1 {
+		t.Fatalf("storefront hits = %d, want 1 within TTL", hits)
+	}
+	f.storeFails.Store(true)
+	f.now = f.now.Add(2 * time.Minute)
+	out, errText := callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "shanks"})
+	if errText != "" || len(out.Exatos) == 0 {
+		t.Fatalf("stale fallback failed: %q %+v", errText, out)
+	}
+	if hits := f.storeHits.Load(); hits != 2 {
+		t.Fatalf("storefront hits = %d, want a refresh attempt", hits)
+	}
+}
+
+func TestSearchErrorsWhenStorefrontDown(t *testing.T) {
+	f := newFixture(t, modeLive)
+	f.storeFails.Store(true)
+	_, errText := callTool[searchOutput](t, f, "buscar_estoque", map[string]string{"consulta": "shanks"})
+	if !strings.Contains(errText, "não consegui ler o estoque") {
+		t.Fatalf("error = %q", errText)
+	}
+}
+
+func TestAuthorizeDraftModeNotifiesAndBlocks(t *testing.T) {
+	f := newFixture(t, modeDraft)
+	out, errText := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "+55 11 99999-8888", "texto": "Oi! Temos sim."})
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	if out.Enviar || !strings.Contains(out.Motivo, "NÃO envie") {
+		t.Fatalf("draft authorize = %+v", out)
+	}
+	pushes := f.pushed()
+	if len(pushes) != 1 || !strings.Contains(pushes[0].body, "Oi! Temos sim.") || pushes[0].title != "Rascunho do atendente" {
+		t.Fatalf("pushes = %+v", pushes)
+	}
+	hist, _ := callTool[historyOutput](t, f, "historico_bot", map[string]string{"telefone": "11999998888"})
+	if len(hist.Mensagens) != 0 {
+		t.Fatalf("draft recorded as sent: %+v", hist)
+	}
+}
+
+func TestAuthorizeTestModeOnlyTestPhones(t *testing.T) {
+	f := newFixture(t, modeTest)
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "+55 11 99999-8888", "texto": "Oi"})
+	if out.Enviar {
+		t.Fatal("non-test phone authorized in test mode")
+	}
+	out, _ = callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "(62) 98888-7777", "texto": "Oi, teste"})
+	if !out.Enviar {
+		t.Fatalf("test phone refused: %+v", out)
+	}
+	hist, _ := callTool[historyOutput](t, f, "historico_bot", map[string]string{"telefone": "556288887777"})
+	if len(hist.Mensagens) != 1 || hist.Mensagens[0].Texto != "Oi, teste" || hist.Mensagens[0].Em != "02/11 15:00" {
+		t.Fatalf("history = %+v", hist)
+	}
+}
+
+func TestAuthorizeLiveKeepsSevenDaysOfHistory(t *testing.T) {
+	f := newFixture(t, modeLive)
+	callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 99999-1111", "texto": "antiga"})
+	f.now = f.now.Add(8 * 24 * time.Hour)
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 99999-1111", "texto": "nova"})
+	if !out.Enviar {
+		t.Fatalf("live refused: %+v", out)
+	}
+	hist, _ := callTool[historyOutput](t, f, "historico_bot", map[string]string{"telefone": "6299991111"})
+	if len(hist.Mensagens) != 1 || hist.Mensagens[0].Texto != "nova" {
+		t.Fatalf("history = %+v", hist)
+	}
+}
+
+func TestAuthorizeRejectsDashAndBadPhone(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 99999-1111", "texto": "Temos sim — R$ 10"})
+	if out.Enviar || !strings.Contains(out.Motivo, "travessão") {
+		t.Fatalf("dash authorized: %+v", out)
+	}
+	_, errText := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "Maria", "texto": "Oi"})
+	if !strings.Contains(errText, "telefone inválido") {
+		t.Fatalf("error = %q", errText)
+	}
+}
+
+func TestHandoffPushesHighPriority(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[handoffOutput](t, f, "chamar_humano", map[string]string{"telefone": "62 99999-1111", "nome": "Ana", "motivo": "quer vender coleção", "resumo": "200 cartas de Pokémon"})
+	if errText != "" || !out.OK {
+		t.Fatalf("handoff = %+v %q", out, errText)
+	}
+	pushes := f.pushed()
+	if len(pushes) != 1 || pushes[0].priority != "high" || !strings.Contains(pushes[0].body, "Ana 62 99999-1111: quer vender coleção") {
+		t.Fatalf("pushes = %+v", pushes)
+	}
+}
+
+func TestHighlightsFeaturedFirstThenNewest(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[highlightsOutput](t, f, "destaques", map[string]string{"jogo": "One Piece"})
+	if errText != "" || len(out.Itens) != 2 {
+		t.Fatalf("destaques %+v %q", out, errText)
+	}
+	if out.Itens[0].Numero != "OP09-004" || out.Itens[0].Motivo != "destaque da loja" || out.Itens[0].Link == "" {
+		t.Fatalf("first %+v", out.Itens[0])
+	}
+	if out.Itens[1].Numero != "OP01-120" || out.Itens[1].Motivo != "chegou agora" {
+		t.Fatalf("second %+v", out.Itens[1])
+	}
+	pkm, _ := callTool[highlightsOutput](t, f, "destaques", map[string]string{"jogo": "pokémon"})
+	if len(pkm.Itens) != 1 || pkm.Itens[0].Preco != "R$ 899,90" {
+		t.Fatalf("pokemon %+v", pkm)
+	}
+}
+
+const newsFile = `# Novidades da Collecta
+Texto antes do primeiro título é ignorado.
+
+## Loja física em reforma
+até: 14/11/2026
+A loja física tá em reforma e abre dia 15/11.
+
+## Loja física aberta
+desde: 15/11/2026
+Aberta todo dia das 12h às 22h.
+
+## Cupom BEMVINDO
+5% na primeira compra no site.
+
+## Pré-venda antiga
+ate: 01/11/2026
+Já acabou.
+
+## Data errada
+até: 31/02/2026
+Não deve aparecer.
+
+## Sem texto
+desde: 01/11/2026
+`
+
+func newsTitles(t *testing.T, f *fixture) []string {
+	t.Helper()
+	out, errText := callTool[newsOutput](t, f, "novidades", nil)
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	titles := make([]string, 0, len(out.Novidades))
+	for _, n := range out.Novidades {
+		titles = append(titles, n.Titulo)
+	}
+	return titles
+}
+
+func TestNewsFilteredByDate(t *testing.T) {
+	f := newFixture(t, modeLive)
+	if got := newsTitles(t, f); len(got) != 0 {
+		t.Fatalf("missing file should give no news, got %v", got)
+	}
+	if err := os.WriteFile(f.app.cfg.NewsPath, []byte(newsFile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(newsTitles(t, f), "|"); got != "Loja física em reforma|Cupom BEMVINDO" {
+		t.Fatalf("02/11 news = %s", got)
+	}
+	f.now = time.Date(2026, 11, 14, 23, 59, 0, 0, saoPaulo)
+	if got := strings.Join(newsTitles(t, f), "|"); got != "Loja física em reforma|Cupom BEMVINDO" {
+		t.Fatalf("14/11 news = %s", got)
+	}
+	f.now = time.Date(2026, 11, 15, 0, 1, 0, 0, saoPaulo)
+	if got := strings.Join(newsTitles(t, f), "|"); got != "Loja física aberta|Cupom BEMVINDO" {
+		t.Fatalf("15/11 news = %s", got)
+	}
+}
+
+func TestRegisterOriginOncePerPhone(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[originOutput](t, f, "registrar_origem", map[string]string{"telefone": "+55 62 99999-1111", "origem": "  Instagram   da loja "})
+	if errText != "" || !out.OK || out.JaRegistrado {
+		t.Fatalf("first = %+v %q", out, errText)
+	}
+	out, _ = callTool[originOutput](t, f, "registrar_origem", map[string]string{"telefone": "62 9999-1111", "origem": "Google"})
+	if !out.JaRegistrado {
+		t.Fatalf("duplicate not detected: %+v", out)
+	}
+	data, err := os.ReadFile(filepath.Join(f.app.cfg.DataDir, "origem.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(data); got != "data,telefone,origem\n02/11/2026 15:00,6299991111,Instagram da loja\n" {
+		t.Fatalf("csv = %q", got)
+	}
+}

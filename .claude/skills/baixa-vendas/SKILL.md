@@ -59,27 +59,37 @@ Quando o argumento contém `--auto` (execução agendada, ninguém olhando):
    (sem tarefa) seguem a regra de propagação abaixo, últimos 7 dias.
 5. Releia os ledgers e confira que cada baixa feita está lá (`buyer` certo,
    qty certa). Baixa que não aparecer = pendência.
+6. **Pós-venda da Liga**: rode a Fase 7 da `liga-vendas` (pedidos `Pagamento
+   efetuado - Aguardando envio` pagos nas últimas 24h → `POST
+   /api/postsale/liga-orders`). Reaproveite os detalhes já abertos na etapa 2;
+   só primeiro nome, telefone, itens e retirada saem da Liga. No relatório, só
+   as contagens `created`/`skipped`.
 
 Releia o ledger entre as etapas 2 e 3: a etapa 2 muda ids e quantidades.
 
 ## Regra de propagação (idempotente)
 
-Para cada item vendido e cada canal que precisa refletir a venda, compare a
-quantidade anunciada no canal (`canal`) com o que sobrou no dashboard para o
-mesmo produto (número + variante + preço; `resto` = soma do `qty` dos holdings):
+**A Liga é a fonte da verdade** de quantidade e preço (regra do dono, 24/10/2026).
+O dono cadastra estoque novo direto na Liga, então Liga acima do dashboard quer
+dizer que o dashboard está atrasado, não que a Liga errou.
+
+Depois de cada baixa, o alvo de cada canal é a quantidade **da Liga** para o
+produto (a Liga já desconta sozinha as vendas dela; para venda do MyP/Site, a Liga
+é reduzida só pelas unidades vendidas — decisão na Fase 5 da `myp-vendas`).
 
 | situação | ação |
 | --- | --- |
-| `canal` ≤ `resto` | já refletido — não mexa |
-| `canal` > `resto` | gravar `resto` (zerou → excluir/zerar anúncio) |
+| MyP ≠ Liga | gravar no MyP a quantidade e o preço da Liga (zerou → excluir anúncio) |
+| dashboard < Liga | lote extra no dashboard com a diferença (`buyBRL 0`, nota "Cadastrado a partir do estoque da LigaMagic <data> (lote extra, Liga tinha mais que o dashboard)") |
+| dashboard > Liga | pendência no relatório (a redução é decisão do dono: reduzir via PUT do registro completo; qty 0 exige DELETE) |
 | item sem lastro no dashboard | não mexa no canal; pendência |
 
-Nunca aumente quantidade em canal nenhum. Isso torna a rodada segura de repetir:
-rodar duas vezes seguidas não muda nada na segunda.
+Nunca reduza a Liga para bater com o dashboard. Pokémon JP anunciado duas
+vezes na Liga (edição JP + edição EN) conta uma vez só.
 
-Antes de gravar uma redução na Liga ou no MyP, confira se o mesmo item não
-vendeu também naquele canal desde a última rodada (pedido novo ainda não
-processado) — se vendeu, é **venda dupla**: pendência marcada `URGENTE`.
+Antes de gravar uma redução no MyP, confira se o mesmo item não vendeu também
+lá desde a última rodada (pedido novo ainda não processado) — se vendeu, é
+**venda dupla**: pendência marcada `URGENTE`.
 
 ## Relatório
 
@@ -124,3 +134,27 @@ Aprendizados de mecânica de cada canal vão nas skills `liga-vendas` e
   dashboard 5). A regra não aumenta; vira alerta.
 - Vendas de balcão/live (buyer `Balcão`, `Aberto em live`) também tiram estoque
   e não têm etapa aqui; listar no relatório os `sold` desses buyers no período.
+
+2026-10-30 (rodada interativa — 3 pedidos Liga, 23 baixas, 61 ajustes no MyP):
+
+- **Baixa manual do dono não desce para a Liga.** `sold` com buyer sem `Liga #`/`MyP #`/`Site #`
+  ("MYP" = cliente que veio do MyP e pagou por fora, "Balcão", "site", "Venda por fora") é
+  venda real: reduza a Liga e o MyP por essas unidades na etapa 4. Nunca crie lote extra
+  para item que tenha uma baixa manual recente (Shiryu OP16-108 e Rob Lucci ST29-013-FA
+  ficaram com a Liga acima do dashboard por isso).
+- O MyP ficou dias sem receber as vendas da Liga. Varrer o MyP inteiro do jogo e cruzar
+  com o estoque atual da Liga (`cartas/all&txt_filtro=1`) por número + preço resolve tudo
+  de uma vez (mecânica na `myp-vendas`).
+
+2026-11-01 (fila Sincronizar à mão — 8 tarefas: Site #24 com 6 cartas Pokémon JP + 2 GEM Pack de balcão):
+
+- **Carta JP com anúncio gêmeo na Liga sai dos dois.** O dono anuncia a mesma AR JP na edição JP
+  e na EN equivalente, com a mesma qty (Tauros 094/083 + 096/086, Ambipom 092/080 + 107/094,
+  Snorunt 200/193 + 227/217, Ethan's Magcargo 197/193 + 222/217; o preço pode diferir). O ledger
+  tem um registro só, então a tarefa de `qty` N tira N de cada gêmeo. Gêmeo = mesmo nome,
+  idioma JP, mesma qty e soma das linhas maior que o ledger.
+- Selado não aparece em `cartas/all`: o admin é `?view=ecom/admin/prod/all`, formulário `bcS`
+  (`txt_produto` = nome), mesmos campos `txt_qty_typed[k]`/`txt_preco[k]`/`btSalvar`; a busca
+  precisa ser submetida pelo próprio form para a gravação funcionar. Flash: "Produtos de sua
+  lista alterados com sucesso." GEM Pack não está anunciado no MyP.
+- Liga já zerada à mão (Goldeen 084, GEM Pack Vol.4): só marcar a tarefa como feita.

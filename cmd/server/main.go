@@ -54,6 +54,7 @@ func run() error {
 	promosPath := flag.String("promos", "data/promos.json", "path to the storefront promo-code ledger (cupons da vitrine)")
 	syncQueuePath := flag.String("syncqueue", "data/syncqueue.json", "path to the Liga/MyP propagation queue (saídas de estoque fora da Liga)")
 	ordersPath := flag.String("orders", "data/orders.json", "path to the storefront order ledger (pedidos pagos pelo site)")
+	conversationsPath := flag.String("conversations", "data/conversations.json", "path to the post-sale WhatsApp conversation ledger (pós-venda)")
 	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
 	setsFlag := flag.String("sets", "", "comma-separated Liga set codes to limit (default all)")
 	fxOverride := flag.Float64("fx", 0, "BRL->USD rate override (0 = fetch live)")
@@ -493,6 +494,12 @@ func run() error {
 		sweepCtx, stopSweep := context.WithCancel(context.Background())
 		defer stopSweep()
 		go srv.SweepCoupons(sweepCtx, time.Minute)
+	}
+	srv.PostSale = buildPostSale(*conversationsPath, *adminToken, logger)
+	if srv.PostSaleEnabled() {
+		postSaleCtx, stopPostSale := context.WithCancel(context.Background())
+		defer stopPostSale()
+		go srv.RunPostSale(postSaleCtx, time.Minute)
 	}
 	logger.Printf("listening on %s (web dir %q)", *addr, *webDir)
 	return http.ListenAndServe(*addr, srv.Handler())

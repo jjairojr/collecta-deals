@@ -251,6 +251,65 @@ desse conhecimento.
 
 ---
 
+## Fase 7 — Pós-venda no WhatsApp (pedidos pagos nas últimas 24h)
+
+Depois da baixa, mande para o pós-venda os pedidos da Liga que ainda não foram
+enviados, para o OpenBot escrever a primeira mensagem (agradece e oferece
+adicionar algo com "Adicionar a um pedido já existente"). O servidor guarda só
+primeiro nome, telefone, itens e se é retirada.
+
+1. Da listagem da Fase 1, separe os pedidos com status **`Pagamento efetuado -
+   Aguardando envio`** e `Data Pag.` nas últimas 24h. Enviado, Retirado no
+   Balcão, Cancelado e Aguardando Pagamento ficam de fora.
+2. Retirada: a coluna de forma de envio da listagem diz `Retirada`/`Retirar no
+   balcão` → `pickup: true`; qualquer transportadora → `pickup: false`.
+3. Para cada um, abra o detalhe (`?view=ecom/admin/compra&id=866280&cod=<pedido>`
+   no host do admin, hoje `www.ligacollectatcg.com.br`; se o admin estiver em
+   `www.ligamagic.com.br`, o caminho é o mesmo), com **7–10 s entre páginas**
+   (regra 6). Reaproveite o detalhe que a Fase 2 já abriu: não abra o mesmo
+   pedido duas vezes. Com `javascript_tool`, devolva SÓ:
+   - do bloco **`Endereço do Cliente`**: o primeiro nome (a primeira palavra do
+     título do bloco) e o telefone `(DD) NNNNNNNNN`. Nada mais desse bloco;
+   - de **`Itens do Pedido`**: nome e qty de cada item (o mesmo formato da
+     Fase 2, ex. `Shanks (OP09-004)`, qty 1);
+   - de **`Confirmação de Pagamento`**: a `Data do Pagamento`.
+   Nunca leia, imprima, grave em arquivo ou mande para o servidor CPF, e-mail,
+   endereço, sobrenome ou qualquer outro dado do comprador. O script do
+   `javascript_tool` deve recortar só esses campos dentro da página e devolver
+   um objeto já filtrado, nunca o `innerText` inteiro do bloco do cliente.
+4. Mande todos de uma vez (o servidor ignora pedido já importado, pago há mais
+   de 24h ou telefone que já recebeu pós-venda nos últimos 7 dias):
+
+```bash
+B=https://collecta-deals-production.up.railway.app
+T=$(sed -n 's/^ADMIN_TOKEN=//p' /Users/jjairo/Documents/www/opdeals/scripts/deploy.env)
+python3 - "$B" "$T" <<'PY'
+import json, sys, urllib.request
+orders = [
+    {"code": "12376472", "firstName": "Ana", "phone": "(62) 99827-4848",
+     "paidAt": "2026-11-02T14:05:00-03:00", "pickup": False,
+     "items": [{"name": "Shanks (OP09-004)", "qty": 1}]},
+]
+req = urllib.request.Request(sys.argv[1] + "/api/postsale/liga-orders",
+    data=json.dumps({"orders": orders}).encode(), method="POST",
+    headers={"Content-Type": "application/json", "X-Admin-Token": sys.argv[2]})
+print(urllib.request.urlopen(req).read().decode())
+PY
+```
+
+   - `paidAt` em RFC 3339 com fuso `-03:00` (a hora da `Data do Pagamento`).
+   - O corpo só aceita esses campos: qualquer campo a mais (cpf, email,
+     endereço) volta 400 e nada é gravado.
+   - Resposta: `{"created": N, "skipped": M}`. 409 = pós-venda não está no modo
+     OpenBot em prod; anote no relatório e siga.
+5. No relatório, só as contagens: `pós-venda Liga: N criados, M ignorados`.
+   Nenhum nome, telefone ou item de cliente no relatório nem no chat.
+
+As mensagens aparecem em **Conversas** no dashboard como "IA escrevendo", com o
+selo Liga; o OpenBot escreve na rodada seguinte e o dono aprova.
+
+---
+
 ## Aprendizados de execuções
 
 2026-08-04 (2ª execução — 10 pedidos novos, 9 já baixados manualmente):
@@ -572,7 +631,7 @@ desse conhecimento.
 
 2026-10-27 (auditoria Liga × aba Vendas — 42 pedidos pagos desde 13/10):
 
-- **Admin da loja agora em `www.ligacollectatcg.com.br`** (mesmos paths `?view=ecom/admin/...`).
+- **Admin da loja: tente `www.ligacollectatcg.com.br` e, se responder "Você não está logado", `www.ligamagic.com.br` (em 30/10 o admin voltou para o ligamagic)** (mesmos paths `?view=ecom/admin/...`).
   Em `www.ligamagic.com.br` o admin responde "Você não está logado" mesmo com a sessão ativa.
 - Item vendido "sem lastro" nunca entrava na aba Vendas, então o faturamento ficava menor.
   Correção: `POST /api/trades` com `status:"sold"`, `buyBRL 0`, `channel:"liga"`, `semLastro:true`,
@@ -601,3 +660,14 @@ desse conhecimento.
 - Lotes múltiplos do mesmo número: alocar a venda do lote mais antigo
   (`createdAt`) para o mais novo, filtrando por número exato e ask = unitário
   do pedido (separa base de Parallel, como Franky OP09-072 vs OP09-072-P).
+
+2026-11-02 (18ª execução — 9 pedidos novos pagos, 25 linhas, 24 baixas + 1 sem lastro):
+
+- Admin respondeu em `www.ligamagic.com.br` com sessão ativa.
+- **Listagem mudou de novo**: `#N` sozinho numa linha, cliente na seguinte, depois
+  data, hora, data pag. (opcional), status, pagamento, envio, `R$ total`.
+- **A fronteira por `Liga #` deixou passar um pedido**: #12360171 (31/10) estava abaixo
+  da maior `Liga #` (#12367793) e nunca tinha sido baixado. Não confie só na fronteira:
+  liste todos os pedidos pagos da 1ª página e compare com o conjunto de `Liga #` baixados.
+- Pedidos já baixados e depois cancelados nesta rodada: #12356004 (Wailord ex, Mega
+  Chandelure ex, Goldeen) e #12327804 (Parasect). Reportar ao dono.

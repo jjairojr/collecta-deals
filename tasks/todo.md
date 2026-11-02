@@ -1,3 +1,92 @@
+# Atendente Collecta + pós-venda via OpenBot (2026-11-02)
+
+Plano aprovado em 2026-11-02: agente do OpenBot (Claude Code, plano do dono) opera o WhatsApp Web do número
+principal 5562993399980 num usuário macOS separado ("collecta-bot"). Fase 1 responde quem chama; fase 2 leva o
+pós-venda de 31/10 para o WhatsApp Web (transporte `openbot`, a Cloud API continua como alternativa).
+
+## Fase 0
+- [x] Backup do WIP: `backups/wip-2026-11-02.patch` + `backups/wip-2026-11-02.tgz`
+- [x] Baseline: `go test ./...` verde, `web` build verde
+
+## Fase 1: responder quem chama
+- [x] `postsale.Search` extraído de `searchItems` (testes atuais verdes sem edição)
+- [x] `cmd/atendente-mcp`: modo, buscar_estoque, autorizar_envio (gate de rascunho/teste/ao vivo + histórico), historico_bot, chamar_humano + instruções embutidas
+- [x] Testes do MCP (12, -race verde) + smoke contra a vitrine de produção (links 200)
+- [x] `bot/atendente/`: settings.json, guard.sh (allowlist, testado), ferramentas-permitidas.txt, rotina.md, install.sh, SETUP.md
+- [x] Makefile: alvo `atendente`
+
+## Fase 2: pós-venda pelo WhatsApp Web
+- [x] conversations: `Kind`, `ClaimedAt`, `Close` falha a fila, `QueuedOffer` (+ teste)
+- [x] Extrações puras em postsale.go: `recordInbound`, `trackingDue`/`renderTracking`, `markOfferSent` (12 testes antigos verdes sem edição)
+- [x] Modo Outbox: sendOffer/sendText enfileiram, sem Claude no servidor, webhook só no modo cloud, sweep (resposta na fila expira em 2h + ntfy "OpenBot parado")
+- [x] `postsale_agent.go`: token próprio (Bearer, fecha por padrão) + rotas claim/delivered/failed/watch/inbound/reply/handoff/link. Busca de estoque e status do pedido ficaram no `buscar_estoque` (com sku e cabe_no_envelope) e no `context` do inbound, sem rota própria
+- [x] `cmd/server/postsale.go`: `POSTSALE_TRANSPORT` (cloud padrão, openbot exige token 32+ diferente do admin, valor desconhecido desliga)
+- [x] Testes: 14 em postsale_agent_test.go, 4 em cmd/server/postsale_test.go, 2 em conversations_test.go; -race verde
+- [x] Painel: selo "OpenBot visto há X" (rosa com 15+ min), "aguardando OpenBot" / "OpenBot enviando" / "entregue", texto do cabeçalho e do campo de resposta; tsc + vite build verdes
+- [x] MCP: 8 ferramentas `posvenda_*` (só com POSTSALE_AGENT_TOKEN), rascunho não chama o servidor, teste filtra telefones, confirmação grava no histórico; 7 testes
+- [x] Ponta a ponta local: servidor openbot em pasta temporária com pedido falso enviado → 401 sem token e com token de admin, webhook 404, MCP pegou o rastreio, confirmou, pedido marcado, histórico gravado, claim seguinte vazio, painel mostra transport openbot
+- [x] RAILWAY.md + memória opdeals-posvenda-ia
+
+## Pós-venda site + Liga (2026-11-02)
+- [x] conversations: estado `compose` ("IA escrevendo"), `Channel` (site/liga, vazio = site), `Pickup`, `Items`, `Opening` (texto da IA), `IsLiga`/`Unsent`
+- [x] Regras: todo pedido pago do site entra (sem opt-in, retirada inclusa, juntar pedido fora); 15 min, 24h, 1 por telefone a cada 7 dias e uma conversa por pedido continuam. `EligibleLigaOrder` e `CleanOpening` (até 600, mantém quebra de linha)
+- [x] Modo openbot: o worker cria conversa em `compose` sem candidato nem pitch; o modo cloud segue igual (opt-in, sem retirada, Draft com pitch)
+- [x] `POST /api/postsale/liga-orders` (X-Admin-Token checado no handler, a rota fica sob o prefixo público `/api/postsale/`): só code, firstName, phone, paidAt, pickup, items (campo a mais = 400), dedup por `liga:<código>`, devolve `{created, skipped}`; 409 no modo cloud
+- [x] Agente: `GET /agent/compose` (contexto com canal, itens, retirada e `canAddHow`) e `POST /agent/conversations/{id}/compose` (travessão/vazio/600+ = 400, já escrita = 409) → Draft com ntfy "Pós-venda: aprovar mensagem" ou Queued com AUTOSEND; a oferta na fila sai com o texto da IA sem moldura
+- [x] Sweep: compose/draft/queued vencem por DraftTTL; "pedido mudou de status" e detectComplement só no site; claim da Liga não depende de pedido; compose conta para o alerta de OpenBot parado
+- [x] `/link` na Liga = 409 com a orientação "Adicionar a um pedido já existente"; contexto do inbound traz `channel`, `pickup`, `canAddHow` e os itens da Liga como `bought`
+- [x] Painel: selo Site/Liga, "Retirada", "IA escrevendo" (com Descartar), itens do pedido, editor de várias linhas para a mensagem da IA, Liga sem link para Pedidos; `useOrderFollowUps` ignora Liga
+- [x] MCP: `posvenda_escrever` e `posvenda_mensagem` (travessão barrado antes do servidor); instruções: passo 0 da primeira mensagem, Liga sem link e nunca fora da Liga
+- [x] Skills: Fase 7 na `liga-vendas` (só primeiro nome, telefone, itens, retirada; 7–10 s; só contagens no relatório) + etapa 6 na `baixa-vendas`
+- [x] Testes: 9 novos em postsale_compose_test.go, helpers do openbot passam pelo compose, 2 em rules_test.go, 1 no MCP; `go test ./...` e -race verdes; `npm run build` verde; `make atendente`
+
+### Review
+- Precisa de deploy para valer. Com o deploy, as conversas do site em openbot deixam de nascer com pitch: a 1ª mensagem espera a rodada do OpenBot (versão das regras nova no `modo`).
+- O Store grava `CreatedAt` com o relógio real, então a expiração por DraftTTL conta da criação, não do pagamento (na Liga, da importação).
+- Não testado: a Fase 7 da `liga-vendas` contra o admin de verdade (seletores do bloco "Endereço do Cliente" e da coluna de envio) e o agente escrevendo no OpenBot.
+
+## Review
+- Fase 1 vai para o ar sem deploy: só `make atendente` + SETUP.md no usuário collecta-bot. A busca roda contra a vitrine de produção (smoke: "charizard" → 3 em estoque + 1 esgotado, links 200).
+- Fase 2 precisa de deploy (push na main) e das envs `POSTSALE_TRANSPORT=openbot`, `POSTSALE_AGENT_TOKEN`, `NTFY_TOPIC` no Railway. Sem as envs o deploy não muda nada.
+- Não testado: o agente de verdade no OpenBot operando o WhatsApp Web (depende do setup do dono) e os nomes das ferramentas de navegador do OpenBot para o allowlist.
+- Nada commitado. Backup do estado anterior em `backups/wip-2026-11-02.*`.
+
+---
+
+# Pós-venda com IA via WhatsApp (2026-10-31)
+
+Design fechado no grilling de 2026-10-31 (ver memória opdeals-posvenda-ia).
+
+## Backend (Go)
+- [x] `internal/whatsapp`: cliente Cloud API (template, texto), parse do webhook, assinatura X-Hub-Signature-256, chave de telefone BR (9º dígito)
+- [x] `internal/conversations`: ledger JSON `data/conversations.json` (mesmo padrão de orders)
+- [x] `internal/postsale`: candidatos (só singles, 30–100% dos itens, mín R$10, relacionado > giro > promo), horário de silêncio 22h–8h, elegibilidade (opt-in, sem retirada/junção, 1 oferta/7 dias)
+- [x] `internal/postsale` agente: Claude (SDK Go) com tools buscar_estoque, status_pedido, gerar_link_complemento, chamar_humano; pitch da 1ª mensagem
+- [x] `orders.Order`: `MarketingOptIn`, `TrackingNotified`; checkout recebe `marketingOptIn`
+- [x] Worker (1 min): cria rascunhos de oferta, envia aprovados fora do silêncio, fecha janela de 12h, detecta complemento pago, manda rastreio automático
+- [x] Rotas: webhook WhatsApp (GET verify / POST), `/api/conversations*` (admin), `/api/postsale/link/{token}` (vitrine)
+- [x] ntfy a cada rascunho / handoff
+- [x] Testes de unidade
+
+## Vitrine
+- [x] Checkbox de opt-in desmarcado no checkout → `marketingOptIn`
+- [x] Página `/complemento/[token]` → carrinho + `/checkout?join=N`
+- [x] Checkout lê `?join=N`
+
+## Dashboard
+- [x] Aba Conversas (rascunhos, aprovar/editar/descartar, responder, devolver à IA, placar)
+- [x] Pedidos: aviso "segurar envio até HH:MM"
+
+## Envs novas
+WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN, WHATSAPP_TEMPLATE_OFFER, WHATSAPP_TEMPLATE_TRACKING, WHATSAPP_TEMPLATE_LANG, ANTHROPIC_API_KEY, POSTSALE_MODEL, NTFY_TOPIC
+
+## Review
+- Go: `internal/whatsapp`, `internal/conversations`, `internal/postsale`, `internal/api/postsale.go`, `cmd/server/postsale.go`; `go test ./...` e `-race` verdes, 9 testes de integração do fluxo (oferta, aprovação noturna, resposta da IA, link, complemento, janela vencida, estranhos/assinatura, rastreio).
+- Vitrine e dashboard: `tsc`/`vite build` verdes; nada testado no navegador ainda.
+- Agente Claude real não foi chamado (sem chave); só o fluxo com cérebro falso.
+
+---
+
 # opdeals — build log
 
 ## Plan
@@ -1185,3 +1274,17 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 - Correções do review: baixa por linha (retry vende só o que falta), venda do MyP não gera pendência, estorno depois de enviado não devolve sozinho (`POST /api/orders/{id}/return-stock` + botão "Devolver ao estoque"), PUT valida canal/motivo, recusa mudança de status e preserva baixa sem venda antiga, front manda só os campos alterados, troca de jogo bloqueada para lote de qualquer pedido do site, desfazer venda só junta pelo `splitFrom`, trocar a compra pelo PUT zera a parcela de frete antiga, liga-precificar soma `orderShippingBRL`.
 - Desvios do plano: regras de legado da Fase 2 (acima); rateio grava campo próprio em vez de `shippingBRL`; worker da Liga fora do escopo.
 - Pendências: (1) worker que executa a fila na Liga sem o Claude — decidir Railway (teste do admin via `railway ssh` deu 403 com UA do wget; falta repetir com UA de Chrome) ou mini PC na loja; (2) depois do deploy, backup do volume e `POST /api/purchases/reallocate` em prod (o frete inteiro de cada compra vai para os itens ainda em estoque); (3) custos dos 591 lotes sem custo em `custos-pendentes-2026-10-30.csv`; (4) a flag nova `-syncqueue` tem padrão `data/syncqueue.json`, dentro do volume de prod; (5) nada foi testado clicando na tela.
+
+## Pré-venda Reinado Delta + preço Pix/cartão (2026-11-02)
+
+- [x] Trade/Listing: `cardBRL` (preço no cartão) e `shipsFrom` (data da pré-venda); listings aceitam os dois como opcionais (omitido = mantém)
+- [x] Pedido com `paymentMethod` pix|card: linha cobra pelo método, conferência de preço nos dois, linha guarda `shipsFrom`/`cardPriced`
+- [x] Preferência MP: Pix exclui cartões (1x); cartão exclui Pix, 6x se tem item com preço de cartão, senão 12x; pedido sem método segue legado (vira Pix se houver item com preço de cartão)
+- [x] Vitrine: card/detalhe com "no Pix" + "em até 6x", selo PRE-VENDA, "envio a partir de", sem contagem de estoque; carrinho/checkout com escolha Pix|Cartão; página do pedido; feeds Google/Meta e JSON-LD como preorder
+- [x] Dashboard: Anúncios (modal do produto edita preço no cartão e data), Pedidos (selo pré-venda, "não enviar antes de", método)
+- [x] Fix: foto enviada por upload aparece na página do pedido (URL absoluta)
+- [ ] Deploy backend (Railway) + vitrine (Vercel)
+- [ ] Criar os 5 produtos em prod: scripts/reinado-delta-prevenda.py <API prod> com ADMIN_TOKEN
+
+### Review
+go test ./internal/... ok, web build ok, storefront tsc + next build ok. E2E local (backend fake + next start): vitrine, detalhe, checkout cartão R$ 410, pedido pago, baixa de 1 un, Pedidos no dashboard com selo e "Cartão · master".

@@ -62,6 +62,8 @@ type Server struct {
 	OwnLigaStoreID int
 	PhotoDir       string
 	Checkout       Checkout
+	PostSale       PostSale
+	postSale       postSaleState
 	SyncQueue      *syncqueue.Store
 	JPImport       *JPImport
 	imports        *importsCache
@@ -215,6 +217,9 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("POST /api/orders/{id}/return-stock", s.handleOrderReturnStock)
 		mux.HandleFunc("POST /api/orders/mp-webhook", s.handleMPWebhook)
 	}
+	if s.PostSaleEnabled() {
+		s.postSaleRoutes(mux)
+	}
 	if s.webDir != "" {
 		mux.Handle("/", s.spaHandler())
 	}
@@ -231,6 +236,8 @@ var publicAPIPrefixes = []string{
 	"/api/shipping/",
 	"/api/admin/",
 	"/api/games",
+	"/api/whatsapp/",
+	"/api/postsale/",
 }
 
 func isPublicAPI(path string) bool {
