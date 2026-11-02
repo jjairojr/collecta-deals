@@ -9,3 +9,5 @@ ToolSearch
 # só openbot_browser.*, sem upload, script, senha ou download, e só em https://web.whatsapp.com.
 mcp__openbot__tool_search
 mcp__openbot__tool_describe
+mcp__openbot__routine_no_update
+mcp__openbot__search_memories
