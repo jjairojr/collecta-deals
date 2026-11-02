@@ -23,7 +23,7 @@ import {
   type OrderPatch,
   type OrderStatus,
 } from "../api";
-import { brl2, fullStamp } from "../format";
+import { brl2, fullStamp, shipsFromLabel } from "../format";
 import { isNewOrder } from "../orderAlerts";
 import EmptyState from "./EmptyState";
 import { Kpi } from "./ui/kpi";
@@ -150,6 +150,12 @@ function addressLabel(o: Order): string {
     .filter(Boolean)
     .join("\n");
 }
+
+function preorderDate(o: Order): string {
+  return o.lines.reduce((latest, l) => (l.shipsFrom && l.shipsFrom > latest ? l.shipsFrom : latest), "");
+}
+
+const paymentLabels: Record<"pix" | "card", string> = { pix: "Pix", card: "Cartão" };
 
 function isUnauthorized(err: unknown): boolean {
   return err instanceof Error && err.message === "unauthorized";
@@ -477,6 +483,7 @@ function OrderRow({
   const keepsStock = releasing && shipped;
   const canReturnStock = (order.status === "cancelled" || order.status === "refunded") && holdsStock(order);
   const whatsapp = `https://wa.me/55${order.buyer.phone}`;
+  const preorder = preorderDate(order);
 
   return (
     <>
@@ -502,6 +509,11 @@ function OrderRow({
         </TableCell>
         <TableCell>
           <Badge variant={statusVariants[order.status]}>{statusLabels[order.status]}</Badge>
+          {preorder && (
+            <Badge variant="amber" className="ml-1">
+              Pré-venda · {shipsFromLabel(preorder)}
+            </Badge>
+          )}
         </TableCell>
         <TableCell className="text-right font-semibold tabular-nums text-slate-200">
           {brl2(order.totals.totalBRL)}
@@ -536,6 +548,11 @@ function OrderRow({
                           <td className="px-3 py-2">
                             <div className="font-display text-base font-bold text-slate-100">{l.name}</div>
                             {l.meta && <div className="text-xs text-slate-500">{l.meta}</div>}
+                            {l.shipsFrom && (
+                              <div className="text-xs font-bold text-amber-300">
+                                Pré-venda · não enviar antes de {shipsFromLabel(l.shipsFrom)}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-slate-400">{brl2(l.unitBRL)}</td>
                           <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-200">
@@ -611,7 +628,9 @@ function OrderRow({
                     )}
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    {[order.mp.method, order.mp.status].filter(Boolean).join(" · ") || "—"}
+                    {[order.paymentMethod ? paymentLabels[order.paymentMethod] : "", order.mp.method, order.mp.status]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
                   </div>
                 </div>
               </section>

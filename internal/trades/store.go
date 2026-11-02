@@ -178,10 +178,12 @@ func (s *Store) Update(id string, mut func(*Trade)) (Trade, error) {
 // Listing is the storefront state for one holding: its per-unit asking price and
 // whether it is shown on the public catalog.
 type Listing struct {
-	AskBRL   float64
-	Listed   bool
-	ImageURL string
-	Featured bool
+	AskBRL    float64
+	Listed    bool
+	ImageURL  string
+	Featured  bool
+	CardBRL   *float64
+	ShipsFrom *string
 }
 
 // SetListings applies storefront listing state to many trades in a single
@@ -204,6 +206,12 @@ func (s *Store) SetListings(updates map[string]Listing) (int, error) {
 		all[i].Listed = u.Listed
 		all[i].ImageURL = u.ImageURL
 		all[i].Featured = u.Featured
+		if u.CardBRL != nil {
+			all[i].CardBRL = *u.CardBRL
+		}
+		if u.ShipsFrom != nil {
+			all[i].ShipsFrom = *u.ShipsFrom
+		}
 		all[i].UpdatedAt = now
 		n++
 	}

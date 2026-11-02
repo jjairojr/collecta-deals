@@ -40,6 +40,8 @@ interface RawItem {
   imageURL?: string;
   askBRL: number;
   askUSD?: number;
+  cardBRL?: number;
+  shipsFrom?: string;
   featured?: boolean;
   addedAt?: string;
   noArt?: boolean;
@@ -247,8 +249,10 @@ function mapSealed(it: RawItem, version: string): Sealed {
     meta: [set || it.gameLabel, language].filter(Boolean).join(" · "),
     language,
     price: Math.round(it.askBRL * 100),
+    cardPrice: it.cardBRL ? Math.round(it.cardBRL * 100) : undefined,
+    shipsFrom: it.shipsFrom || undefined,
     qty: Math.max(it.qty, 0),
-    badge: "LACRADO",
+    badge: it.shipsFrom ? "PRE-VENDA" : "LACRADO",
     imageURL: resolveImage(it, version),
     featured: it.featured,
     addedAt: it.addedAt,
@@ -271,8 +275,10 @@ function mapAccessory(it: RawItem, version: string): Accessory {
     set,
     meta: set || "Acessório",
     price: Math.round(it.askBRL * 100),
+    cardPrice: it.cardBRL ? Math.round(it.cardBRL * 100) : undefined,
+    shipsFrom: it.shipsFrom || undefined,
     qty: Math.max(it.qty, 0),
-    badge: "ACESSORIO",
+    badge: it.shipsFrom ? "PRE-VENDA" : "ACESSORIO",
     imageURL: resolveImage(it, version),
     featured: it.featured,
     addedAt: it.addedAt,
@@ -311,8 +317,14 @@ interface Product {
   sku: string;
   qty: number;
   price: number;
+  cardPrice?: number;
+  shipsFrom?: string;
   featured?: boolean;
   addedAt?: string;
+}
+
+function cardOf(p: Product): number {
+  return p.cardPrice ?? p.price;
 }
 
 function dedupProducts<T extends Product>(items: T[], aliases: Map<string, string>): T[] {
@@ -325,7 +337,13 @@ function dedupProducts<T extends Product>(items: T[], aliases: Map<string, strin
     }
     const cur = group.item;
     cur.qty += s.qty;
+    if (cur.cardPrice !== undefined || s.cardPrice !== undefined) {
+      cur.cardPrice = Math.min(cardOf(cur), cardOf(s));
+    }
     cur.price = Math.min(cur.price, s.price);
+    if (s.shipsFrom && (!cur.shipsFrom || s.shipsFrom > cur.shipsFrom)) {
+      cur.shipsFrom = s.shipsFrom;
+    }
     cur.featured = cur.featured || s.featured;
     if (s.slug !== cur.slug) {
       const older = s.addedAt && group.firstAdded && s.addedAt < group.firstAdded;

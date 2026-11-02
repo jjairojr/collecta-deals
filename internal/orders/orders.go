@@ -32,16 +32,34 @@ const (
 
 const ReservationTTL = 30 * time.Minute
 
+type PaymentMethod string
+
+const (
+	PaymentAny  PaymentMethod = ""
+	PaymentPix  PaymentMethod = "pix"
+	PaymentCard PaymentMethod = "card"
+)
+
+func ParsePaymentMethod(raw string) (PaymentMethod, bool) {
+	switch m := PaymentMethod(raw); m {
+	case PaymentAny, PaymentPix, PaymentCard:
+		return m, true
+	}
+	return "", false
+}
+
 type Line struct {
-	SKU      string   `json:"sku"`
-	Game     string   `json:"game"`
-	Kind     string   `json:"kind,omitempty"`
-	Name     string   `json:"name"`
-	Meta     string   `json:"meta,omitempty"`
-	Qty      int      `json:"qty"`
-	UnitBRL  float64  `json:"unitBRL"`
-	ImageURL string   `json:"imageURL,omitempty"`
-	TradeIDs []string `json:"tradeIDs,omitempty"`
+	SKU        string   `json:"sku"`
+	Game       string   `json:"game"`
+	Kind       string   `json:"kind,omitempty"`
+	Name       string   `json:"name"`
+	Meta       string   `json:"meta,omitempty"`
+	Qty        int      `json:"qty"`
+	UnitBRL    float64  `json:"unitBRL"`
+	ImageURL   string   `json:"imageURL,omitempty"`
+	TradeIDs   []string `json:"tradeIDs,omitempty"`
+	CardPriced bool     `json:"cardPriced,omitempty"`
+	ShipsFrom  string   `json:"shipsFrom,omitempty"`
 
 	ReturnedTradeIDs []string `json:"returnedTradeIDs,omitempty"`
 }
@@ -110,6 +128,8 @@ type Order struct {
 	Shipping Shipping `json:"shipping"`
 	Totals   Totals   `json:"totals"`
 	MP       MP       `json:"mp"`
+
+	PaymentMethod PaymentMethod `json:"paymentMethod,omitempty"`
 
 	CollectaUserID    string    `json:"collectaUserId,omitempty"`
 	Coupons           []Coupon  `json:"coupons,omitempty"`

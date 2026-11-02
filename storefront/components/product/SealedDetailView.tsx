@@ -11,6 +11,7 @@ import { useCart } from "@/lib/cart";
 import { sealedToCartLine } from "@/lib/cart-lines";
 import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
+import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
 import type { AccessoryDetail, SealedDetail } from "@/lib/types";
 
 export default function SealedDetailView({
@@ -24,6 +25,7 @@ export default function SealedDetailView({
   const sealed = item.kind === "sealed";
   const stockNoun = sealed ? "CAIXAS" : "UNIDADES";
   const preorder = item.badge === "PRE-VENDA";
+  const installments = item.cardPrice !== undefined ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS;
   const soldPct =
     item.stockTotal > 0
       ? Math.round(((item.stockTotal - item.stockLeft) / item.stockTotal) * 100)
@@ -114,12 +116,28 @@ export default function SealedDetailView({
               <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
                 {brl(item.price)}
               </span>
-              <div className="mt-4 font-pixel text-[9px] text-brand-soft">
-                {soldPct > 0
-                  ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} ${stockNoun}`
-                  : `RESTAM ${item.stockLeft} ${stockNoun}`}
-              </div>
-              {soldPct > 0 && (
+              {item.cardPrice !== undefined && (
+                <>
+                  <span className="ml-2 font-pixel text-[9px] text-brand-soft">NO PIX</span>
+                  <p className="mt-2 text-sm text-muted">
+                    ou <strong className="text-white">{brl(item.cardPrice)}</strong> em até {installments}x no
+                    cartão
+                  </p>
+                </>
+              )}
+              {item.shipsFrom && (
+                <p className="mt-4 rounded-[8px] border-[3px] border-brand bg-outline px-3 py-2 text-sm text-white">
+                  <strong>Pré-venda:</strong> envio e retirada a partir de {shipsFromLabel(item.shipsFrom)}.
+                </p>
+              )}
+              {!preorder && (
+                <div className="mt-4 font-pixel text-[9px] text-brand-soft">
+                  {soldPct > 0
+                    ? `RESTAM ${item.stockLeft} DE ${item.stockTotal} ${stockNoun}`
+                    : `RESTAM ${item.stockLeft} ${stockNoun}`}
+                </div>
+              )}
+              {!preorder && soldPct > 0 && (
                 <div className="mt-2 h-[18px] overflow-hidden rounded-[10px] border-[3px] border-brand bg-outline">
                   <div
                     className="h-full"
@@ -169,14 +187,14 @@ export default function SealedDetailView({
                 {item.name} é um produto selado de {item.gameLabel}
                 {item.language ? ` em ${item.language.toLowerCase()}` : ""}, com
                 lacre original de fábrica conferido antes do envio. Pague por
-                Pix ou cartão em até 12x no checkout do site e receba em todo o
+                Pix ou cartão em até {installments}x no checkout do site e receba em todo o
                 Brasil, ou retire na loja em Goiânia.
               </>
             ) : (
               <>
                 {item.name} é um acessório para TCG, novo e conferido antes do
                 envio — serve para qualquer jogo da loja. Pague por Pix ou cartão
-                em até 12x no checkout do site e receba em todo o Brasil, ou
+                em até {installments}x no checkout do site e receba em todo o Brasil, ou
                 retire na loja em Goiânia.
               </>
             )}

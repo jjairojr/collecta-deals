@@ -31,7 +31,7 @@ import {
   type PortfolioResponse,
   type TradeView,
 } from "../api";
-import { brl, brl0, usd } from "../format";
+import { brl, brl0, shipsFromLabel, usd } from "../format";
 import CardArt from "./CardArt";
 import ShareList from "./ShareList";
 import { Button } from "./ui/button";
@@ -76,7 +76,10 @@ interface RowState {
   imageURL: string;
   featured: boolean;
   ligaListed: boolean;
+  cardBRL: number;
+  shipsFrom: string;
 }
+
 
 // LigaSync says where a holding stands on the LigaMagic store. "stale" means it
 // is registered there but the ledger moved since — the quantity or the price no
@@ -249,6 +252,8 @@ export default function StockPage() {
           imageURL: t.imageURL ?? "",
           featured: Boolean(t.featured),
           ligaListed: Boolean(t.ligaListed),
+          cardBRL: t.cardBRL ?? 0,
+          shipsFrom: t.shipsFrom ?? "",
         };
       }
       setRows(seeded);
@@ -334,7 +339,9 @@ export default function StockPage() {
         (round2(r.askBRL) !== round2(t.askBRL ?? 0) ||
           r.listed !== Boolean(t.listed) ||
           (r.imageURL ?? "") !== (t.imageURL ?? "") ||
-          r.featured !== Boolean(t.featured))
+          r.featured !== Boolean(t.featured) ||
+          round2(r.cardBRL) !== round2(t.cardBRL ?? 0) ||
+          r.shipsFrom !== (t.shipsFrom ?? ""))
       );
     });
   }, [holdings, rows, data, ligaChanged]);
@@ -461,6 +468,8 @@ export default function StockPage() {
         listed: Boolean(rows[t.id]?.listed),
         imageURL: rows[t.id]?.imageURL ?? "",
         featured: Boolean(rows[t.id]?.featured),
+        cardBRL: rows[t.id]?.cardBRL ?? 0,
+        shipsFrom: rows[t.id]?.shipsFrom ?? "",
       }));
       await setListings(items);
       if (ligaChanged.length > 0) {
@@ -758,7 +767,7 @@ export default function StockPage() {
           >
             <div className="win-bar">
               <span className="win-title font-pixel !text-[9px] uppercase text-brand-label">
-                Imagem do produto
+                Produto na vitrine
               </span>
             </div>
             <div className="p-6">
@@ -796,6 +805,36 @@ export default function StockPage() {
                 </p>
               </div>
             </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-pixel text-[8px] uppercase text-brand-label">
+                  Preço no cartão R$ (un.)
+                </label>
+                <Input
+                  type="number"
+                  value={rows[imgEditId]?.cardBRL ? String(rows[imgEditId]?.cardBRL) : ""}
+                  onChange={(e) => patch(imgEditId, { cardBRL: Number(e.target.value) || 0 })}
+                  placeholder="igual ao Pix"
+                  className="mt-1 w-full"
+                />
+              </div>
+              <div>
+                <label className="font-pixel text-[8px] uppercase text-brand-label">
+                  Pré-venda: envio a partir de
+                </label>
+                <Input
+                  type="date"
+                  value={rows[imgEditId]?.shipsFrom ?? ""}
+                  onChange={(e) => patch(imgEditId, { shipsFrom: e.target.value })}
+                  className="mt-1 w-full"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">
+              O preço da tabela vale para o Pix. Com preço no cartão, o cartão sai em até 6x. Deixe a data em
+              branco quando o produto já estiver em estoque.
+            </p>
 
             <div className="mt-5 flex items-center justify-between gap-2">
               <Button
@@ -884,7 +923,7 @@ function StockRow({
             onMouseLeave={() => setPreview(null)}
             onFocus={openPreview}
             onBlur={() => setPreview(null)}
-            title="Definir imagem do produto"
+            title="Imagem, preço no cartão e pré-venda"
             className="group relative h-12 w-[34px] shrink-0 overflow-hidden rounded"
           >
             <CardArt
@@ -907,6 +946,11 @@ function StockRow({
               <CopyButton text={displayName(t)} />
             </div>
             <div className="font-mono text-[10px] text-slate-500">{rowMeta(t)}</div>
+            {row?.shipsFrom && (
+              <div className="mt-0.5 inline-block rounded bg-brand/20 px-1.5 text-[10px] font-bold text-brand-label">
+                Pré-venda · envio {shipsFromLabel(row.shipsFrom)}
+              </div>
+            )}
           </div>
         </div>
         {preview && (
@@ -940,6 +984,9 @@ function StockRow({
         </div>
         {ask > 0 && fx > 0 && (
           <div className="mt-0.5 text-[10px] tabular-nums text-slate-500">≈ {usd(askUSD)}</div>
+        )}
+        {(row?.cardBRL ?? 0) > 0 && (
+          <div className="mt-0.5 text-[10px] tabular-nums text-slate-400">cartão {brl(row?.cardBRL ?? 0)}</div>
         )}
       </td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-300">{ask > 0 ? brl0(total) : "—"}</td>

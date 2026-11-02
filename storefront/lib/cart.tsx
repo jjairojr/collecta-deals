@@ -28,7 +28,7 @@ interface CartContext {
   setQty: (line: CartLine, qty: number) => void;
   remove: (line: CartLine) => void;
   clear: () => void;
-  reprice: (prices: Record<string, number>) => void;
+  reprice: (prices: Record<string, { price: number; cardPrice: number }>) => void;
   cap: (stock: Record<string, number>) => void;
 }
 
@@ -102,9 +102,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clear = useCallback(() => setLines([]), []);
 
-  const reprice = useCallback((prices: Record<string, number>) => {
+  const reprice = useCallback((prices: Record<string, { price: number; cardPrice: number }>) => {
     setLines((prev) =>
-      prev.map((l) => (l.sku in prices ? { ...l, price: prices[l.sku] } : l)),
+      prev.map((l) => {
+        const next = prices[l.sku];
+        if (!next) {
+          return l;
+        }
+        return { ...l, price: next.price, cardPrice: next.cardPrice !== next.price ? next.cardPrice : undefined };
+      }),
     );
   }, []);
 

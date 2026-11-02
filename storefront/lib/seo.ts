@@ -112,13 +112,21 @@ function shippingDetails(priceCents: number) {
   };
 }
 
-function offerJsonLd(path: string, priceCents: number, itemCondition: string, soldOut?: boolean) {
+function availability(soldOut?: boolean, shipsFrom?: string): string {
+  if (soldOut) {
+    return "https://schema.org/OutOfStock";
+  }
+  return shipsFrom ? "https://schema.org/PreOrder" : "https://schema.org/InStock";
+}
+
+function offerJsonLd(path: string, priceCents: number, itemCondition: string, soldOut?: boolean, shipsFrom?: string) {
   return {
     "@type": "Offer",
     url: absoluteURL(path),
     priceCurrency: "BRL",
     price: (priceCents / 100).toFixed(2),
-    availability: soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+    availability: availability(soldOut, shipsFrom),
+    availabilityStarts: shipsFrom,
     itemCondition,
     seller: { "@id": ORGANIZATION_ID },
     shippingDetails: shippingDetails(priceCents),
@@ -171,6 +179,7 @@ export function sealedProductJsonLd(item: Sealed) {
       item.price,
       "https://schema.org/NewCondition",
       item.soldOut,
+      item.shipsFrom,
     ),
   };
 }
@@ -191,6 +200,7 @@ export function accessoryProductJsonLd(item: Accessory) {
       item.price,
       "https://schema.org/NewCondition",
       item.soldOut,
+      item.shipsFrom,
     ),
   };
 }

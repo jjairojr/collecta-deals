@@ -593,6 +593,8 @@ export interface Trade {
   imageURL?: string;
   photos?: string[];
   featured?: boolean;
+  cardBRL?: number;
+  shipsFrom?: string;
   ligaListed?: boolean;
   ligaQty?: number;
   ligaPriceBRL?: number;
@@ -1047,6 +1049,8 @@ export interface ListingInput {
   listed: boolean;
   imageURL: string;
   featured: boolean;
+  cardBRL?: number;
+  shipsFrom?: string;
 }
 
 // setListings persists storefront state (asking price + listed flag) for one or
@@ -1367,6 +1371,8 @@ export interface OrderLine {
   imageURL?: string;
   tradeIDs?: string[];
   returnedTradeIDs?: string[];
+  cardPriced?: boolean;
+  shipsFrom?: string;
 }
 
 export interface OrderBuyer {
@@ -1419,6 +1425,7 @@ export interface Order {
   shipping: OrderShipping;
   totals: OrderTotals;
   mp: OrderPayment;
+  paymentMethod?: "pix" | "card";
   trackingCode?: string;
   notes?: string;
   createdAt: string;

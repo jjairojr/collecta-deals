@@ -26,6 +26,10 @@ func (g *Gateway) CreatePreference(_ context.Context, in mercadopago.PreferenceI
 	for _, it := range in.Items {
 		total += float64(it.Qty) * it.UnitBRL
 	}
+	method := "pix"
+	if in.Method == mercadopago.MethodCard {
+		method = "master"
+	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.next++
@@ -36,7 +40,7 @@ func (g *Gateway) CreatePreference(_ context.Context, in mercadopago.PreferenceI
 		StatusDetail:      "accredited",
 		ExternalReference: in.OrderID,
 		AmountBRL:         total,
-		Method:            "pix",
+		Method:            method,
 	}
 	sep := "?"
 	if strings.Contains(in.ReturnURL, "?") {

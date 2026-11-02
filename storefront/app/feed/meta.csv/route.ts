@@ -32,7 +32,7 @@ function row(it: FeedItem): string {
     it.id,
     it.title,
     it.description,
-    it.inStock ? "in stock" : "out of stock",
+    !it.inStock ? "out of stock" : it.shipsFrom ? "preorder" : "in stock",
     it.condition,
     it.price,
     it.link,

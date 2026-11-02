@@ -2,6 +2,7 @@ import "server-only";
 import { loadCatalog } from "@/lib/catalog";
 import { feedID, maker } from "@/lib/product-id";
 import { absoluteURL } from "@/lib/site";
+import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS } from "@/lib/payment";
 import type { Accessory, Sealed, Single } from "@/lib/types";
 
 // One normalized catalog row, serialized by the Google Merchant (RSS) and Meta
@@ -14,6 +15,8 @@ export interface FeedItem {
   imageLink: string;
   price: string;
   inStock: boolean;
+  // Pre-order start date (YYYY-MM-DD); in stock but shipping from that day.
+  shipsFrom?: string;
   quantity: number;
   condition: "new" | "used";
   brand: string;
@@ -127,13 +130,14 @@ async function sealedRow(s: Sealed): Promise<FeedItem | null> {
       150,
     ),
     description: clamp(
-      `Comprar ${s.name} lacrado na Collecta: ${s.format ?? "produto selado"} de ${s.gameLabel}${lang}, com lacre original. Pix ou cartão em até 12x e envio para todo o Brasil.`,
+      `Comprar ${s.name} lacrado na Collecta: ${s.format ?? "produto selado"} de ${s.gameLabel}${lang}, com lacre original. Pix ou cartão em até ${s.cardPrice !== undefined ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS}x e envio para todo o Brasil.`,
       5000,
     ),
     link: absoluteURL(`/selado/${s.slug}`),
     imageLink: image,
     price: money(s.price),
     inStock: s.qty > 0,
+    shipsFrom: s.shipsFrom,
     quantity: s.qty,
     condition: "new",
     brand: maker(s.game, s.gameLabel),

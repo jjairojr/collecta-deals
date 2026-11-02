@@ -26,6 +26,13 @@ type Payer struct {
 	CPF   string
 }
 
+type Method string
+
+const (
+	MethodPix  Method = "pix"
+	MethodCard Method = "card"
+)
+
 type PreferenceInput struct {
 	OrderID         string
 	Number          int
@@ -34,6 +41,8 @@ type PreferenceInput struct {
 	ReturnURL       string
 	NotificationURL string
 	ExpiresAt       time.Time
+	Method          Method
+	Installments    int
 }
 
 type Preference struct {
@@ -108,11 +117,8 @@ func (c *Client) CreatePreference(ctx context.Context, in PreferenceInput) (Pref
 		Expires:             true,
 		ExpirationDateFrom:  &from,
 		ExpirationDateTo:    &to,
-		PaymentMethods: &preference.PaymentMethodsRequest{
-			ExcludedPaymentTypes: []preference.ExcludedPaymentTypeRequest{{ID: "ticket"}},
-			Installments:         12,
-		},
-		Metadata: map[string]any{"order_number": in.Number},
+		PaymentMethods:      paymentMethods(in.Method, in.Installments),
+		Metadata:            map[string]any{"order_number": in.Number},
 	}
 	resp, err := c.prefs.Create(ctx, req)
 	if err != nil {
@@ -138,6 +144,25 @@ func (c *Client) GetPayment(ctx context.Context, id int64) (Payment, error) {
 
 func ValidateSignature(xSignature, xRequestID, dataID, secret string) error {
 	return webhook.ValidateSignature(xSignature, xRequestID, dataID, secret)
+}
+
+func paymentMethods(method Method, installments int) *preference.PaymentMethodsRequest {
+	excluded := []string{"ticket"}
+	switch method {
+	case MethodPix:
+		excluded = append(excluded, "credit_card", "debit_card", "prepaid_card")
+		installments = 1
+	case MethodCard:
+		excluded = append(excluded, "bank_transfer")
+	}
+	if installments <= 0 {
+		installments = 12
+	}
+	types := make([]preference.ExcludedPaymentTypeRequest, 0, len(excluded))
+	for _, id := range excluded {
+		types = append(types, preference.ExcludedPaymentTypeRequest{ID: id})
+	}
+	return &preference.PaymentMethodsRequest{ExcludedPaymentTypes: types, Installments: installments}
 }
 
 func autoReturn(returnURL string) string {

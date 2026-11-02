@@ -39,7 +39,11 @@ type Checkout struct {
 	Log             *logx.Logger
 }
 
-const maxLineQty = 20
+const (
+	maxLineQty             = 20
+	maxInstallments        = 12
+	cardPricedInstallments = 6
+)
 
 var (
 	emailRe  = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
@@ -59,6 +63,7 @@ type orderLineInput struct {
 	SKU       string `json:"sku"`
 	Qty       int    `json:"qty"`
 	UnitCents int64  `json:"unitCents"`
+	CardCents int64  `json:"cardCents"`
 }
 
 type orderCreateInput struct {
@@ -74,6 +79,7 @@ type orderCreateInput struct {
 	CollectaUserID string   `json:"collectaUserId"`
 	CouponIDs      []string `json:"couponIds"`
 	PromoCode      string   `json:"promoCode"`
+	PaymentMethod  string   `json:"paymentMethod"`
 }
 
 type skuEntry struct {
@@ -240,6 +246,7 @@ func lineMeta(t trades.Trade) string {
 type lineProblem struct {
 	SKU       string `json:"sku"`
 	UnitCents int64  `json:"unitCents,omitempty"`
+	CardCents int64  `json:"cardCents,omitempty"`
 	Available int    `json:"available"`
 }
 
@@ -249,7 +256,7 @@ type resolveResult struct {
 	shortages  []lineProblem
 }
 
-func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int) (resolveResult, error) {
+func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int, method orders.PaymentMethod) (resolveResult, error) {
 	var res resolveResult
 	if len(in) == 0 {
 		return res, errors.New("carrinho vazio")
@@ -268,10 +275,17 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int) (r
 			res.shortages = append(res.shortages, lineProblem{SKU: l.SKU})
 			continue
 		}
-		unit, _ := orders.UnitPrice(e.trades)
-		unitCents := int64(math.Round(unit * 100))
-		if unitCents != l.UnitCents {
-			res.priceDiffs = append(res.priceDiffs, lineProblem{SKU: l.SKU, UnitCents: unitCents})
+		pix, _ := orders.UnitPrice(e.trades)
+		card, _ := orders.CardUnitPrice(e.trades)
+		pixCents := cents(pix)
+		cardCents := cents(card)
+		checkCard := method == orders.PaymentCard || l.CardCents != 0
+		if pixCents != l.UnitCents || (checkCard && cardCents != l.CardCents) {
+			res.priceDiffs = append(res.priceDiffs, lineProblem{SKU: l.SKU, UnitCents: pixCents, CardCents: cardCents})
+		}
+		unit := pix
+		if method == orders.PaymentCard {
+			unit = card
 		}
 		available := orders.Available(e.trades) - reserved[l.SKU]
 		if available < l.Qty {
@@ -287,14 +301,16 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int) (r
 			kind = "single"
 		}
 		res.lines = append(res.lines, orders.Line{
-			SKU:      l.SKU,
-			Game:     e.game,
-			Kind:     kind,
-			Name:     first.Name,
-			Meta:     lineMeta(first),
-			Qty:      l.Qty,
-			UnitBRL:  round2(unit),
-			ImageURL: lineImage(eligible, e.game, e.lookup),
+			SKU:        l.SKU,
+			Game:       e.game,
+			Kind:       kind,
+			Name:       first.Name,
+			Meta:       lineMeta(first),
+			Qty:        l.Qty,
+			UnitBRL:    round2(unit),
+			ImageURL:   lineImage(eligible, e.game, e.lookup),
+			CardPriced: orders.HasCardPrice(e.trades),
+			ShipsFrom:  orders.ShipsFrom(e.trades),
 		})
 	}
 	return res, nil
@@ -386,8 +402,9 @@ func (s *Server) handleShippingQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		CEP   string           `json:"cep"`
-		Lines []orderLineInput `json:"lines"`
+		CEP           string           `json:"cep"`
+		Lines         []orderLineInput `json:"lines"`
+		PaymentMethod string           `json:"paymentMethod"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -403,7 +420,12 @@ func (s *Server) handleShippingQuote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	res, err := resolveLines(in.Lines, idx, map[string]int{})
+	method, ok := orders.ParsePaymentMethod(in.PaymentMethod)
+	if !ok {
+		writeError(w, http.StatusBadRequest, map[string]any{"error": "forma de pagamento inválida"})
+		return
+	}
+	res, err := resolveLines(in.Lines, idx, map[string]int{}, method)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
@@ -431,6 +453,11 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 	var in orderCreateInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	method, ok := orders.ParsePaymentMethod(in.PaymentMethod)
+	if !ok {
+		writeError(w, http.StatusBadRequest, map[string]any{"error": "forma de pagamento inválida"})
 		return
 	}
 	if msg := validateBuyer(&in.Buyer); msg != "" {
@@ -483,10 +510,13 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	preview, err := resolveLines(in.Lines, idx, map[string]int{})
+	preview, err := resolveLines(in.Lines, idx, map[string]int{}, method)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
+	}
+	if method == orders.PaymentAny && anyCardPriced(preview.lines) {
+		method = orders.PaymentPix
 	}
 	if len(preview.priceDiffs) > 0 {
 		writeError(w, http.StatusConflict, map[string]any{"error": "price_changed", "lines": preview.priceDiffs})
@@ -548,7 +578,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return orders.Order{}, err
 		}
-		res, err := resolveLines(in.Lines, idx, reserved)
+		res, err := resolveLines(in.Lines, idx, reserved, method)
 		if err != nil {
 			return orders.Order{}, err
 		}
@@ -568,6 +598,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 			Shipping:       ship,
 			Totals:         orders.Totals{ItemsBRL: items, ShippingBRL: ship.PriceBRL, TotalBRL: round2(items + ship.PriceBRL)},
 			CollectaUserID: in.CollectaUserID,
+			PaymentMethod:  method,
 		}
 		if in.PromoCode == "" {
 			return o, nil
@@ -613,6 +644,8 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		ReturnURL:       site + "/pedido/" + order.ID,
 		NotificationURL: strings.TrimRight(s.Checkout.APIURL, "/") + "/api/orders/mp-webhook",
 		ExpiresAt:       order.ExpiresAt,
+		Method:          mercadopago.Method(order.PaymentMethod),
+		Installments:    installments(order),
 	})
 	if err != nil {
 		cancelled, _ := s.Checkout.Orders.Update(order.ID, func(o *orders.Order) {
@@ -650,6 +683,28 @@ func preferenceItems(o orders.Order) []mercadopago.Item {
 		})
 	}
 	return items
+}
+
+func anyCardPriced(lines []orders.Line) bool {
+	for _, l := range lines {
+		if l.CardPriced {
+			return true
+		}
+	}
+	return false
+}
+
+func installments(o orders.Order) int {
+	switch o.PaymentMethod {
+	case orders.PaymentPix:
+		return 1
+	case orders.PaymentAny:
+		return maxInstallments
+	}
+	if anyCardPriced(o.Lines) {
+		return cardPricedInstallments
+	}
+	return maxInstallments
 }
 
 func validateBuyer(b *orders.Buyer) string {
@@ -732,12 +787,13 @@ func appendNote(notes, add string) string {
 }
 
 type publicLine struct {
-	Name     string  `json:"name"`
-	Meta     string  `json:"meta,omitempty"`
-	Kind     string  `json:"kind"`
-	Qty      int     `json:"qty"`
-	UnitBRL  float64 `json:"unitBRL"`
-	ImageURL string  `json:"imageURL,omitempty"`
+	Name      string  `json:"name"`
+	Meta      string  `json:"meta,omitempty"`
+	Kind      string  `json:"kind"`
+	Qty       int     `json:"qty"`
+	UnitBRL   float64 `json:"unitBRL"`
+	ImageURL  string  `json:"imageURL,omitempty"`
+	ShipsFrom string  `json:"shipsFrom,omitempty"`
 }
 
 type publicCoupon struct {
@@ -758,6 +814,8 @@ type publicOrder struct {
 	ExpiresAt    time.Time       `json:"expiresAt"`
 	FirstName    string          `json:"firstName"`
 	CreatedAt    time.Time       `json:"createdAt"`
+
+	PaymentMethod orders.PaymentMethod `json:"paymentMethod,omitempty"`
 }
 
 func publicView(o orders.Order, now time.Time, art map[string]string) publicOrder {
@@ -772,6 +830,8 @@ func publicView(o orders.Order, now time.Time, art map[string]string) publicOrde
 		TrackingCode: o.TrackingCode,
 		ExpiresAt:    o.ExpiresAt,
 		CreatedAt:    o.CreatedAt,
+
+		PaymentMethod: o.PaymentMethod,
 	}
 	if parts := strings.Fields(o.Buyer.Name); len(parts) > 0 {
 		out.FirstName = parts[0]
@@ -784,18 +844,28 @@ func publicView(o orders.Order, now time.Time, art map[string]string) publicOrde
 	}
 	for _, l := range o.Lines {
 		out.Lines = append(out.Lines, publicLine{
-			Name:     l.Name,
-			Meta:     l.Meta,
-			Kind:     l.Kind,
-			Qty:      l.Qty,
-			UnitBRL:  l.UnitBRL,
-			ImageURL: storefrontImage(orderLineImage(l, art)),
+			Name:      l.Name,
+			Meta:      l.Meta,
+			Kind:      l.Kind,
+			Qty:       l.Qty,
+			UnitBRL:   l.UnitBRL,
+			ImageURL:  storefrontImage(orderLineImage(l, art)),
+			ShipsFrom: l.ShipsFrom,
 		})
 	}
 	if status == orders.StatusPending || status == orders.StatusFailed {
 		out.InitPoint = o.MP.InitPoint
 	}
 	return out
+}
+
+func withPhotoBase(o publicOrder, base string) publicOrder {
+	for i := range o.Lines {
+		if strings.HasPrefix(o.Lines[i].ImageURL, itemPhotosPath) {
+			o.Lines[i].ImageURL = base + o.Lines[i].ImageURL
+		}
+	}
+	return o
 }
 
 func (s *Server) handleOrderGet(w http.ResponseWriter, r *http.Request) {
@@ -819,7 +889,7 @@ func (s *Server) handleOrderGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, publicView(o, time.Now(), s.listingArt()))
+	writeJSON(w, withPhotoBase(publicView(o, time.Now(), s.listingArt()), publicBase(r)))
 }
 
 func (s *Server) logCheckout(format string, args ...any) {
@@ -1044,7 +1114,7 @@ func (s *Server) handleUserOrders(w http.ResponseWriter, r *http.Request, uid st
 	out := make([]publicOrder, 0)
 	for _, o := range all {
 		if o.CollectaUserID == uid {
-			out = append(out, publicView(o, now, art))
+			out = append(out, withPhotoBase(publicView(o, now, art), publicBase(r)))
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")

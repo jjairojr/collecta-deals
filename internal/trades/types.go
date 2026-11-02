@@ -41,6 +41,9 @@ type Trade struct {
 	Featured bool     `json:"featured,omitempty"`
 	Photos   []string `json:"photos,omitempty"`
 
+	CardBRL   float64 `json:"cardBRL,omitempty"`
+	ShipsFrom string  `json:"shipsFrom,omitempty"`
+
 	// LigaListed records that this holding was registered on the LigaMagic store.
 	// LigaQty and LigaPriceBRL keep what was actually sent there, so the Estoque
 	// tab can tell "registered and in sync" from "registered but the ledger moved

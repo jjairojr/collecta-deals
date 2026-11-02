@@ -35,6 +35,7 @@ import {
 } from "@/lib/checkout";
 import { couponsApplicable, promoDiscountCents, type CheckoutCoupon, type PromoCoupon } from "@/lib/coupons";
 import { brl, pixelText } from "@/lib/format";
+import { installmentsFor, shipsFromLabel, unitPriceFor, type PaymentMethod } from "@/lib/payment";
 import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
 const EMPTY_BUYER: Buyer = { name: "", email: "", phone: "", cpf: "" };
@@ -82,11 +83,11 @@ async function checkPromo(code: string): Promise<PromoCoupon> {
   throw new Error(data.message ?? "Esse cupom não pôde ser aplicado.");
 }
 
-async function quote(cep: string, lines: OrderLineInput[]): Promise<ShippingOption[]> {
+async function quote(cep: string, lines: OrderLineInput[], paymentMethod: PaymentMethod): Promise<ShippingOption[]> {
   const res = await fetch("/api/frete", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cep, lines }),
+    body: JSON.stringify({ cep, lines, paymentMethod }),
   });
   const data = (await res.json()) as { services?: ShippingOption[]; error?: string };
   if (!res.ok) {
@@ -96,7 +97,13 @@ async function quote(cep: string, lines: OrderLineInput[]): Promise<ShippingOpti
 }
 
 export default function CheckoutView() {
-  const { lines, total: itemsCents, reprice, cap } = useCart();
+  const { lines, reprice, cap } = useCart();
+  const [payment, setPayment] = useState<PaymentMethod>("pix");
+  const pixCents = lines.reduce((s, l) => s + unitPriceFor(l, "pix") * l.qty, 0);
+  const cardCents = lines.reduce((s, l) => s + unitPriceFor(l, "card") * l.qty, 0);
+  const itemsCents = payment === "card" ? cardCents : pixCents;
+  const installments = installmentsFor(lines);
+  const shipsFrom = lines.reduce((latest, l) => (l.shipsFrom && l.shipsFrom > latest ? l.shipsFrom : latest), "");
   const { status: accountStatus, user } = useAccount();
   const [buyer, setBuyer] = useState<Buyer>(EMPTY_BUYER);
   const [coupons, setCoupons] = useState<CheckoutCoupon[] | null>(null);
@@ -179,7 +186,7 @@ export default function CheckoutView() {
       return;
     }
     let cancelled = false;
-    quote("", payloadLines)
+    quote("", payloadLines, payment)
       .then((services) => {
         if (!cancelled) {
           setLocal(services.filter((s) => s.serviceID < 0));
@@ -193,7 +200,7 @@ export default function CheckoutView() {
     return () => {
       cancelled = true;
     };
-  }, [payloadLines]);
+  }, [payloadLines, payment]);
 
   useEffect(() => {
     if (mode !== "ship" || cepDigits.length !== 8 || payloadLines.length === 0) {
@@ -204,7 +211,7 @@ export default function CheckoutView() {
     let cancelled = false;
     setQuoting(true);
     setQuoteError(null);
-    quote(cepDigits, payloadLines)
+    quote(cepDigits, payloadLines, payment)
       .then((services) => {
         if (cancelled) {
           return;
@@ -230,7 +237,7 @@ export default function CheckoutView() {
     return () => {
       cancelled = true;
     };
-  }, [mode, cepDigits, payloadLines]);
+  }, [mode, cepDigits, payloadLines, payment]);
 
   const pickupOption = local.find((s) => isPickup(s.serviceID)) ?? null;
   const joinOption = local.find((s) => isJoin(s.serviceID)) ?? null;
@@ -395,6 +402,7 @@ export default function CheckoutView() {
           },
           couponIds: promo ? [] : activeCoupons.map((c) => c.id),
           promoCode: promo?.code ?? "",
+          paymentMethod: payment,
         }),
       });
       const data = (await res.json()) as CreateResponse & CheckoutError;
@@ -404,10 +412,10 @@ export default function CheckoutView() {
         return;
       }
       if (data.error === "price_changed" && data.lines) {
-        const prices: Record<string, number> = {};
+        const prices: Record<string, { price: number; cardPrice: number }> = {};
         for (const l of data.lines) {
           if (typeof l.unitCents === "number") {
-            prices[l.sku] = l.unitCents;
+            prices[l.sku] = { price: l.unitCents, cardPrice: l.cardCents ?? l.unitCents };
           }
         }
         reprice(prices);
@@ -681,7 +689,31 @@ export default function CheckoutView() {
             </Section>
           )}
 
-          <Section step={mode === "ship" ? "04" : "03"} title="Cupons">
+          <Section step={mode === "ship" ? "04" : "03"} title="Pagamento">
+            <div className="grid gap-3">
+              <OptionChip
+                title="Pix"
+                detail="aprovação na hora"
+                price={brl(pixCents)}
+                selected={payment === "pix"}
+                onSelect={() => setPayment("pix")}
+              />
+              <OptionChip
+                title="Cartão de crédito"
+                detail={`em até ${installments}x`}
+                price={brl(cardCents)}
+                selected={payment === "card"}
+                onSelect={() => setPayment("card")}
+              />
+            </div>
+            {cardCents !== pixCents && (
+              <p className="mt-4 text-sm text-muted">
+                O preço dos itens muda conforme a forma de pagamento. Os valores acima não incluem frete.
+              </p>
+            )}
+          </Section>
+
+          <Section step={mode === "ship" ? "05" : "04"} title="Cupons">
             {accountStatus === "anon" ? (
               <p className="text-sm text-muted">
                 <Link
@@ -807,9 +839,14 @@ export default function CheckoutView() {
                     {l.qty}× {l.name}
                   </span>
                   <span className="block truncate text-xs text-muted">{l.meta}</span>
+                  {l.shipsFrom && (
+                    <span className="block text-xs font-bold text-brand">
+                      Pré-venda · envio a partir de {shipsFromLabel(l.shipsFrom)}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 font-pixel text-[10px] text-white">
-                  {brl(l.price * l.qty)}
+                  {brl(unitPriceFor(l, payment) * l.qty)}
                 </span>
               </li>
             ))}
@@ -837,7 +874,15 @@ export default function CheckoutView() {
               {brl(totalCents)}
             </span>
           </div>
-          <p className="mt-2 text-xs text-muted">Pix ou cartão em até 12x</p>
+          <p className="mt-2 text-xs text-muted">
+            {payment === "pix" ? "no Pix" : `no cartão em até ${installments}x`}
+          </p>
+          {shipsFrom && (
+            <p className="mt-3 rounded-[8px] border-[3px] border-brand px-3 py-2 text-xs text-white">
+              Este pedido tem item de pré-venda: o envio ou a retirada acontece a partir de{" "}
+              {shipsFromLabel(shipsFrom)}, junto com o restante do pedido.
+            </p>
+          )}
 
           {notice && (
             <p

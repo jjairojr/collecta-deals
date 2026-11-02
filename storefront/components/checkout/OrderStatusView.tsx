@@ -7,6 +7,7 @@ import { trackPurchase, trackViewOrder, trackViewOrderArt } from "@/lib/analytic
 import { useCart } from "@/lib/cart";
 import { ORDER_STORAGE_PREFIX, cents, isJoin, isPickup, type PublicOrder } from "@/lib/checkout";
 import { brl, pixelText } from "@/lib/format";
+import { shipsFromLabel } from "@/lib/payment";
 
 const POLL_MS = 3000;
 const POLL_LIMIT = 60;
@@ -164,6 +165,7 @@ export default function OrderStatusView({
               e te avisamos pelo WhatsApp com o código de rastreio.
             </p>
           )}
+          <PreorderNote order={order} />
           {order.trackingCode && (
             <p className="sticker mt-4 rounded-[10px] bg-brand-soft px-4 py-3 font-pixel text-[9px] text-outline [--sh:3px]">
               RASTREIO: {order.trackingCode}
@@ -198,7 +200,10 @@ export default function OrderStatusView({
         <Shell title="O pagamento não foi aprovado" eyebrow={pixelText(`PEDIDO ${number} · TRY AGAIN`)}>
           <p className="text-sm text-[#c9c9d1]">
             O Mercado Pago recusou a tentativa. Seus itens continuam reservados
-            por alguns minutos: tente outro cartão ou pague com Pix.
+            por alguns minutos:{" "}
+            {order.paymentMethod === "card"
+              ? "tente outro cartão, ou volte ao carrinho e escolha Pix."
+              : "tente de novo ou volte ao carrinho para pagar de outro jeito."}
           </p>
           <OrderLines order={order} />
           <Actions
@@ -262,6 +267,18 @@ function Shell({
   );
 }
 
+function PreorderNote({ order }: { order: PublicOrder }) {
+  const date = order.lines.reduce((latest, l) => (l.shipsFrom && l.shipsFrom > latest ? l.shipsFrom : latest), "");
+  if (!date) {
+    return null;
+  }
+  return (
+    <p className="mt-3 rounded-[8px] border-[3px] border-brand px-3 py-2 text-sm text-white">
+      Seu pedido tem item de pré-venda: o envio ou a retirada acontece a partir de {shipsFromLabel(date)}.
+    </p>
+  );
+}
+
 function OrderLines({ order }: { order: PublicOrder }) {
   const [viewing, setViewing] = useState<string | null>(null);
   return (
@@ -284,6 +301,11 @@ function OrderLines({ order }: { order: PublicOrder }) {
                   {l.qty}× {l.name}
                 </span>
                 {l.meta && <span className="block truncate text-xs text-muted">{l.meta}</span>}
+                {l.shipsFrom && (
+                  <span className="block text-xs font-bold text-brand">
+                    Pré-venda · envio a partir de {shipsFromLabel(l.shipsFrom)}
+                  </span>
+                )}
               </span>
             </span>
             <span className="shrink-0 font-pixel text-[10px] text-white">

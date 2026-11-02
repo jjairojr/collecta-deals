@@ -57,6 +57,48 @@ func UnitPrice(ts []trades.Trade) (float64, bool) {
 	return price, found
 }
 
+func CardUnitPrice(ts []trades.Trade) (float64, bool) {
+	price := 0.0
+	found := false
+	for _, t := range Eligible(ts) {
+		card := t.AskBRL
+		if t.CardBRL > 0 {
+			card = t.CardBRL
+		}
+		if !found || card < price {
+			price = card
+			found = true
+		}
+	}
+	return price, found
+}
+
+func UnitPriceFor(ts []trades.Trade, method PaymentMethod) (float64, bool) {
+	if method == PaymentCard {
+		return CardUnitPrice(ts)
+	}
+	return UnitPrice(ts)
+}
+
+func HasCardPrice(ts []trades.Trade) bool {
+	for _, t := range Eligible(ts) {
+		if t.CardBRL > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func ShipsFrom(ts []trades.Trade) string {
+	latest := ""
+	for _, t := range Eligible(ts) {
+		if t.ShipsFrom > latest {
+			latest = t.ShipsFrom
+		}
+	}
+	return latest
+}
+
 func Allocate(ts []trades.Trade, qty int) ([]Pick, bool) {
 	if qty <= 0 {
 		return nil, false

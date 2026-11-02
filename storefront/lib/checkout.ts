@@ -51,6 +51,7 @@ export interface OrderLineInput {
   sku: string;
   qty: number;
   unitCents: number;
+  cardCents: number;
 }
 
 export interface PublicOrderLine {
@@ -60,6 +61,7 @@ export interface PublicOrderLine {
   qty: number;
   unitBRL: number;
   imageURL?: string;
+  shipsFrom?: string;
 }
 
 export interface PublicOrder {
@@ -81,11 +83,13 @@ export interface PublicOrder {
   expiresAt: string;
   firstName: string;
   createdAt: string;
+  paymentMethod?: "pix" | "card";
 }
 
 export interface LineProblem {
   sku: string;
   unitCents?: number;
+  cardCents?: number;
   available: number;
 }
 
@@ -234,7 +238,7 @@ export async function lookupCEP(cep: string): Promise<CEPResult | null> {
 }
 
 export function orderLines(lines: CartLine[]): OrderLineInput[] {
-  return lines.map((l) => ({ sku: l.sku, qty: l.qty, unitCents: l.price }));
+  return lines.map((l) => ({ sku: l.sku, qty: l.qty, unitCents: l.price, cardCents: l.cardPrice ?? l.price }));
 }
 
 export function cents(brl: number): number {

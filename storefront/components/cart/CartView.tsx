@@ -15,6 +15,7 @@ import {
 import { useAccount } from "@/lib/account";
 import { useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
+import { installmentsFor, shipsFromLabel, unitPriceFor } from "@/lib/payment";
 import type { CartLine } from "@/lib/types";
 import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
@@ -115,6 +116,8 @@ export default function CartView() {
   }
 
   const count = lines.reduce((n, l) => n + l.qty, 0);
+  const cardTotal = lines.reduce((s, l) => s + unitPriceFor(l, "card") * l.qty, 0);
+  const installments = installmentsFor(lines);
 
   const whatsapp = () => {
     trackBeginCheckout(lines, total);
@@ -156,6 +159,11 @@ export default function CartView() {
                   {l.name}
                 </div>
                 <div className="truncate text-xs text-muted">{l.meta}</div>
+                {l.shipsFrom && (
+                  <div className="mt-1 text-xs font-bold text-brand">
+                    Pré-venda · envio a partir de {shipsFromLabel(l.shipsFrom)}
+                  </div>
+                )}
                 <div className="mt-1 truncate font-pixel text-[8px] text-brand-soft">
                   {l.seller.toUpperCase()}
                 </div>
@@ -229,7 +237,9 @@ export default function CartView() {
             </span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            sem o frete · Pix ou cartão em até 12x
+            {cardTotal !== total
+              ? `sem o frete · no Pix · ${brl(cardTotal)} no cartão em até ${installments}x`
+              : `sem o frete · Pix ou cartão em até ${installments}x`}
           </p>
 
           <Link

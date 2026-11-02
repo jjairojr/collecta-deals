@@ -32,6 +32,8 @@ type storefrontItem struct {
 	ImageURL  string  `json:"imageURL,omitempty"`
 	AskBRL    float64 `json:"askBRL"`
 	AskUSD    float64 `json:"askUSD,omitempty"`
+	CardBRL   float64 `json:"cardBRL,omitempty"`
+	ShipsFrom string  `json:"shipsFrom,omitempty"`
 	Featured  bool    `json:"featured,omitempty"`
 	AddedAt   string  `json:"addedAt,omitempty"`
 }
@@ -178,7 +180,11 @@ func publicItem(t trades.Trade, gameID, gameLabel string, qty int, fx float64, l
 		GTIN:      t.GTIN,
 		Qty:       qty,
 		AskBRL:    round2(t.AskBRL),
+		ShipsFrom: t.ShipsFrom,
 		Featured:  t.Featured,
+	}
+	if t.CardBRL > 0 {
+		item.CardBRL = round2(t.CardBRL)
 	}
 	if !t.CreatedAt.IsZero() {
 		item.AddedAt = t.CreatedAt.UTC().Format(time.RFC3339)
@@ -241,11 +247,13 @@ func (s *Server) storefrontFX() float64 {
 }
 
 type listingInput struct {
-	ID       string  `json:"id"`
-	AskBRL   float64 `json:"askBRL"`
-	Listed   bool    `json:"listed"`
-	ImageURL string  `json:"imageURL"`
-	Featured bool    `json:"featured"`
+	ID        string   `json:"id"`
+	AskBRL    float64  `json:"askBRL"`
+	Listed    bool     `json:"listed"`
+	ImageURL  string   `json:"imageURL"`
+	Featured  bool     `json:"featured"`
+	CardBRL   *float64 `json:"cardBRL"`
+	ShipsFrom *string  `json:"shipsFrom"`
 }
 
 // handleTradesListings sets storefront state (asking price + listed flag) on one
@@ -273,7 +281,22 @@ func (s *Server) handleTradesListings(w http.ResponseWriter, r *http.Request) {
 		if ask < 0 {
 			ask = 0
 		}
-		updates[it.ID] = trades.Listing{AskBRL: ask, Listed: it.Listed, ImageURL: strings.TrimSpace(it.ImageURL), Featured: it.Featured}
+		listing := trades.Listing{AskBRL: ask, Listed: it.Listed, ImageURL: strings.TrimSpace(it.ImageURL), Featured: it.Featured}
+		if it.CardBRL != nil {
+			card := math.Max(*it.CardBRL, 0)
+			listing.CardBRL = &card
+		}
+		if it.ShipsFrom != nil {
+			date := strings.TrimSpace(*it.ShipsFrom)
+			if date != "" {
+				if _, err := time.Parse(time.DateOnly, date); err != nil {
+					http.Error(w, "shipsFrom must be YYYY-MM-DD", http.StatusBadRequest)
+					return
+				}
+			}
+			listing.ShipsFrom = &date
+		}
+		updates[it.ID] = listing
 	}
 	// The Estoque tab saves the game's cards and the shared accessories in one
 	// batch, so the write goes to both ledgers; each ignores the ids it doesn't own.

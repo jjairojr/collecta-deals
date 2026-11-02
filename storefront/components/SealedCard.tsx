@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { sealedItem, trackSelectItem } from "@/lib/analytics";
 import { brl } from "@/lib/format";
+import { CARD_PRICED_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import type { Accessory, Sealed } from "@/lib/types";
 
@@ -29,9 +30,11 @@ export default function SealedCard({ item }: { item: Sealed | Accessory }) {
             {item.badge}
           </span>
         )}
-        <span className="absolute bottom-2 right-2 bg-outline px-1.5 py-1 font-pixel text-[8px] text-white">
-          {item.qty} UN
-        </span>
+        {!item.shipsFrom && (
+          <span className="absolute bottom-2 right-2 bg-outline px-1.5 py-1 font-pixel text-[8px] text-white">
+            {item.qty} UN
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5 p-4">
@@ -39,9 +42,18 @@ export default function SealedCard({ item }: { item: Sealed | Accessory }) {
           {item.name}
         </h3>
         <p className="text-xs text-on-soft">{item.meta}</p>
+        {item.shipsFrom && (
+          <p className="text-xs font-bold text-royal">Envio a partir de {shipsFromLabel(item.shipsFrom)}</p>
+        )}
         <span className="mt-auto pt-1 font-pixel text-[10px] leading-relaxed text-royal sm:text-[12px]">
           {brl(item.price)}
+          {item.cardPrice !== undefined && <span className="ml-1.5 text-[8px] sm:text-[9px]">NO PIX</span>}
         </span>
+        {item.cardPrice !== undefined && (
+          <span className="text-xs text-on-soft">
+            ou {brl(item.cardPrice)} em até {CARD_PRICED_INSTALLMENTS}x no cartão
+          </span>
+        )}
       </div>
     </Link>
   );

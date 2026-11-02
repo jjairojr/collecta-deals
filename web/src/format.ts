@@ -73,3 +73,8 @@ export function timeAgo(iso: string): string {
   }
   return `há ${Math.floor(hours / 24)}d`;
 }
+
+export function shipsFromLabel(date: string): string {
+  const [, month, day] = date.split("-");
+  return day && month ? `${day}/${month}` : date;
+}

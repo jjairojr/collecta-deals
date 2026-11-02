@@ -25,6 +25,8 @@ export function sealedToCartLine(item: Sealed | Accessory, stock: number): Omit<
     meta: [...new Set([item.set, item.meta].filter(Boolean))].join(" · "),
     seller: STORE_SELLER,
     price: item.price,
+    cardPrice: item.cardPrice,
+    shipsFrom: item.shipsFrom,
     stock,
     imageURL: item.imageURL,
   };

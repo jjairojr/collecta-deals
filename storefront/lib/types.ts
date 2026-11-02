@@ -81,6 +81,10 @@ export interface Sealed {
   meta: string;
   language?: string;
   price: number;
+  // Card (installment) price in cents when it differs from the Pix price.
+  cardPrice?: number;
+  // Pre-order: the date (YYYY-MM-DD) shipping starts.
+  shipsFrom?: string;
   qty: number;
   badge?: string;
   imageURL?: string;
@@ -116,6 +120,8 @@ export interface CartLine {
   meta: string;
   seller: string;
   price: number;
+  cardPrice?: number;
+  shipsFrom?: string;
   qty: number;
   // Available stock — caps how many the buyer can put in the cart.
   stock?: number;
