@@ -21,7 +21,7 @@ converse com quem chamou, passe para o Jairo (o dono) o que não for seu e encer
 4. Atendimento geral. Primeiro olhe a lista de conversas sem abrir nenhuma. Abrir uma conversa marca as mensagens
    como lidas no celular do dono e mostra "visto" para o cliente, então só abra a conversa que você vai tratar.
    Candidatas: conversas individuais com clientes (nada de grupos, comunidades, canais, status ou arquivadas) em que
-   a última mensagem é do cliente e chegou nas últimas 2 horas, ou que estão marcadas como não lidas. Pule, sem abrir:
+   a última mensagem é do cliente e chegou nas últimas 14 horas (a rotina roda 2 vezes por dia), ou que estão marcadas como não lidas. Pule, sem abrir:
    - conversas da lista "Humano" (clique no filtro "Humano" acima da lista de conversas para ver quais são) e os
      telefones que apareceram em `posvenda_conversas`;
    - números de fora do Brasil (que não começam com +55), a não ser que a prévia fale claramente de cartas ou da loja;
