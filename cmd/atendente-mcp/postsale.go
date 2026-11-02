@@ -122,8 +122,17 @@ type composeItem struct {
 }
 
 type composeOutput struct {
-	Items []composeItem `json:"items"`
+	ComoEscrever string        `json:"como_escrever"`
+	Items        []composeItem `json:"items"`
 }
+
+const composeGuide = `Escreva como o Jairo, dono da loja, escreve do celular: 3 balões curtos separados por quebra de linha.
+Balão 1: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙"
+Balão 2: carinho com o que comprou. Um produto: fale dele com empolgação de colecionador ("esse Jolteon é lindo demais, já tá separado aqui"). Vários: fale do pedido no geral ("suas cartas já tão separadas aqui"), sem nomes.
+Balão 3 (Liga, com envio): "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br 🩷"
+Balão 3 (site, com envio): "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido 🩷"
+Balão 3 (retirada): "Se quiser, separo mais alguma coisa pra você pegar junto 🩷"
+Nunca: "aqui é da Collecta", "recebemos seu pedido", número do pedido, lista de cartas, quantidades, preço, passo a passo da Liga, travessão.`
 
 func (a *app) addPostSaleTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
@@ -340,13 +349,24 @@ func (a *app) toolReply(ctx context.Context, _ *mcp.CallToolRequest, in replyInp
 	return nil, out, err
 }
 
+const ligaComposeHint = "liga: mande o site da Collecta (https://www.collectatcg.com.br) para ele ver mais coisa. Não explique a opção da Liga e não prometa frete junto"
+
 func (a *app) toolComposeList(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, composeOutput, error) {
 	out := composeOutput{Items: []composeItem{}}
 	data, err := a.agentRequest(ctx, http.MethodGet, "compose", nil)
 	if err != nil {
 		return nil, out, err
 	}
-	return nil, out, json.Unmarshal(data, &out)
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, out, err
+	}
+	out.ComoEscrever = composeGuide
+	for i := range out.Items {
+		if out.Items[i].Channel == "liga" {
+			out.Items[i].CanAddHow = ligaComposeHint
+		}
+	}
+	return nil, out, nil
 }
 
 type composeInput struct {
