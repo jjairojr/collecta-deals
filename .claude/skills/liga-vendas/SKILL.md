@@ -671,3 +671,11 @@ selo Liga; o OpenBot escreve na rodada seguinte e o dono aprova.
   liste todos os pedidos pagos da 1ª página e compare com o conjunto de `Liga #` baixados.
 - Pedidos já baixados e depois cancelados nesta rodada: #12356004 (Wailord ex, Mega
   Chandelure ex, Goldeen) e #12327804 (Parasect). Reportar ao dono.
+
+2026-11-02 (19ª execução — 1 pedido novo pago, 1 baixa):
+
+- #12376472: Jolteon TG04 BSTG EN casou exato (ask 198,98), venda total. O detalhe veio sem
+  hora em `Data do Pagamento`; `paidAt` do pós-venda usou a hora do pedido na listagem.
+- O primeiro nome do bloco `Endereço do Cliente` não é a primeira linha depois do rótulo
+  (veio "Avaliar"); use o primeiro nome do cliente da listagem.
+- #12373980 (Fennekin 085 M4 + Braixen TG01, baixados hoje) virou Cancelado. Reportar ao dono.
