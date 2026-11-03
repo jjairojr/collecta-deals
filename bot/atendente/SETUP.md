@@ -36,7 +36,9 @@ senhas. Os mesmos arquivos servem para os dois jeitos.
      (no modo "Só a pasta" ele ignora o `.claude/settings.json`).
    - Navegador: perfil **Só este agente**.
    - Instruções: `Siga as instruções do servidor collecta-loja.`
-   - Não use esse agente para mais nada, e não deixe outros agentes conversando com ele.
+   - Não use esse agente para mais nada. O único agente que fala com ele é o "Pesquisador Collecta" (time de marketing,
+     `collecta-app/store/agente-marketing`), e só com a lista `[CARRINHOS]`. Com ela, o atendente chama cada carrinho abandonado da
+     Liga com até 2 balões personalizados e o cupom CONTINUE5, no máximo 10 por dia e uma vez por semana por número. Não ponha o atendente em canais do OpenBot.
 5. **Colocar a trava na pasta do agente:**
    ```sh
    ls ~/OpenBot/Agents/
