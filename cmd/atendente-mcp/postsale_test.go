@@ -45,7 +45,7 @@ func (a *fakeAgentAPI) handler(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(r.URL.Path, "/inbound"):
 		_, _ = io.WriteString(w, `{"action":"answer","conversationId":"c1","context":{"firstName":"Ana","orderNumber":7,"status":"paid","bought":[{"nome":"Teach","qtd":1,"preco":250}],"offer":{"sku":"s1","name":"Teach (Parallel)","meta":"OP16","unitBRL":300},"windowOpen":true,"canAddUntil":"03/11 02:00","autoSend":false,"history":[{"role":"assistant","text":"Oi Ana!"},{"role":"customer","text":"quero"}]}}`)
 	case r.URL.Path == "/api/postsale/agent/compose":
-		_, _ = io.WriteString(w, `{"items":[{"conversationId":"c9","channel":"liga","firstName":"Ana","orderNumber":12376472,"pickup":true,"items":[{"name":"Shanks (OP09-004)","qty":1}],"canAddHow":"liga: Adicionar a um pedido já existente"}]}`)
+		_, _ = io.WriteString(w, `{"items":[{"conversationId":"c9","channel":"liga","firstName":"Ana","orderNumber":12376472,"pickup":true,"shipped":true,"items":[{"name":"Shanks (OP09-004)","qty":1}],"canAddHow":"liga: Adicionar a um pedido já existente"}]}`)
 	case strings.HasSuffix(r.URL.Path, "/compose"):
 		_, _ = io.WriteString(w, `{"status":"draft"}`)
 	case strings.HasSuffix(r.URL.Path, "/reply"):
@@ -199,7 +199,7 @@ func TestComposeListAndMessageMapping(t *testing.T) {
 	api := &fakeAgentAPI{}
 	f := newFixtureWith(t, modeLive, testToken, api.handler)
 	list, errText := callWith[struct{}, composeOutput](t, f, "posvenda_escrever", struct{}{})
-	if errText != "" || len(list.Items) != 1 || list.Items[0].Channel != "liga" || !list.Items[0].Pickup || list.Items[0].Items[0].Name != "Shanks (OP09-004)" {
+	if errText != "" || len(list.Items) != 1 || list.Items[0].Channel != "liga" || !list.Items[0].Pickup || !list.Items[0].Shipped || !strings.Contains(list.ComoEscrever, "a caminho") || list.Items[0].Items[0].Name != "Shanks (OP09-004)" {
 		t.Fatalf("compose list %+v %q", list, errText)
 	}
 	reqs := api.all()

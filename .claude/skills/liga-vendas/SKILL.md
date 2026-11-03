@@ -258,9 +258,11 @@ enviados, para o OpenBot escrever a primeira mensagem (agradece e oferece
 adicionar algo com "Adicionar a um pedido já existente"). O servidor guarda só
 primeiro nome, telefone, itens e se é retirada.
 
-1. Da listagem da Fase 1, separe os pedidos com status **`Pagamento efetuado -
-   Aguardando envio`** e `Data Pag.` nas últimas 24h. Enviado, Retirado no
-   Balcão, Cancelado e Aguardando Pagamento ficam de fora.
+1. Da listagem da Fase 1, separe os pedidos pagos nas últimas 24h com status
+   **`Pagamento efetuado - Aguardando envio`** (`shipped: false`) ou **`Enviado`**
+   (`shipped: true`, a mensagem diz "já tá a caminho" em vez de "já tá
+   separado"; decisão do dono em 03/11/2026). Retirado no Balcão, Cancelado e
+   Aguardando Pagamento ficam de fora.
 2. Retirada: a coluna de forma de envio da listagem diz `Retirada`/`Retirar no
    balcão` → `pickup: true`; qualquer transportadora → `pickup: false`.
 3. Para cada um, abra o detalhe (`?view=ecom/admin/compra&id=866280&cod=<pedido>`
@@ -287,7 +289,7 @@ python3 - "$B" "$T" <<'PY'
 import json, sys, urllib.request
 orders = [
     {"code": "12376472", "firstName": "Ana", "phone": "(62) 99827-4848",
-     "paidAt": "2026-11-02T14:05:00-03:00", "pickup": False,
+     "paidAt": "2026-11-02T14:05:00-03:00", "pickup": False, "shipped": False,
      "items": [{"name": "Shanks (OP09-004)", "qty": 1}]},
 ]
 req = urllib.request.Request(sys.argv[1] + "/api/postsale/liga-orders",
@@ -679,3 +681,17 @@ selo Liga; o OpenBot escreve na rodada seguinte e o dono aprova.
 - O primeiro nome do bloco `Endereço do Cliente` não é a primeira linha depois do rótulo
   (veio "Avaliar"); use o primeiro nome do cliente da listagem.
 - #12373980 (Fennekin 085 M4 + Braixen TG01, baixados hoje) virou Cancelado. Reportar ao dono.
+- Fase 7 só entrou em prod em 02/11 às 17:57; os pedidos baixados antes disso foram mandados
+  depois à mão (8 pedidos de 01 e 02/11). Os de 01/11 passavam das 24h: a pedido do dono foram
+  com `paidAt` = agora, porque o campo só serve para a checagem de elegibilidade.
+- Item sem `(Código: ...)` (selado chinês `(CHN) Caixa de Booster - GEM Pack Vol. 6`) escapa
+  do regex `^(\d+)x (.+?) \(Código:`. Pegue toda linha `^\d+x ` e corte em `(Código:` ou
+  `(NCM` o que vier primeiro; confira a contagem com o cabeçalho `N Itens - Pedido #N`.
+
+2026-11-03 (20ª execução, via `baixa-vendas` — 3 pedidos novos pagos, 8 baixas):
+
+- Dois dos três já estavam `Enviado` quando a rodada passou (o dono despacha logo depois do
+  pagamento) e ficaram fora do pós-venda; o dono pediu para mandar mesmo assim, só para
+  agradecer. Daí o campo `shipped` na Fase 7.
+- O telefone do `Endereço do Cliente` pode ser fixo (8 dígitos depois do DDD); manda igual,
+  o OpenBot marca `posvenda_falhou` se não tiver WhatsApp.

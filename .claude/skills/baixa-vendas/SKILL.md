@@ -60,7 +60,7 @@ Quando o argumento contém `--auto` (execução agendada, ninguém olhando):
 5. Releia os ledgers e confira que cada baixa feita está lá (`buyer` certo,
    qty certa). Baixa que não aparecer = pendência.
 6. **Pós-venda da Liga**: rode a Fase 7 da `liga-vendas` (pedidos `Pagamento
-   efetuado - Aguardando envio` pagos nas últimas 24h → `POST
+   efetuado - Aguardando envio` ou `Enviado`, com `shipped`, pagos nas últimas 24h → `POST
    /api/postsale/liga-orders`). Reaproveite os detalhes já abertos na etapa 2;
    só primeiro nome, telefone, itens e retirada saem da Liga. No relatório, só
    as contagens `created`/`skipped`.

@@ -676,6 +676,7 @@ type composeItem struct {
 	FirstName      string               `json:"firstName"`
 	OrderNumber    int                  `json:"orderNumber"`
 	Pickup         bool                 `json:"pickup"`
+	Shipped        bool                 `json:"shipped"`
 	Items          []conversations.Item `json:"items"`
 	CanAddHow      string               `json:"canAddHow"`
 }
@@ -713,6 +714,7 @@ func (s *Server) handleAgentComposeList(w http.ResponseWriter, _ *http.Request) 
 			FirstName:      postsale.FirstName(c.Name),
 			OrderNumber:    c.OrderNumber,
 			Pickup:         c.Pickup,
+			Shipped:        c.Shipped,
 			Items:          items,
 			CanAddHow:      canAddHow(c),
 		})

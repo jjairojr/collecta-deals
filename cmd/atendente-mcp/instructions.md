@@ -78,6 +78,7 @@ dos pedidos do site.
    só, separados por uma quebra de linha.
    - **Balão 1:** agradecimento e carinho com o que comprou, juntos: "Oii Ana, tudo bem? Muito obrigado pela compra!
      💙 Esse Jolteon é lindo demais, já tá separado aqui". Vários produtos: fale do pedido no geral, sem nomes.
+     Item com `shipped = true` (pedido da Liga que já saiu): "já tá a caminho" no lugar de "já tá separado aqui".
    - **Balão 2:** o convite. Liga: "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br
      🩷". Site: "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido
      🩷". Retirada: "Se quiser, separo mais alguma coisa pra você pegar junto 🩷".

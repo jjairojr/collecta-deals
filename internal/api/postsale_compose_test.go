@@ -167,6 +167,24 @@ func TestLigaImportCreatesComposeAndDedups(t *testing.T) {
 	}
 }
 
+func TestLigaImportCarriesShippedToCompose(t *testing.T) {
+	f := openBotServer(t)
+	shipped := ligaOrder("12380950", f.now.Add(-time.Hour))
+	shipped.Shipped = true
+	waiting := ligaOrder("12380826", f.now.Add(-time.Hour))
+	waiting.Phone = "(11) 98888-7777"
+	if got := f.importLiga(t, shipped, waiting); got.Created != 2 {
+		t.Fatalf("import %+v", got)
+	}
+	byOrder := map[int]bool{}
+	for _, it := range f.composeList(t).Items {
+		byOrder[it.OrderNumber] = it.Shipped
+	}
+	if len(byOrder) != 2 || !byOrder[12380950] || byOrder[12380826] {
+		t.Fatalf("shipped flags %+v", byOrder)
+	}
+}
+
 func TestComposeFlowDraftApproveClaimDeliver(t *testing.T) {
 	f := openBotServer(t)
 	f.paidOrder(t, false)

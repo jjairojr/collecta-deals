@@ -24,6 +24,7 @@ type ligaOrderIn struct {
 	Phone     string               `json:"phone"`
 	PaidAt    time.Time            `json:"paidAt"`
 	Pickup    bool                 `json:"pickup"`
+	Shipped   bool                 `json:"shipped"`
 	Items     []conversations.Item `json:"items"`
 }
 
@@ -111,6 +112,7 @@ func (s *Server) importLigaOrder(o ligaOrderIn) bool {
 			OrderID:     orderID,
 			OrderNumber: number,
 			Pickup:      o.Pickup,
+			Shipped:     o.Shipped,
 			Items:       items,
 			State:       conversations.StateCompose,
 			Messages:    []conversations.Message{},
