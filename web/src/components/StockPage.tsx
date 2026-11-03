@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  CalendarClock,
   Check,
   ChevronsUpDown,
   Combine,
@@ -888,6 +889,7 @@ function StockRow({
   const ask = row?.askBRL ?? 0;
   const listed = Boolean(row?.listed);
   const featured = Boolean(row?.featured);
+  const terms = Boolean(row?.shipsFrom) || (row?.cardBRL ?? 0) > 0;
   const ref = refBRL(t, fx);
   const live = listed && ask > 0;
   // The Liga chip follows the draft flag so a click reacts immediately, but the
@@ -1020,6 +1022,18 @@ function StockRow({
               <Star className={`h-3 w-3 ${featured ? "fill-current" : ""}`} />
             </button>
           )}
+          <button
+            onClick={() => onEditImage(t.id)}
+            title={terms ? "Pré-venda / preço no cartão configurados — clique para editar" : "Configurar pré-venda e preço no cartão"}
+            aria-label={`Pré-venda e preço no cartão de ${t.name}`}
+            className={`inline-flex items-center rounded-[8px] border-2 border-outline p-1 ${
+              terms
+                ? "bg-brand/20 text-brand-label hover:bg-brand/30"
+                : "bg-panel text-slate-500 hover:bg-raised hover:text-slate-300"
+            }`}
+          >
+            <CalendarClock className="h-3 w-3" />
+          </button>
         </div>
       </td>
       <td className="px-3 py-2 text-center">
