@@ -6,7 +6,7 @@ TodoWrite
 ToolSearch
 
 # OpenBot: busca e descrição de ferramentas (só listam). O tool_call do navegador é checado à parte no guard.sh:
-# só openbot_browser.*, sem upload, script, senha ou download, e só em https://web.whatsapp.com.
+# só openbot_browser.*, sem upload, script, senha ou download, e só em https://web.whatsapp.com e https://www.instagram.com/direct/.
 mcp__openbot__tool_search
 mcp__openbot__tool_describe
 mcp__openbot__routine_no_update

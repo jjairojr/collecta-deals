@@ -222,3 +222,17 @@ alertas de preço (unitário do pedido ≠ ask do ledger).
   (5 − 2): nenhuma gravação na Liga foi necessária; só o `ligaQty` do lote que
   sobrou (4 → 2).
 - Monkey.D.Luffy EB04-061 tinha `ligaQty` 2 com qty 1 (defasado desde o Site #9).
+
+2026-10-30 (propagação de Liga/Site para o MyP, via `baixa-vendas`):
+
+- Excluir anúncio sem navegar a página: `fetch('/estoque/delete?id=<id>', {method:'POST',
+  body:new URLSearchParams({[csrfParam]:csrfToken}), headers:{'X-CSRF-Token':csrfToken,
+  'X-Requested-With':'XMLHttpRequest'}, redirect:'manual'})`, com `csrf-param`/`csrf-token`
+  das `<meta>` da página. Volta status 0 (redirect opaco); conferir com
+  `fetch('/estoque/update/<id>',{redirect:'manual'})` → 404. Sem o body em
+  `URLSearchParams` dá 403; o `$.ajax` navega a aba e só a 1ª exclusão passa.
+- `.card-preco` vem com espaço não separável (`R$ 2,80`): parsear com
+  `replace(/[^\d,]/g,'')`, senão o preço vira NaN e nada casa.
+- O MyP estava muito atrás da Liga (vendas da Liga de 27–29/10 nunca propagadas):
+  varrer `/CollectaTCG/<jogo>?page=N` inteiro, cruzar com o estoque atual da Liga
+  (`cartas/all&txt_filtro=1`) por número + preço e gravar a qty da Liga.

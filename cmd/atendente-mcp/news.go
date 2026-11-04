@@ -118,7 +118,7 @@ func (a *app) toolNews(_ context.Context, _ *mcp.CallToolRequest, _ noInput) (*m
 }
 
 type originInput struct {
-	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD"`
+	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD, ou ig:usuario no Instagram"`
 	Origem   string `json:"origem" jsonschema:"como a pessoa achou a loja, nas palavras dela. Ex.: Instagram, Google, indicação de amigo"`
 }
 

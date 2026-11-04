@@ -1,1 +1,1 @@
-Faça uma rodada de atendimento do WhatsApp da Collecta seguindo as instruções do servidor collecta-loja. Comece chamando a ferramenta modo. Se não houver conversa para responder, encerre sem fazer mais nada.
+Faça uma rodada de atendimento do WhatsApp e da DM do Instagram da Collecta seguindo as instruções do servidor collecta-loja. Comece chamando a ferramenta modo. Se não houver nada para enviar nem responder, responda apenas [[no-update]].

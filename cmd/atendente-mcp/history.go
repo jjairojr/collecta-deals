@@ -10,7 +10,10 @@ import (
 	"time"
 )
 
-const historyKeep = 30 * 24 * time.Hour
+const (
+	historyKeep  = 30 * 24 * time.Hour
+	historyDedup = 10 * time.Minute
+)
 
 type sentMessage struct {
 	Text string    `json:"texto"`
@@ -47,6 +50,12 @@ func (h *history) add(key, text string, at time.Time) error {
 	all, err := h.load()
 	if err != nil {
 		return err
+	}
+	if prev := all[key]; len(prev) > 0 {
+		last := prev[len(prev)-1]
+		if last.Text == text && at.Sub(last.At) <= historyDedup {
+			return nil
+		}
 	}
 	all[key] = append(all[key], sentMessage{Text: text, At: at})
 	for k, msgs := range all {

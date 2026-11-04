@@ -287,8 +287,12 @@ func (s *Server) handleAgentFailed(w http.ResponseWriter, r *http.Request) {
 		if m.Status != conversations.MsgQueued {
 			return errClaimed
 		}
-		m.Status = conversations.MsgFailed
 		m.Error = reason
+		if !in.Permanent {
+			m.ClaimedAt = time.Time{}
+			return nil
+		}
+		m.Status = conversations.MsgFailed
 		if m.Kind == conversations.KindOffer {
 			cv.Close(conversations.OutcomeFailed)
 		}
@@ -296,6 +300,11 @@ func (s *Server) handleAgentFailed(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		agentConversationError(w, err)
+		return
+	}
+	if !in.Permanent {
+		s.logPostSale("pós-venda %s (pedido #%d) de volta à fila: %s", c.ID, c.OrderNumber, reason)
+		writeJSON(w, map[string]bool{"ok": true})
 		return
 	}
 	s.notify("Pós-venda: mensagem não entregue", fmt.Sprintf("%s (pedido #%d): %s", postsale.FirstName(c.Name), c.OrderNumber, reason))

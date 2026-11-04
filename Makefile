@@ -19,7 +19,7 @@ AIR_ARGS := $(if $(MYP),-build.args_bin "-web= $(MYP)")
 ARGS     ?=
 
 .DEFAULT_GOAL := dev
-.PHONY: dev server web cli build web-build cfgate cfgate-once atendente test tidy clean ensure-air help
+.PHONY: dev server web cli build web-build cfgate cfgate-once atendente baixa test tidy clean ensure-air help
 
 ## dev: Go server (air) + Vite web dev, together; Ctrl-C stops both.
 dev: web/node_modules ensure-air
@@ -61,6 +61,10 @@ cfgate-once:
 ## atendente: build the WhatsApp attendant MCP and install it under /Users/Shared/collecta-bot (see bot/atendente/SETUP.md).
 atendente:
 	sh bot/atendente/install.sh
+
+## baixa: build the sale write-off MCP and install it under /Users/Shared/collecta-bot/baixa (see bot/baixa/SETUP.md).
+baixa:
+	sh bot/baixa/install.sh
 
 web-build: web/node_modules
 	cd web && npm run build

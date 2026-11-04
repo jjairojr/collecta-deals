@@ -225,16 +225,36 @@ func TestOpenBotDiscardFailsQueuedOffer(t *testing.T) {
 	}
 }
 
-func TestOpenBotFailedOfferClosesConversation(t *testing.T) {
+func TestOpenBotFailedOfferGoesBackToQueue(t *testing.T) {
 	f := openBotServer(t)
 	f.approvedOffer(t)
 	item := f.claim(t).Items[0]
-	if rec := f.agentPost(t, "/api/postsale/agent/outbox/"+item.ID+"/failed", map[string]interface{}{"error": "número sem WhatsApp"}); rec.Code != http.StatusOK {
+	if rec := f.agentPost(t, "/api/postsale/agent/outbox/"+item.ID+"/failed", map[string]interface{}{"error": "busca não achou o contato"}); rec.Code != http.StatusOK {
+		t.Fatalf("failed %d %s", rec.Code, rec.Body.String())
+	}
+	c := f.only(t)
+	if c.State != conversations.StateQueued || c.Outcome != "" || c.Messages[0].Status != conversations.MsgQueued || c.Messages[0].Error != "busca não achou o contato" {
+		t.Fatalf("after transient failure %+v", c)
+	}
+	retry := f.claim(t)
+	if len(retry.Items) != 1 || retry.Items[0].ID != item.ID {
+		t.Fatalf("transient failure not retried: %+v", retry)
+	}
+}
+
+func TestOpenBotPermanentFailedOfferClosesConversation(t *testing.T) {
+	f := openBotServer(t)
+	f.approvedOffer(t)
+	item := f.claim(t).Items[0]
+	if rec := f.agentPost(t, "/api/postsale/agent/outbox/"+item.ID+"/failed", map[string]interface{}{"error": "número sem WhatsApp", "permanent": true}); rec.Code != http.StatusOK {
 		t.Fatalf("failed %d %s", rec.Code, rec.Body.String())
 	}
 	c := f.only(t)
 	if c.State != conversations.StateClosed || c.Outcome != conversations.OutcomeFailed || c.Messages[0].Error != "número sem WhatsApp" {
 		t.Fatalf("after failure %+v", c)
+	}
+	if again := f.claim(t); len(again.Items) != 0 {
+		t.Fatalf("permanent failure retried: %+v", again)
 	}
 }
 

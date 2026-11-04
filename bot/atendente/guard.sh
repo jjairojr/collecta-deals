@@ -29,7 +29,8 @@ if [ "$tool" = "mcp__openbot__tool_call" ]; then
   if [ -n "$url" ]; then
     case "$url" in
       https://web.whatsapp.com | https://web.whatsapp.com/*) ;;
-      *) block "$target fora do WhatsApp Web" ;;
+      https://www.instagram.com/direct | https://www.instagram.com/direct/*) ;;
+      *) block "$target fora do WhatsApp Web e da DM do Instagram" ;;
     esac
   fi
   exit 0

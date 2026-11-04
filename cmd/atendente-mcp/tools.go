@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -22,6 +23,8 @@ import (
 
 //go:embed instructions.md
 var instructions string
+
+const serverInstructions = "Você é o atendente da Collecta TCG no WhatsApp e na DM do Instagram. Antes de qualquer outra coisa, chame a ferramenta modo da collecta-loja. O campo regras do resultado traz as regras completas do atendimento: leia inteiras e siga todas, do começo ao fim. Sem as regras não abra conversa nem mande mensagem."
 
 const (
 	catalogTTL    = 60 * time.Second
@@ -84,10 +87,10 @@ func newApp(cfg config, client *http.Client, now func() time.Time) *app {
 }
 
 func (a *app) server() *mcp.Server {
-	s := mcp.NewServer(&mcp.Implementation{Name: "collecta-loja", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: instructions})
+	s := mcp.NewServer(&mcp.Implementation{Name: "collecta-loja", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "modo",
-		Description: "Diz o modo do atendente (rascunho, teste ou ao_vivo), a data e hora em Goiânia e a versão das regras. Chame no começo de cada rodada.",
+		Description: "Diz o modo do atendente (rascunho, teste ou ao_vivo), a data e hora em Goiânia e a versão e o texto completo das regras (siga todas). Chame no começo de cada rodada, antes de qualquer outra coisa.",
 	}, a.toolMode)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "buscar_estoque",
@@ -129,6 +132,7 @@ type modeOutput struct {
 	Versao string `json:"versao_regras"`
 	Modo   string `json:"modo"`
 	Agora  string `json:"agora"`
+	Regras string `json:"regras"`
 }
 
 var weekdays = [...]string{"domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"}
@@ -139,6 +143,7 @@ func (a *app) toolMode(_ context.Context, _ *mcp.CallToolRequest, _ noInput) (*m
 		Versao: rulesVersion,
 		Modo:   a.cfg.Mode,
 		Agora:  fmt.Sprintf("%s %s", weekdays[now.Weekday()], now.Format("02/01 15:04")),
+		Regras: instructions,
 	}, nil
 }
 
@@ -334,7 +339,7 @@ func (a *app) toolHighlights(ctx context.Context, _ *mcp.CallToolRequest, in hig
 }
 
 type authorizeInput struct {
-	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD, como aparece no WhatsApp. Ex.: +55 62 99999-9999"`
+	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD, como aparece no WhatsApp (ex.: +55 62 99999-9999), ou ig: seguido do usuário no Instagram (ex.: ig:collecta.fan)"`
 	Texto    string `json:"texto" jsonschema:"o texto exato que você vai enviar"`
 }
 
@@ -343,10 +348,20 @@ type authorizeOutput struct {
 	Motivo string `json:"motivo"`
 }
 
+var instagramHandle = regexp.MustCompile(`^[a-z0-9._]{1,30}$`)
+
 func phoneKey(phone string) (string, error) {
-	key := whatsapp.PhoneKey(phone)
+	raw := strings.TrimSpace(phone)
+	if rest, ok := strings.CutPrefix(strings.ToLower(raw), "ig:"); ok {
+		handle := strings.TrimPrefix(strings.TrimSpace(rest), "@")
+		if !instagramHandle.MatchString(handle) {
+			return "", fmt.Errorf("usuário do Instagram inválido: %q (use ig: seguido do @ que aparece no topo da conversa, ex.: ig:collecta.fan)", phone)
+		}
+		return "ig:" + handle, nil
+	}
+	key := whatsapp.PhoneKey(raw)
 	if len(key) < 10 {
-		return "", fmt.Errorf("telefone inválido: %q (abra os dados do contato e copie o número com DDD)", phone)
+		return "", fmt.Errorf("telefone inválido: %q (abra os dados do contato e copie o número com DDD; no Instagram use ig:usuario)", phone)
 	}
 	return key, nil
 }
@@ -381,7 +396,7 @@ func (a *app) toolAuthorize(ctx context.Context, _ *mcp.CallToolRequest, in auth
 }
 
 type historyInput struct {
-	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD"`
+	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD, ou ig:usuario no Instagram"`
 }
 
 type historyEntry struct {
@@ -410,7 +425,7 @@ func (a *app) toolHistory(_ context.Context, _ *mcp.CallToolRequest, in historyI
 }
 
 type handoffInput struct {
-	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD"`
+	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD, ou ig:usuario no Instagram"`
 	Nome     string `json:"nome,omitempty" jsonschema:"nome do cliente, se aparecer"`
 	Motivo   string `json:"motivo" jsonschema:"por que a conversa precisa de uma pessoa"`
 	Resumo   string `json:"resumo" jsonschema:"resumo curto do que o cliente quer"`

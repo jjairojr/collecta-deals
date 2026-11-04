@@ -179,8 +179,9 @@ func TestToolsAndInstructions(t *testing.T) {
 	if got := strings.Join(names, ","); got != want {
 		t.Fatalf("tools = %s, want %s", got, want)
 	}
-	if !strings.Contains(f.session.InitializeResult().Instructions, "autorizar_envio") {
-		t.Fatal("instructions missing from initialize")
+	got := f.session.InitializeResult().Instructions
+	if got != serverInstructions || len(got) > 2000 || !strings.Contains(got, "modo") {
+		t.Fatalf("instruções do servidor com %d bytes", len(got))
 	}
 }
 
@@ -192,6 +193,9 @@ func TestModeReportsVersionAndTime(t *testing.T) {
 	}
 	if out.Modo != modeTest || out.Agora != "segunda 02/11 15:00" || len(out.Versao) != 8 {
 		t.Fatalf("modo = %+v", out)
+	}
+	if out.Regras != instructions {
+		t.Fatal("modo devia devolver as regras inteiras")
 	}
 }
 
@@ -304,6 +308,23 @@ func TestAuthorizeLiveKeepsSevenDaysOfHistory(t *testing.T) {
 	}
 }
 
+func TestHistoryIgnoresRepeatWithinTenMinutes(t *testing.T) {
+	h := newHistory(t.TempDir())
+	at := time.Date(2026, 11, 3, 19, 0, 0, 0, saoPaulo)
+	for _, d := range []time.Duration{0, 2 * time.Minute, 20 * time.Minute} {
+		if err := h.add("556299991111", "Oii, tudo bem?", at.Add(d)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := h.since("556299991111", at.Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("history = %+v", got)
+	}
+}
+
 func TestAuthorizeRejectsDashAndBadPhone(t *testing.T) {
 	f := newFixture(t, modeLive)
 	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 99999-1111", "texto": "Temos sim — R$ 10"})
@@ -313,6 +334,34 @@ func TestAuthorizeRejectsDashAndBadPhone(t *testing.T) {
 	_, errText := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "Maria", "texto": "Oi"})
 	if !strings.Contains(errText, "telefone inválido") {
 		t.Fatalf("error = %q", errText)
+	}
+}
+
+func TestAuthorizeInstagramHandle(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "ig:@Collecta.Fan", "texto": "Oii, tudo bem?"})
+	if !out.Enviar || errText != "" {
+		t.Fatalf("instagram refused: %+v %q", out, errText)
+	}
+	hist, _ := callTool[historyOutput](t, f, "historico_bot", map[string]string{"telefone": "ig:collecta.fan"})
+	if len(hist.Mensagens) != 1 {
+		t.Fatalf("history = %+v", hist)
+	}
+	other, _ := callTool[historyOutput](t, f, "historico_bot", map[string]string{"telefone": "62 99999-1111"})
+	if len(other.Mensagens) != 0 {
+		t.Fatalf("instagram leaked into phone history: %+v", other)
+	}
+	_, errText = callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "ig:nome com espaço", "texto": "Oi"})
+	if !strings.Contains(errText, "Instagram inválido") {
+		t.Fatalf("error = %q", errText)
+	}
+}
+
+func TestAuthorizeTestModeBlocksInstagram(t *testing.T) {
+	f := newFixtureWith(t, modeTest, "", nil)
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "ig:collecta.fan", "texto": "Oi"})
+	if out.Enviar {
+		t.Fatalf("test mode sent to instagram: %+v", out)
 	}
 }
 
