@@ -86,8 +86,11 @@ Trocar o modo = mudar `ATENDENTE_MODO` no painel MCP e reiniciar o servidor `col
 - **Novidades** (loja, pré-vendas, cupons, o que vai chegar): edite `/Users/Shared/collecta-bot/novidades.md` em
   qualquer editor de texto. Vale na próxima rodada, sem reinstalar. Cada novidade tem `## Título` e, se quiser,
   `desde:` / `até:` com data dd/mm/aaaa. O `make atendente` nunca sobrescreve esse arquivo.
-- **Jeito de falar e regras:** `cmd/atendente-mcp/instructions.md` (este repo). O agente recebe esse texto no campo
-  `regras` da ferramenta `modo`, não nas instruções do servidor: o Claude Code corta instruções de MCP em ~4 KB. Depois
+- **Jeito de falar e regras:** `cmd/atendente-mcp/instructions.md` (este repo). O agente recebe esse texto em partes,
+  no campo `regras` das ferramentas, não nas instruções do servidor: o Claude Code corta instruções de MCP em ~4 KB.
+  O `modo` traz só as regras da rodada; `novidades` traz as de conversa; cada ferramenta do pós-venda traz a sua parte
+  quando tem trabalho; Instagram e carrinhos vêm pela ferramenta `regras`. Cada `## ` do arquivo precisa estar num
+  grupo em `cmd/atendente-mcp/rules.go` (seção nova sem grupo derruba o teste e o servidor). Depois
   de mudar, `make atendente`. Não precisa reiniciar nada no OpenBot: cada rodada abre um `atendente-mcp` novo. A
   `versao_regras` que o agente diz no fim da rodada confirma a versão.
 - **De onde vêm os clientes:** `~/.collecta-atendente/origem.csv` (data, telefone, origem), abre no Numbers ou Excel.

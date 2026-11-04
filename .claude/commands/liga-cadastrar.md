@@ -298,6 +298,27 @@ Com `--dry-run`: só monte e mostre a tabela `item → sid → qty → preço �
     tempo para passar a renderizar. Categoria certa + estoque público = config
     ok; recheque a home depois.
 
+13. **Pré-venda = "encomenda"** (validado em 2026-10-31, GEM Pack Vol. 7).
+    São dois campos: prazo de envio em **dias após a confirmação do pagamento**
+    (3 a 120) e um texto de detalhes, e o save exige os dois. Na linha `[n]` do
+    `prod/all`: `ecomEncomenda.openModal(n)`, preencha `#txt_dias_encomenda` e
+    `#txt-detalhes-encomenda`, chame `ecomEncomenda.save(n)` e depois
+    `requestSubmit(btSalvar)`. **Grava, mas o `prod/all` relê vazio** (ícone
+    `icon-encomenda-off`). Confira em `prod/multi&sid=<sid>`: os hiddens
+    `ITEM_TXT_ENCOMENDA_ENVIO` e `ITEM_TXT_ENCOMENDA_DETALHE` trazem o valor.
+    Não clique no `+` verde de Ações do `prod/multi`: ele abre um `alert()` e
+    trava a aba. Antes de mexer nessa tela, sobrescreva `window.alert` e
+    `window.confirm`.
+    **Encomenda tira a oferta do marketplace** (testado em 2026-11-02 no
+    GEM Pack Vol. 7): com encomenda ligada (30 ou 15 dias) o item fica
+    "Produto indexado no Marketplace" e com log "Índice Criado", mas não
+    aparece na página do produto na Liga; desligada, aparece na hora. Para
+    desligar: `openModal(n)`, `#txt_dias_encomenda` = `''`,
+    `#txt-detalhes-encomenda` = `''`, `save("n")`, `requestSubmit(btSalvar)`
+    e confira `ITEM_POSSUI_ENCOMENDA_TEM=0` no `prod/multi`. O selo "Pre Order"
+    das outras lojas vem de outra tela (`ecom/admin/preorder&tcg=<id>`), que
+    é por edição de cartas, não por produto selado.
+
 ---
 
 ## Fase 2b — Mover para a categoria do jogo (OBRIGATÓRIO)

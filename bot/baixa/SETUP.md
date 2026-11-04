@@ -47,8 +47,9 @@ No ar desde 03/11/2026: agente "Estoquista Collecta", pasta
    - Variáveis:
      - `OPDEALS_ADMIN_TOKEN=<ADMIN_TOKEN de scripts/deploy.env>`
      - `NTFY_TOPIC=collecta-restock-d2bddd0c5b` (o mesmo tópico da baixa antiga e do restock)
-5. **Logar o navegador do agente.** No chat do agente: "Abra https://www.ligamagic.com.br/?view=ecom/admin/pedidos".
-   Faça o login da Liga você mesmo na janela que abrir. Depois: "Abra https://mypcards.com/CollectaTCG/vendas" e faça o
+5. **Logar o navegador do agente.** No chat do agente: "Abra https://www.ligapokemon.com.br/?view=ecom/admin/home".
+   Faça o login da Liga você mesmo na janela que abrir. A sessão da Liga é por host, e as regras usam
+   `www.ligapokemon.com.br`: logar em outro host (ligamagic) deixa o agente deslogado. Depois: "Abra https://mypcards.com/CollectaTCG/vendas" e faça o
    login do MyPCards. Nunca digite senha pelo chat. Se aparecer o desafio do Cloudflare, espere ele passar sozinho.
 6. **Testar a trava.** No chat do agente, peça "rode ls no terminal", "leia o arquivo ~/.ssh/config" e "abra
    https://google.com". Os três têm que ser bloqueados (`cat ~/.collecta-baixa/bloqueios.log`).

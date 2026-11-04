@@ -426,24 +426,122 @@ func TestOpenBotOwnerReplyQueuesAndExpires(t *testing.T) {
 func TestOpenBotStaleAgentAlertDecision(t *testing.T) {
 	f := openBotServer(t)
 	start := f.now
-	f.s.alertIfAgentStale(1, start)
+	waiting := pendingWork{Outbox: 1, OldestAt: start}
+	f.s.alertIfAgentStale(pendingWork{Open: 3}, start.Add(time.Hour))
 	if !f.s.postSale.agentAlertAt.IsZero() {
-		t.Fatal("alerted right after boot")
+		t.Fatal("alerted with only open conversations")
 	}
-	f.s.alertIfAgentStale(1, start.Add(16*time.Minute))
+	f.s.alertIfAgentStale(waiting, start)
+	if !f.s.postSale.agentAlertAt.IsZero() {
+		t.Fatal("alerted as soon as the item appeared")
+	}
+	f.s.alertIfAgentStale(waiting, start.Add(16*time.Minute))
 	first := f.s.postSale.agentAlertAt
 	if first.IsZero() {
-		t.Fatal("no alert after 16 min without the agent")
+		t.Fatal("no alert after 16 min with the item waiting and no agent")
 	}
-	f.s.alertIfAgentStale(1, start.Add(30*time.Minute))
+	f.s.alertIfAgentStale(waiting, start.Add(30*time.Minute))
 	if !f.s.postSale.agentAlertAt.Equal(first) {
 		t.Fatal("alerted twice within the hour")
 	}
 	f.now = start.Add(80 * time.Minute)
 	f.claim(t)
-	f.s.alertIfAgentStale(1, start.Add(85*time.Minute))
+	f.s.alertIfAgentStale(waiting, start.Add(85*time.Minute))
 	if !f.s.postSale.agentAlertAt.Equal(first) {
 		t.Fatal("alerted although the agent was just seen")
+	}
+}
+
+func TestOpenBotStaleAlertIgnoresIdleAgentBeforeWork(t *testing.T) {
+	f := openBotServer(t)
+	f.claim(t)
+	arrived := f.now.Add(25 * time.Minute)
+	f.s.alertIfAgentStale(pendingWork{Compose: 1, OldestAt: arrived}, arrived.Add(time.Minute))
+	if !f.s.postSale.agentAlertAt.IsZero() {
+		t.Fatal("an agent idle between heartbeats raised the alert")
+	}
+	f.s.alertIfAgentStale(pendingWork{Compose: 1, OldestAt: arrived}, arrived.Add(16*time.Minute))
+	if f.s.postSale.agentAlertAt.IsZero() {
+		t.Fatal("no alert after the work waited 16 min")
+	}
+}
+
+func (f *postSaleFixture) pending(t *testing.T) pendingWork {
+	t.Helper()
+	rec := f.do(t, http.MethodGet, "/api/postsale/agent/pending", nil, agentAuth())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("pending %d %s", rec.Code, rec.Body.String())
+	}
+	return decodeBody[pendingWork](t, rec)
+}
+
+func TestOpenBotPendingCountsWithoutTouchingAgent(t *testing.T) {
+	f := openBotServer(t)
+	if rec := f.do(t, http.MethodGet, "/api/postsale/agent/pending", nil, admin()); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("admin token %d", rec.Code)
+	}
+	if p := f.pending(t); p != (pendingWork{}) {
+		t.Fatalf("empty %+v", p)
+	}
+	f.paidOrder(t, true)
+	f.s.postSaleTick(context.Background())
+	p := f.pending(t)
+	if p.Compose != 1 || p.Total() != 1 || !p.OldestAt.Equal(f.only(t).CreatedAt) {
+		t.Fatalf("compose %+v", p)
+	}
+	if !f.s.agentSeenAt().IsZero() {
+		t.Fatal("pending marked the agent as seen")
+	}
+	cloud := postSaleServer(t)
+	if rec := cloud.do(t, http.MethodGet, "/api/postsale/agent/pending", nil, agentAuth()); rec.Code != http.StatusNotFound {
+		t.Fatalf("pending in cloud mode %d", rec.Code)
+	}
+}
+
+func TestOpenBotPendingFollowsOutboxLifecycle(t *testing.T) {
+	f := openBotServer(t)
+	f.approvedOffer(t)
+	f.shippedOrder(t, "BR555")
+	if p := f.pending(t); p.Outbox != 1 || p.Tracking != 1 || p.Compose != 0 || p.Open != 0 {
+		t.Fatalf("queued %+v", p)
+	}
+	items := f.claim(t).Items
+	if p := f.pending(t); p.Total() != 0 {
+		t.Fatalf("leased items still pending %+v", p)
+	}
+	for _, it := range items {
+		if it.Kind == conversations.KindOffer {
+			f.agentPost(t, "/api/postsale/agent/outbox/"+it.ID+"/delivered", nil)
+		}
+	}
+	f.now = f.now.Add(31 * time.Minute)
+	p := f.pending(t)
+	if p.Outbox != 0 || p.Tracking != 1 || p.Open != 1 {
+		t.Fatalf("after delivery %+v", p)
+	}
+	if !p.OldestAt.Equal(f.now.Add(-time.Minute)) {
+		t.Fatalf("tracking retry since %v, now %v", p.OldestAt, f.now)
+	}
+}
+
+func TestOpenBotPendingQuietHours(t *testing.T) {
+	f := openBotServer(t)
+	f.now = time.Date(2026, 10, 31, 23, 0, 0, 0, saoPaulo)
+	f.paidOrder(t, true)
+	f.shippedOrder(t, "BR999")
+	f.s.postSaleTick(context.Background())
+	if p := f.pending(t); !p.Quiet || p.Total() != 0 {
+		t.Fatalf("night %+v", p)
+	}
+	f.now = time.Date(2026, 11, 1, 8, 1, 0, 0, saoPaulo)
+	p := f.pending(t)
+	morning := time.Date(2026, 11, 1, 8, 0, 0, 0, saoPaulo)
+	if p.Quiet || p.Compose != 1 || p.Tracking != 1 || !p.OldestAt.Equal(morning) {
+		t.Fatalf("morning %+v", p)
+	}
+	f.s.alertIfAgentStale(p, f.now)
+	if !f.s.postSale.agentAlertAt.IsZero() {
+		t.Fatal("night backlog raised the alert right at 8h")
 	}
 }
 

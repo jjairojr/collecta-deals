@@ -113,7 +113,7 @@ func TestClaimSendsBearerAndRecordsHistoryOnConfirm(t *testing.T) {
 	api := &fakeAgentAPI{}
 	f := newFixtureWith(t, modeLive, testToken, api.handler)
 	claim, errText := callWith[struct{}, claimOutput](t, f, "posvenda_envios", struct{}{})
-	if errText != "" || len(claim.Items) != 2 {
+	if errText != "" || len(claim.Items) != 2 || claim.Regras != rules[rulesPostSaleDelivery] {
 		t.Fatalf("claim %+v %q", claim, errText)
 	}
 	if _, errText := callWith[outboxIDInput, okOutput](t, f, "posvenda_confirmar", outboxIDInput{ID: "t.o1.BR1"}); errText != "" {
@@ -142,7 +142,7 @@ func TestClaimInDraftModeNeverCallsServer(t *testing.T) {
 	api := &fakeAgentAPI{}
 	f := newFixtureWith(t, modeDraft, testToken, api.handler)
 	claim, _ := callWith[struct{}, claimOutput](t, f, "posvenda_envios", struct{}{})
-	if len(claim.Items) != 0 || claim.Aviso == "" || len(api.all()) != 0 {
+	if len(claim.Items) != 0 || claim.Aviso == "" || claim.Regras != "" || len(api.all()) != 0 {
 		t.Fatalf("draft claim %+v requests %+v", claim, api.all())
 	}
 }
@@ -152,7 +152,7 @@ func TestInboundMapsFieldsAndReturnsContext(t *testing.T) {
 	f := newFixtureWith(t, modeLive, testToken, api.handler)
 	in := inboundInput{ConversaID: "c1", Mensagens: []inboundMessage{{Texto: "quero", Hora: "14:05"}, {Texto: "oi, é o Jairo", DaLoja: true}}}
 	out, errText := callWith[inboundInput, inboundOutput](t, f, "posvenda_registrar", in)
-	if errText != "" || out.Action != "answer" || out.Context == nil || out.Context.Offer == nil || out.Context.Offer.SKU != "s1" || len(out.Context.History) != 2 {
+	if errText != "" || out.Action != "answer" || out.Regras != rules[rulesConversation] || out.Context == nil || out.Context.Offer == nil || out.Context.Offer.SKU != "s1" || len(out.Context.History) != 2 {
 		t.Fatalf("inbound %+v %q", out, errText)
 	}
 	reqs := api.all()
@@ -199,7 +199,7 @@ func TestComposeListAndMessageMapping(t *testing.T) {
 	api := &fakeAgentAPI{}
 	f := newFixtureWith(t, modeLive, testToken, api.handler)
 	list, errText := callWith[struct{}, composeOutput](t, f, "posvenda_escrever", struct{}{})
-	if errText != "" || len(list.Items) != 1 || list.Items[0].Channel != "liga" || !list.Items[0].Pickup || !list.Items[0].Shipped || !strings.Contains(list.ComoEscrever, "a caminho") || list.Items[0].Items[0].Name != "Shanks (OP09-004)" {
+	if errText != "" || len(list.Items) != 1 || list.Items[0].Channel != "liga" || !list.Items[0].Pickup || !list.Items[0].Shipped || !strings.Contains(list.ComoEscrever, "a caminho") || list.Items[0].Items[0].Name != "Shanks (OP09-004)" || list.Regras != rules[rulesPostSaleCompose] {
 		t.Fatalf("compose list %+v %q", list, errText)
 	}
 	reqs := api.all()
@@ -225,5 +225,26 @@ func TestComposeListAndMessageMapping(t *testing.T) {
 	}
 	if last.method != http.MethodPost || last.path != "/api/postsale/agent/conversations/c9/compose" || body.Text != text {
 		t.Fatalf("compose request %+v", last)
+	}
+}
+
+func TestWatchCarriesResponseRulesOnlyWithConversations(t *testing.T) {
+	api := &fakeAgentAPI{}
+	f := newFixtureWith(t, modeLive, testToken, api.handler)
+	out, errText := callWith[struct{}, watchOutput](t, f, "posvenda_conversas", struct{}{})
+	if errText != "" || len(out.Conversations) != 1 || out.Regras != rules[rulesPostSaleResponses] {
+		t.Fatalf("watch %+v %q", out, errText)
+	}
+	empty := newFixtureWith(t, modeLive, testToken, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"conversations":[],"items":[]}`)
+	})
+	if out, _ := callWith[struct{}, watchOutput](t, empty, "posvenda_conversas", struct{}{}); out.Regras != "" {
+		t.Fatal("conversas vazias com regras")
+	}
+	if out, _ := callWith[struct{}, composeOutput](t, empty, "posvenda_escrever", struct{}{}); out.Regras != "" {
+		t.Fatal("lista vazia de primeira mensagem com regras")
+	}
+	if out, _ := callWith[struct{}, claimOutput](t, empty, "posvenda_envios", struct{}{}); out.Regras != "" {
+		t.Fatal("envios vazios com regras")
 	}
 }

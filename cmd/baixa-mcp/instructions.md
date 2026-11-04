@@ -44,8 +44,8 @@ para criar lote extra nem para reduzir o dashboard, e isso é de propósito.
    carregamentos de página por chamada, nunca 5 ou mais em sequência. Leitura também conta: o risco é a taxa, não a
    escrita.
 8. **Cloudflare.** O desafio passivo ("Performing security verification") resolve sozinho: espere ~10 s e siga. Bloqueio
-   é Error 1007, desafio que não resolve em ~15 s, ou página de login no lugar do admin (depois de tentar o outro host da
-   Liga, ver Mecânica da Liga). Ao primeiro bloqueio, pare de usar a Liga na rodada inteira e não tente de novo. Pule
+   é Error 1007, desafio que não resolve em ~15 s, ou página de login no lugar do admin (depois de tentar os outros
+   hosts da Liga, ver Mecânica da Liga). Ao primeiro bloqueio, pare de usar a Liga na rodada inteira e não tente de novo. Pule
    para o relatório (o pós-venda depende da Liga). Tarefas da fila ficam pendentes, sem `fila_erro`.
 9. **Dados pessoais.** Do comprador você só usa o primeiro nome, e o telefone só dentro do `posvenda_liga`. Nunca
    leia, devolva de script, guarde ou mande CPF, e-mail, endereço, sobrenome. O relatório não leva telefone.
@@ -101,9 +101,12 @@ real). O dedup por número não enxerga essas.
 
 ### Hosts e páginas
 
-- O admin hoje responde logado em `https://www.ligamagic.com.br/?view=ecom/admin/...`. Se aparecer "Você não está logado
-  ou não possui acesso a esta página", tente o mesmo caminho em `https://www.ligacollectatcg.com.br`. Só os dois
-  responderem assim é sessão caída (bloqueio, regra 8). O domínio público do jogo (ligapokemon etc.) não serve o admin.
+- O admin da loja é `https://www.ligapokemon.com.br/?view=ecom/admin/home`: é nesse host que o dono deixa o navegador
+  logado, então todo caminho `?view=ecom/admin/...` começa por `https://www.ligapokemon.com.br/`. A sessão da Liga é por
+  host: se aparecer "Você não está logado ou não possui acesso a esta página", tente o mesmo caminho em
+  `https://www.ligamagic.com.br` e depois em `https://www.ligacollectatcg.com.br`. Só os três responderem assim é
+  sessão caída (bloqueio, regra 8). Fique na rodada inteira no host que respondeu logado; `fetch` com caminho relativo
+  já fica nele.
 - Listagem de pedidos: `?view=ecom/admin/pedidos` (`compras` dá 404).
 - Detalhe: `?view=ecom/admin/compra&id=866280&cod=<pedido>`.
 - Estoque de cartas: `?view=ecom/admin/cartas/all`. Estoque de selados: `?view=ecom/admin/prod/all`.
@@ -158,7 +161,7 @@ real). O dedup por número não enxerga essas.
 - Chegue na lista pela URL que o formulário de busca gera; só ela grava (a URL curta mostra a mesma lista e não salva
   nada). Navegue a aba (fetch não grava):
 
-  `https://www.ligamagic.com.br/?view=ecom%2Fadmin%2Fcartas%2Fall&tcg=<11|2|19>&txt_estoque=&page=1&search_type=1&txt_carta=<nome>&txt_edicao=&txt_raridade=&txt_cor=&txt_qualid=&txt_grading=&txt_grading_company=&txt_extras_opcao=0&txt_filtro=&txt_estoque_de=&txt_estoque_ate=&txt_idioma=&btBuscar=Buscar&txt_order=`
+  `https://www.ligapokemon.com.br/?view=ecom%2Fadmin%2Fcartas%2Fall&tcg=<11|2|19>&txt_estoque=&page=1&search_type=1&txt_carta=<nome>&txt_edicao=&txt_raridade=&txt_cor=&txt_qualid=&txt_grading=&txt_grading_company=&txt_extras_opcao=0&txt_filtro=&txt_estoque_de=&txt_estoque_ate=&txt_idioma=&btBuscar=Buscar&txt_order=`
 
   `tcg` 11 = One Piece, 2 = Pokémon, 19 = Riftbound. `txt_filtro=` vazio mostra também os cadastros zerados;
   `txt_filtro=1` só os com estoque. A lista corta em 50 linhas por página.

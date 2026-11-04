@@ -27,9 +27,10 @@ type outboxItem struct {
 }
 
 type claimOutput struct {
-	Quiet bool         `json:"quiet"`
-	Items []outboxItem `json:"items"`
-	Aviso string       `json:"aviso,omitempty"`
+	Quiet  bool         `json:"quiet"`
+	Items  []outboxItem `json:"items"`
+	Aviso  string       `json:"aviso,omitempty"`
+	Regras string       `json:"regras,omitempty"`
 }
 
 type okOutput struct {
@@ -54,6 +55,7 @@ type watchConversation struct {
 
 type watchOutput struct {
 	Conversations []watchConversation `json:"conversations"`
+	Regras        string              `json:"regras,omitempty"`
 }
 
 type boughtLine struct {
@@ -96,6 +98,7 @@ type inboundOutput struct {
 	Reason         string          `json:"reason,omitempty"`
 	ConversationID string          `json:"conversationId"`
 	Context        *inboundContext `json:"context,omitempty"`
+	Regras         string          `json:"regras,omitempty"`
 }
 
 type replyOutput struct {
@@ -125,6 +128,7 @@ type composeItem struct {
 type composeOutput struct {
 	ComoEscrever string        `json:"como_escrever"`
 	Items        []composeItem `json:"items"`
+	Regras       string        `json:"regras,omitempty"`
 }
 
 const composeGuide = `Escreva como o Jairo, dono da loja, escreve do celular: 2 balões curtos separados por uma quebra de linha.
@@ -248,6 +252,9 @@ func (a *app) toolClaim(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) 
 	}
 	a.mu.Unlock()
 	claim.Items = kept
+	if len(kept) > 0 {
+		claim.Regras = rules[rulesPostSaleDelivery]
+	}
 	return nil, claim, nil
 }
 
@@ -300,7 +307,13 @@ func (a *app) toolWatch(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) 
 	if err != nil {
 		return nil, out, err
 	}
-	return nil, out, json.Unmarshal(data, &out)
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, out, err
+	}
+	if len(out.Conversations) > 0 {
+		out.Regras = rules[rulesPostSaleResponses]
+	}
+	return nil, out, nil
 }
 
 type inboundMessage struct {
@@ -330,6 +343,9 @@ func (a *app) toolInbound(ctx context.Context, _ *mcp.CallToolRequest, in inboun
 		body.Messages = append(body.Messages, serverMessage{Text: m.Texto, At: m.Hora, FromStore: m.DaLoja})
 	}
 	out, err := agentPost[inboundBody, inboundOutput](a, ctx, conversationPath(in.ConversaID, "inbound"), body)
+	if err == nil && out.Action == "answer" {
+		out.Regras = rules[rulesConversation]
+	}
 	return nil, out, err
 }
 
@@ -362,6 +378,9 @@ func (a *app) toolComposeList(ctx context.Context, _ *mcp.CallToolRequest, _ noI
 		return nil, out, err
 	}
 	out.ComoEscrever = composeGuide
+	if len(out.Items) > 0 {
+		out.Regras = rules[rulesPostSaleCompose]
+	}
 	for i := range out.Items {
 		if out.Items[i].Channel == "liga" {
 			out.Items[i].CanAddHow = ligaComposeHint

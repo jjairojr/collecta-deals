@@ -10,10 +10,10 @@ import (
 
 func TestSlugMatchesStorefront(t *testing.T) {
 	cases := map[string]Trade{
-		"pokemon-mega-darkrai-ex-101-nm":            {Name: "Mega Darkrai ex", Number: "101", Condition: "NM"},
+		"pokemon-mega-darkrai-ex-101-nm":           {Name: "Mega Darkrai ex", Number: "101", Condition: "NM"},
 		"pokemon-pokemon-de-n-s-zoroark-ex-185-en": {Name: "Pokémon de N's Zoroark ex", Number: "185", Variant: "EN"},
-		"pokemon-boss-s-orders-tg24":                {Name: "Boss's Orders", Number: "TG24"},
-		"pokemon-ceu-escuro-101-084-nm":             {Name: "Céu Escuro", Number: "101/084", Condition: "NM"},
+		"pokemon-boss-s-orders-tg24":               {Name: "Boss's Orders", Number: "TG24"},
+		"pokemon-ceu-escuro-101-084-nm":            {Name: "Céu Escuro", Number: "101/084", Condition: "NM"},
 	}
 	for want, tr := range cases {
 		if got := Slug("pokemon", tr); got != want {

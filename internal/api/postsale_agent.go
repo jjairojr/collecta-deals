@@ -33,9 +33,18 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/reply", s.agentOnly(s.handleAgentReply))
 	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/handoff", s.agentOnly(s.handleAgentHandoff))
 	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/link", s.agentOnly(s.handleAgentLink))
+	mux.HandleFunc("GET /api/postsale/agent/pending", s.agentPeek(s.handleAgentPending))
 }
 
 func (s *Server) agentOnly(h http.HandlerFunc) http.HandlerFunc {
+	return s.agentGate(h, true)
+}
+
+func (s *Server) agentPeek(h http.HandlerFunc) http.HandlerFunc {
+	return s.agentGate(h, false)
+}
+
+func (s *Server) agentGate(h http.HandlerFunc, seen bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := s.PostSale.AgentToken
 		if token == "" {
@@ -47,9 +56,11 @@ func (s *Server) agentOnly(h http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		s.postSale.mu.Lock()
-		s.postSale.agentSeen = s.psNow()
-		s.postSale.mu.Unlock()
+		if seen {
+			s.postSale.mu.Lock()
+			s.postSale.agentSeen = s.psNow()
+			s.postSale.mu.Unlock()
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, agentBodyLimit)
 		h(w, r)
 	}
@@ -793,30 +804,14 @@ func (s *Server) sweepOutbox(all []orders.Order, now time.Time) {
 		s.logPostSale("conversas: %v", err)
 		return
 	}
-	quiet := postsale.Quiet(now, saoPaulo)
-	pending := 0
 	for _, c := range convs {
-		if c.State == conversations.StateCompose {
-			pending++
-		}
 		for _, m := range c.Messages {
-			if m.Status != conversations.MsgQueued {
-				continue
-			}
-			if m.Kind == conversations.KindReply && now.Sub(m.At) > queuedReplyTTL {
+			if m.Status == conversations.MsgQueued && m.Kind == conversations.KindReply && now.Sub(m.At) > queuedReplyTTL {
 				s.expireQueued(c, m)
-				continue
 			}
-			if m.Kind == conversations.KindOffer && quiet {
-				continue
-			}
-			pending++
 		}
 	}
-	if !quiet {
-		pending += len(trackingDue(all, now))
-	}
-	s.alertIfAgentStale(pending, now)
+	s.alertIfAgentStale(pendingWorkOf(all, convs, now), now)
 }
 
 func (s *Server) expireQueued(c conversations.Conversation, m conversations.Message) {
@@ -835,18 +830,18 @@ func (s *Server) expireQueued(c conversations.Conversation, m conversations.Mess
 	s.notify("Pós-venda: mensagem não entregue", fmt.Sprintf("%s (pedido #%d): o OpenBot não entregou em 2h: %s", postsale.FirstName(c.Name), c.OrderNumber, m.Text))
 }
 
-func (s *Server) alertIfAgentStale(pending int, now time.Time) {
-	s.postSale.mu.Lock()
-	if s.postSale.outboxSince.IsZero() {
-		s.postSale.outboxSince = now
+func (s *Server) alertIfAgentStale(p pendingWork, now time.Time) {
+	if p.Total() == 0 {
+		return
 	}
+	s.postSale.mu.Lock()
 	seen := s.postSale.agentSeen
 	reference := seen
-	if reference.Before(s.postSale.outboxSince) {
-		reference = s.postSale.outboxSince
+	if reference.Before(p.OldestAt) {
+		reference = p.OldestAt
 	}
 	alerted := s.postSale.agentAlertAt
-	if pending == 0 || now.Sub(reference) <= agentStaleAfter || (!alerted.IsZero() && now.Sub(alerted) < agentAlertEvery) {
+	if now.Sub(reference) <= agentStaleAfter || (!alerted.IsZero() && now.Sub(alerted) < agentAlertEvery) {
 		s.postSale.mu.Unlock()
 		return
 	}
@@ -856,5 +851,6 @@ func (s *Server) alertIfAgentStale(pending int, now time.Time) {
 	if !seen.IsZero() {
 		last = "visto às " + seen.In(saoPaulo).Format("15:04")
 	}
-	s.notify("OpenBot parado", fmt.Sprintf("%d mensagem(ns) do pós-venda esperando o OpenBot (%s). Confira se o Mac está acordado e o OpenBot aberto.", pending, last))
+	waiting := int(now.Sub(p.OldestAt).Minutes())
+	s.notify("OpenBot parado", fmt.Sprintf("%d item(ns) do pós-venda esperando o OpenBot há %d min (%s). Confira se o Mac está acordado, o OpenBot aberto e o vigia rodando.", p.Total(), waiting, last))
 }

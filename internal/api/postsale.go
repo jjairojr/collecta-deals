@@ -46,7 +46,6 @@ type postSaleState struct {
 	now          func() time.Time
 	agentSeen    time.Time
 	agentAlertAt time.Time
-	outboxSince  time.Time
 }
 
 func (s *Server) psNow() time.Time {

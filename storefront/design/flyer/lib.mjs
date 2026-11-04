@@ -30,7 +30,7 @@ export function target(medium) {
   return `https://www.${SITE}/?utm_source=flyer&utm_medium=${medium}`;
 }
 
-async function dataURI(path, mime) {
+export async function dataURI(path, mime) {
   const buf = await readFile(path);
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
@@ -120,19 +120,20 @@ async function chrome(args) {
   ]);
 }
 
-export async function emit({ name, html, pdf, png }) {
-  const htmlPath = join(out, `${name}.html`);
+export async function emit({ name, html, pdf, png, dir }) {
+  const target = dir ?? out;
+  const htmlPath = join(target, `${name}.html`);
   await writeFile(htmlPath, html);
   if (pdf) {
     await chrome([
-      `--print-to-pdf=${join(out, `${name}.pdf`)}`,
+      `--print-to-pdf=${join(target, `${name}.pdf`)}`,
       "--no-pdf-header-footer",
       `file://${htmlPath}`,
     ]);
   }
   if (png) {
     await chrome([
-      `--screenshot=${join(out, `${name}.png`)}`,
+      `--screenshot=${join(target, `${name}.png`)}`,
       `--window-size=${png.w},${png.h}`,
       `--force-device-scale-factor=${png.scale ?? 4}`,
       `file://${htmlPath}`,

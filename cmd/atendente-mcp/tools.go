@@ -24,7 +24,7 @@ import (
 //go:embed instructions.md
 var instructions string
 
-const serverInstructions = "Você é o atendente da Collecta TCG no WhatsApp e na DM do Instagram. Antes de qualquer outra coisa, chame a ferramenta modo da collecta-loja. O campo regras do resultado traz as regras completas do atendimento: leia inteiras e siga todas, do começo ao fim. Sem as regras não abra conversa nem mande mensagem."
+const serverInstructions = "Você é o atendente da Collecta TCG no WhatsApp e na DM do Instagram. Antes de qualquer outra coisa, chame a ferramenta modo da collecta-loja. O campo regras do resultado traz as regras da rodada: leia inteiras e siga todas. As regras de cada caso chegam no campo regras da ferramenta do caso: sempre que vier, leia e siga. Sem as regras não abra conversa nem mande mensagem."
 
 const (
 	catalogTTL    = 60 * time.Second
@@ -90,7 +90,7 @@ func (a *app) server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "collecta-loja", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "modo",
-		Description: "Diz o modo do atendente (rascunho, teste ou ao_vivo), a data e hora em Goiânia e a versão e o texto completo das regras (siga todas). Chame no começo de cada rodada, antes de qualquer outra coisa.",
+		Description: "Diz o modo do atendente (rascunho, teste ou ao_vivo), a data e hora em Goiânia, a versão das regras e as regras da rodada (siga todas). Chame no começo de cada rodada, antes de qualquer outra coisa.",
 	}, a.toolMode)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "buscar_estoque",
@@ -102,8 +102,12 @@ func (a *app) server() *mcp.Server {
 	}, a.toolHighlights)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "novidades",
-		Description: "As novidades que valem hoje, escritas pelo dono: situação e horário da loja física, pré-vendas, cupons, promoções, produtos que vão chegar. Use para responder e para puxar assunto quando combinar.",
+		Description: "As novidades que valem hoje, escritas pelo dono (situação e horário da loja física, pré-vendas, cupons, promoções, produtos que vão chegar), e as regras de conversa no campo regras. Chame uma vez na rodada antes de responder qualquer cliente.",
 	}, a.toolNews)
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "regras",
+		Description: "Devolve as regras de um caso: instagram (quando há DM não lida), carrinhos (quando chega a mensagem [CARRINHOS]), conversa ou posvenda.",
+	}, a.toolRules)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "registrar_origem",
 		Description: "Anota como um cliente novo achou a loja (Instagram, Google, indicação...). Chame quando a pessoa responder. Se vier ja_registrado = true, essa pessoa já tinha respondido antes.",
@@ -143,7 +147,7 @@ func (a *app) toolMode(_ context.Context, _ *mcp.CallToolRequest, _ noInput) (*m
 		Versao: rulesVersion,
 		Modo:   a.cfg.Mode,
 		Agora:  fmt.Sprintf("%s %s", weekdays[now.Weekday()], now.Format("02/01 15:04")),
-		Regras: instructions,
+		Regras: rules[rulesRound],
 	}, nil
 }
 

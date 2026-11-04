@@ -175,7 +175,7 @@ func TestToolsAndInstructions(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	sort.Strings(names)
-	want := "autorizar_envio,buscar_estoque,chamar_humano,destaques,historico_bot,modo,novidades,registrar_origem"
+	want := "autorizar_envio,buscar_estoque,chamar_humano,destaques,historico_bot,modo,novidades,registrar_origem,regras"
 	if got := strings.Join(names, ","); got != want {
 		t.Fatalf("tools = %s, want %s", got, want)
 	}
@@ -194,8 +194,57 @@ func TestModeReportsVersionAndTime(t *testing.T) {
 	if out.Modo != modeTest || out.Agora != "segunda 02/11 15:00" || len(out.Versao) != 8 {
 		t.Fatalf("modo = %+v", out)
 	}
-	if out.Regras != instructions {
-		t.Fatal("modo devia devolver as regras inteiras")
+	if out.Regras != rules[rulesRound] || !strings.Contains(out.Regras, "## A cada rodada") || !strings.Contains(out.Regras, "## Regras que nunca mudam") {
+		t.Fatal("modo devia devolver as regras da rodada")
+	}
+	if strings.Contains(out.Regras, "## Como falar") || strings.Contains(out.Regras, "## Pós-venda") || len(out.Regras) > 8000 {
+		t.Fatalf("modo devolveu regras demais: %d bytes", len(out.Regras))
+	}
+}
+
+func TestRulesSplitKeepsEverySection(t *testing.T) {
+	total := 0
+	for _, text := range rules {
+		total += len(text)
+	}
+	if want := len(strings.TrimSpace(instructions)); total < want-100 || total > want {
+		t.Fatalf("grupos somam %d bytes, regras têm %d", total, want)
+	}
+	for _, line := range strings.Split(instructions, "\n") {
+		heading, ok := strings.CutPrefix(line, "## ")
+		if !ok {
+			continue
+		}
+		found := 0
+		for _, text := range rules {
+			if strings.Contains(text, "## "+heading+"\n") {
+				found++
+			}
+		}
+		if found != 1 {
+			t.Fatalf("seção %q aparece em %d grupos", heading, found)
+		}
+	}
+	if _, err := splitRules("## Seção nova\ntexto\n"); err == nil {
+		t.Fatal("seção sem grupo aceita")
+	}
+}
+
+func TestRulesTool(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[rulesOutput](t, f, "regras", map[string]string{"secao": " Instagram "})
+	if errText != "" || out.Secao != "instagram" || out.Regras != rules[rulesInstagram] {
+		t.Fatalf("instagram = %+v %q", out, errText)
+	}
+	out, _ = callTool[rulesOutput](t, f, "regras", map[string]string{"secao": "posvenda"})
+	for _, g := range []string{rulesPostSaleCompose, rulesPostSaleDelivery, rulesPostSaleResponses} {
+		if !strings.Contains(out.Regras, rules[g]) {
+			t.Fatalf("posvenda sem %s", g)
+		}
+	}
+	_, errText = callTool[rulesOutput](t, f, "regras", map[string]string{"secao": "tudo"})
+	if !strings.Contains(errText, "seção desconhecida") {
+		t.Fatalf("error = %q", errText)
 	}
 }
 
@@ -432,6 +481,14 @@ func newsTitles(t *testing.T, f *fixture) []string {
 		titles = append(titles, n.Titulo)
 	}
 	return titles
+}
+
+func TestNewsCarriesConversationRules(t *testing.T) {
+	f := newFixture(t, modeLive)
+	out, errText := callTool[newsOutput](t, f, "novidades", nil)
+	if errText != "" || out.Regras != rules[rulesConversation] || !strings.Contains(out.Regras, "## Como falar") || !strings.Contains(out.Regras, "## Dados da loja") {
+		t.Fatalf("novidades sem regras de conversa: %q", errText)
+	}
 }
 
 func TestNewsFilteredByDate(t *testing.T) {

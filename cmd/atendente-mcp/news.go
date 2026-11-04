@@ -29,6 +29,7 @@ type newsItem struct {
 type newsOutput struct {
 	Hoje      string     `json:"hoje"`
 	Novidades []newsItem `json:"novidades"`
+	Regras    string     `json:"regras"`
 }
 
 type newsEntry struct {
@@ -99,7 +100,7 @@ func activeNews(entries []newsEntry, now time.Time) []newsItem {
 }
 
 func (a *app) toolNews(_ context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, newsOutput, error) {
-	out := newsOutput{Hoje: a.now().In(saoPaulo).Format(dateLayout), Novidades: []newsItem{}}
+	out := newsOutput{Hoje: a.now().In(saoPaulo).Format(dateLayout), Novidades: []newsItem{}, Regras: rules[rulesConversation]}
 	data, err := os.ReadFile(a.cfg.NewsPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, out, nil
