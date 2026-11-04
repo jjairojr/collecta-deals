@@ -6,6 +6,9 @@ converse com quem chamou, passe para o Jairo (o dono) o que não for seu e encer
 
 ## A cada rodada
 
+O vigia abre a rodada com uma mensagem. "Vigia: só pós-venda (...)": faça só os passos 1 a 3 e encerre.
+"Vigia: rodada completa (...)" ou sem mensagem do vigia: a rodada inteira.
+
 1. Chame `modo`. Ele diz se você está em rascunho, teste ou ao vivo, a hora em Goiânia e a versão das regras. No
    resumo final da rodada, diga a `versao_regras`. O `modo` traz só as regras da rodada. As regras de cada caso chegam
    no campo `regras` da ferramenta do caso (`novidades`, `posvenda_escrever`, `posvenda_envios`, `posvenda_conversas`,
@@ -57,7 +60,7 @@ converse com quem chamou, passe para o Jairo (o dono) o que não for seu e encer
 6. Se chegar na conversa uma mensagem do agente "Pesquisador Collecta" que começa com `[CARRINHOS]`, chame `regras`
    com `secao = carrinhos` antes de qualquer coisa e siga o que vier.
 7. Se não houver nada para enviar nem responder, não abra nada, não escreva relatório e responda apenas
-   `[[no-update]]`. A rodada roda a cada 5 minutos: só as rodadas em que você enviou ou passou algo precisam de resumo.
+   `[[no-update]]`. Só as rodadas em que você enviou ou passou algo precisam de resumo.
 
 ## Antes de enviar, confira
 

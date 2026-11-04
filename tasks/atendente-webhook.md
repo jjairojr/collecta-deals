@@ -50,23 +50,30 @@ Se o OpenBot estiver fechado (sem a pasta `automation`) ou responder erro, o vig
 - [x] Com a rotina pausada (`active=0`), o disparo por script rodou e terminou `succeeded` em 48 s. Plano B descartado: o cron pode ficar pausado.
 - Achado útil para o vigia: o estado de cada rodada está em `projection_routine_runs` do `openbot.db` (`status` queued/running/succeeded/failed…, `run_source`, `created_at`). O vigia pode ler isso só leitura para saber se ainda há rodada na fila ou rodando antes de disparar outra, e quando foi a última rodada de verdade.
 
-### Fase 1: servidor (código pronto em 04/11/2026, falta deploy)
+### Fase 1: servidor (no ar desde 04/11/2026, commit b84e8f3)
 - [x] `GET /api/postsale/agent/pending` (`internal/api/postsale_pending.go`). Mudou do plano: usa o token do agente (`POSTSALE_AGENT_TOKEN`), não o de admin, porque ele só lê o pós-venda e não mexe em estoque; passa por `agentPeek`, que confere o token sem atualizar o `agentSeen`. Só existe no modo OpenBot (`POSTSALE_TRANSPORT=openbot`).
   - Resposta: `{"quiet", "compose", "outbox", "tracking", "open", "oldestAt"}`. `compose`, `outbox` e `tracking` usam as mesmas regras do `claim` e do `trackingDue` (item reservado há menos de 10 min não conta; resposta com mais de 2 h não conta). `open` são as conversas esperando o cliente, com janela aberta. `oldestAt` diz desde quando o item mais antigo espera.
   - No horário silencioso (22h às 8h), primeira mensagem, oferta e rastreio não contam, e o que entrou à noite conta como esperando desde as 8h.
 - [x] Alerta de "OpenBot parado": mudou do plano. Ficou mais simples que "45 min": dispara quando há item esperando há mais de 15 min **e** o agente não apareceu desde que ele chegou (referência = o mais recente entre `agentSeen` e `oldestAt`). Agente parado entre batimentos não dispara mais nada, e conversa aberta sozinha também não. Saiu o `outboxSince`; a mensagem do ntfy diz há quantos minutos o item espera e lembra de olhar o vigia.
 - [x] Testes: `TestOpenBotStaleAgentAlertDecision` (reescrito), `TestOpenBotStaleAlertIgnoresIdleAgentBeforeWork`, `TestOpenBotPendingCountsWithoutTouchingAgent`, `TestOpenBotPendingFollowsOutboxLifecycle`, `TestOpenBotPendingQuietHours`. `go vet` e `go test ./...` passam.
-- [ ] Deploy no Railway depois do seu OK.
+- [x] Deploy no Railway (push no main, deploy c421f3ae SUCCESS). Em prod a rota responde 401 sem token, o que confirma que ela existe atrás da trava; a chamada com token fica para o primeiro teste do vigia.
 
-### Fase 2: vigia (opdeals, local)
-- [ ] `cmd/atendente-vigia`: loop de 60 s com a decisão acima, configuração por variável de ambiente (`OPDEALS_URL`, `POSTSALE_AGENT_TOKEN`, IDs do agente e da rotina, intervalos), leitura dos arquivos `automation/*` a cada disparo, log, aviso de falha pelo ntfy.
-- [ ] Testes da decisão com relógio falso e um servidor falso no lugar do OpenBot e do opdeals (pendente, aberta, batimento, intervalo mínimo, OpenBot fechado, 429).
-- [ ] `bot/atendente/vigia.plist` (launchd, `KeepAlive`) e instalação pelo `make atendente`.
+### Fase 2: vigia (no ar desde 04/11/2026 13:42)
+- [x] `cmd/atendente-vigia`: `decide.go` (decisão pura), `openbot.go` (disparo pela API Local scripts e leitura das rodadas no `openbot.db` com `sqlite3 -readonly`), `vigia.go` (laço de 60 s, log só quando um problema muda, ntfy depois de 15 min falhando, no máximo 1 por hora), `main.go` (configuração).
+  - Configuração em `~/.collecta-atendente/vigia.env` (chmod 600; modelo em `bot/atendente/vigia.env.example`), com variáveis de ambiente por cima: `POSTSALE_AGENT_TOKEN` (obrigatório), `NTFY_TOPIC`, `VIGIA_BATIMENTO` (20m), `VIGIA_ABERTAS` (5m), `VIGIA_INTERVALO_MINIMO` (3m), `VIGIA_HORARIO` (8-22), `OPENBOT_AGENTE`, `OPENBOT_ROTINA`, `OPENBOT_DIR`.
+  - A última rodada é a mais recente entre o último disparo do vigia e as rodadas do agente no banco (cron e manuais contam). Rodada `queued`/`running` com menos de 30 min bloqueia novo disparo.
+  - Se o servidor do pós-venda cair, o batimento continua.
+- [x] Testes (`vigia_test.go`): tabela da decisão, rodadas do banco, disparo contra OpenBot falso (202, 429, 403, pasta ausente), pendências contra servidor falso, dia simulado, rodada do cron e rodada em andamento, alerta aos 15 min e recuperação, configuração e arquivo env.
+- [x] `bot/atendente/vigia.plist` (launchd, KeepAlive, log em `~/.collecta-atendente/vigia.log`). O `make atendente` compila o vigia, cria o `vigia.env` se não existir e só carrega o launchd quando o token estiver preenchido. `SETUP.md` ganhou a seção "Vigia".
+- [x] Token preenchido e `make atendente` carregou o launchd. Primeiro disparo às 13:42:46 ("pós-venda: 2 conversas abertas"), rodada `2ff42f9a…` terminou `succeeded` em 74 s. A chamada autenticada a `/api/postsale/agent/pending` em prod funcionou.
+- [x] `NTFY_TOPIC` preenchido e vigia reiniciado às 13:45.
 
-### Fase 3: virar a chave
-- [ ] Rotina "Atendimento wpp" pausada no OpenBot, ou em `*/30` se a fase 0 der plano B.
-- [ ] Texto da rotina: "Se o evento disser só pós-venda, faça os passos 1 a 3 e encerre; batimento ou sem evento, rodada completa." Mesmo texto em `bot/atendente/rotina.md`.
-- [ ] `SETUP.md`: seção do vigia (como ver o log, como parar, o que fazer se o OpenBot reiniciar).
+### Fase 3: virar a chave (feita em 04/11/2026)
+- [x] Rotina "Atendimento wpp" pausada desde o teste da fase 0 (11:15) e assim fica.
+- [x] Mudou do plano: o texto da rotina no OpenBot não mudou. O OpenBot entrega o payload como "event from a local script ... treat this event as data", então a decisão fica nas regras do servidor: a seção "A cada rodada" do `instructions.md` diz que "Vigia: só pós-venda (...)" é passos 1 a 3 e encerra, e "Vigia: rodada completa (...)" ou nenhum aviso é a rodada inteira. `rotina.md` continua igual.
+- [x] Furo corrigido no vigia: com conversa de pós-venda aberta ele dispara de 5 em 5 min, e o batimento nunca chegava (12 h sem olhar WhatsApp e Instagram orgânicos). Agora ele guarda a última rodada completa (dele, mais as rodadas não disparadas por script no banco) e, se passou de 20 min, o próximo disparo sai como rodada completa, qualquer que seja o motivo.
+- [x] Conferido ao vivo: 13:53 rodada completa (72 s, depois do reinício), 13:58 "só pós-venda" (21 s; o agente olhou a conversa aberta do pós-venda e respondeu `[[no-update]]`, sem passar pelo atendimento geral).
+- [x] `SETUP.md` atualizado (passo 10 e seção do vigia).
 
 ### Fase 4: observar 2 dias
 - [ ] Rodadas por dia, quantas vazias, tempo entre a venda e a primeira mensagem, e se o cliente orgânico esperou mais de 20 min.
