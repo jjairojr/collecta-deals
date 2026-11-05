@@ -167,6 +167,7 @@ function ChannelBadges({ conversation: c }: { conversation: Conversation }) {
   return (
     <>
       <Badge variant={isLiga(c) ? "amber" : "sky"}>{isLiga(c) ? "Liga" : "Site"}</Badge>
+      {c.cancelled && <Badge variant="rose">Cancelado</Badge>}
       {c.pickup && (
         <Badge variant="emerald">
           <Package className="h-3 w-3" /> Retirada

@@ -1,5 +1,7 @@
 # Atendente acordado por evento, não por cron (plano)
 
+> **Encerrado em 04/11/2026: voltou para a rotina do OpenBot (cron de 5 min).** O vigia rodou das 13:42 às ~14:45 e funcionou como desenhado, mas o dono preferiu a rotina: para cliente novo o vigia é cego (não existe sinal de mensagem nova do WhatsApp Web sem LLM), então ele virava um relógio de 20 min, mais lento que o cron de 5. O código do vigia saiu do repositório (está no commit 9ffec7b, se um dia voltar) e o launchd foi removido. Ficaram: o modo enxuto das regras, a rota `GET /api/postsale/agent/pending` (sem uso hoje) e o alerta de "OpenBot parado" que só dispara com item esperando 15 min sem o agente aparecer. Caminho futuro, se quiser evento de verdade: contador de não lidas do WhatsApp Desktop no Dock (`lsappinfo`), não testado.
+
 Base: pesquisa de 04/11/2026 no OpenBot 0.60.0 (bundle extraído), no `openbot.db` (só leitura) e no servidor do pós-venda.
 
 ## Situação hoje

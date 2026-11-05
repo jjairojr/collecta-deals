@@ -133,13 +133,14 @@ type ligaOrderItem struct {
 }
 
 type ligaOrder struct {
-	Code      string          `json:"code"`
-	FirstName string          `json:"firstName"`
-	Phone     string          `json:"phone"`
-	PaidAt    string          `json:"paidAt"`
-	Pickup    bool            `json:"pickup"`
-	Shipped   bool            `json:"shipped"`
-	Items     []ligaOrderItem `json:"items"`
+	Code        string          `json:"code"`
+	FirstName   string          `json:"firstName"`
+	Phone       string          `json:"phone"`
+	PaidAt      string          `json:"paidAt,omitempty"`
+	CancelledAt string          `json:"cancelledAt,omitempty"`
+	Pickup      bool            `json:"pickup"`
+	Shipped     bool            `json:"shipped"`
+	Items       []ligaOrderItem `json:"items"`
 }
 
 type ligaImport struct {

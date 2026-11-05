@@ -63,41 +63,8 @@ senhas. Os mesmos arquivos servem para os dois jeitos.
    publicar site ou mensagem para outros agentes.
 9. **Testar a trava.** No chat do agente: "rode ls no terminal" e "leia o arquivo ~/.ssh/config". Os dois têm que ser
    bloqueados.
-10. **Deixar rodando.** No OpenBot: "Manter computador acordado" ligado, Mac na tomada. Rotina nova com o texto de
-    `rotina.md`, **pausada**: quem dispara é o vigia (seção abaixo). Com a tampa fechada ou o Mac dormindo, o
-    atendente para.
-
-## Vigia (acorda o atendente sem cron)
-
-O `atendente-vigia` (`cmd/atendente-vigia`) roda no launchd do seu usuário e decide quando acordar o atendente, sem
-usar LLM. A cada minuto, das 8h às 22h, ele olha o pós-venda no servidor (`/api/postsale/agent/pending`) e as rodadas
-do agente no banco do OpenBot (só leitura), e dispara a rotina pela API "Local scripts":
-
-- pós-venda pendente (primeira mensagem, fila, rastreio): na hora;
-- conversa de pós-venda aberta: de 5 em 5 min;
-- rodada completa (WhatsApp e Instagram) no máximo 20 min depois da última completa; as outras são só de pós-venda;
-- nunca com rodada em andamento nem menos de 3 min depois da última (conta também as rodadas manuais).
-
-O vigia manda junto um texto: "Vigia: só pós-venda (...)" ou "Vigia: rodada completa (...)". O OpenBot entrega isso
-como dado de script, e quem diz ao agente o que fazer com cada um é a seção "A cada rodada" de
-`cmd/atendente-mcp/instructions.md`. Se mudar o texto do vigia (`cmd/atendente-vigia/decide.go`), mude a regra junto.
-
-Para ligar:
-
-1. No OpenBot: Agents → Local scripts. Default desligado e só o **Atendente Collecta** em "On".
-2. `make atendente` cria `~/.collecta-atendente/vigia.env` (chmod 600). Preencha `POSTSALE_AGENT_TOKEN` (o mesmo do
-   painel MCP do `collecta-loja`) e `NTFY_TOPIC`, e rode `make atendente` de novo: ele carrega o
-   `~/Library/LaunchAgents/com.collecta.atendente-vigia.plist`.
-3. Deixe a rotina "Atendimento wpp" pausada: o disparo pelo vigia roda mesmo com ela pausada.
-
-No dia a dia:
-
-- Log: `tail -f ~/.collecta-atendente/vigia.log` (cada disparo com o motivo e o id da rodada; problemas só quando
-  mudam).
-- Parar: `launchctl bootout gui/$(id -u)/com.collecta.atendente-vigia`. Voltar: `make atendente`.
-- OpenBot fechado ou "Local scripts" desligado: o vigia anota e tenta de novo a cada minuto; depois de 15 min sem
-  conseguir, avisa no ntfy (no máximo 1 vez por hora). Ao reabrir o OpenBot ele volta sozinho: a porta e o token
-  da API são lidos de `~/Library/Application Support/OpenBot/automation/` a cada disparo.
+10. **Deixar rodando.** No OpenBot: "Manter computador acordado" ligado, Mac na tomada. Rotina nova: a cada 5 minutos,
+    das 8h às 22h, com o texto de `rotina.md`. Com a tampa fechada ou o Mac dormindo, o atendente para.
 
 ## Ligar em etapas
 

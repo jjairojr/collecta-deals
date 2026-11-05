@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,13 +20,14 @@ const (
 )
 
 type ligaOrderIn struct {
-	Code      string               `json:"code"`
-	FirstName string               `json:"firstName"`
-	Phone     string               `json:"phone"`
-	PaidAt    time.Time            `json:"paidAt"`
-	Pickup    bool                 `json:"pickup"`
-	Shipped   bool                 `json:"shipped"`
-	Items     []conversations.Item `json:"items"`
+	Code        string               `json:"code"`
+	FirstName   string               `json:"firstName"`
+	Phone       string               `json:"phone"`
+	PaidAt      time.Time            `json:"paidAt,omitzero"`
+	CancelledAt time.Time            `json:"cancelledAt,omitzero"`
+	Pickup      bool                 `json:"pickup"`
+	Shipped     bool                 `json:"shipped"`
+	Items       []conversations.Item `json:"items"`
 }
 
 type ligaImportResult struct {
@@ -79,6 +81,9 @@ func (s *Server) handleLigaOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "corpo inválido: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	sort.SliceStable(in.Orders, func(i, j int) bool {
+		return in.Orders[i].CancelledAt.IsZero() && !in.Orders[j].CancelledAt.IsZero()
+	})
 	var out ligaImportResult
 	for _, o := range in.Orders {
 		if s.importLigaOrder(o) {
@@ -97,12 +102,17 @@ func (s *Server) importLigaOrder(o ligaOrderIn) bool {
 	code, number, ok := ligaCode(o.Code)
 	items := ligaItems(o.Items)
 	first := postsale.FirstName(o.FirstName)
-	if !ok || first == "" || len(items) == 0 {
+	cancelled := !o.CancelledAt.IsZero()
+	at := o.PaidAt
+	if cancelled {
+		at = o.CancelledAt
+	}
+	if !ok || first == "" || len(items) == 0 || (cancelled && !o.PaidAt.IsZero()) {
 		return false
 	}
 	orderID := ligaOrderIDPfx + code
 	_, created, err := s.PostSale.Conversations.Create(func(existing []conversations.Conversation) (conversations.Conversation, bool) {
-		if !postsale.EligibleLigaOrder(orderID, o.Phone, o.PaidAt, existing, s.psNow()) {
+		if !postsale.EligibleLigaOrder(orderID, o.Phone, at, existing, s.psNow()) {
 			return conversations.Conversation{}, false
 		}
 		return conversations.Conversation{
@@ -112,7 +122,8 @@ func (s *Server) importLigaOrder(o ligaOrderIn) bool {
 			OrderID:     orderID,
 			OrderNumber: number,
 			Pickup:      o.Pickup,
-			Shipped:     o.Shipped,
+			Shipped:     o.Shipped && !cancelled,
+			Cancelled:   cancelled,
 			Items:       items,
 			State:       conversations.StateCompose,
 			Messages:    []conversations.Message{},

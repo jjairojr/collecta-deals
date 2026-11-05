@@ -323,3 +323,85 @@ func TestComposeExpiresAfterDraftTTL(t *testing.T) {
 		t.Fatalf("expired compose listed %+v", list)
 	}
 }
+
+func cancelledLigaOrder(code string, cancelledAt time.Time) ligaOrderIn {
+	o := ligaOrder(code, time.Time{})
+	o.CancelledAt = cancelledAt
+	o.Shipped = true
+	return o
+}
+
+func TestLigaImportCancelledOrder(t *testing.T) {
+	f := openBotServer(t)
+	paidThenCancelled := cancelledLigaOrder("12373980", f.now.Add(-time.Hour))
+	paidThenCancelled.PaidAt = f.now.Add(-3 * time.Hour)
+	paidThenCancelled.Phone = "(11) 97777-1111"
+	old := cancelledLigaOrder("12380118", f.now.Add(-25*time.Hour))
+	old.Phone = "(21) 96666-2222"
+	if got := f.importLiga(t, cancelledLigaOrder("12391287", f.now.Add(-30*time.Minute)), paidThenCancelled, old); got.Created != 1 || got.Skipped != 2 {
+		t.Fatalf("import %+v", got)
+	}
+	c := f.only(t)
+	if !c.Cancelled || c.Shipped || c.Channel != conversations.ChannelLiga || c.OrderID != "liga:12391287" || c.State != conversations.StateCompose {
+		t.Fatalf("cancelled conversation %+v", c)
+	}
+	list := f.composeList(t)
+	if len(list.Items) != 1 || !list.Items[0].Cancelled || list.Items[0].Phone != "5562998274848" || list.Items[0].CanAddHow != cancelHow {
+		t.Fatalf("compose list %+v", list)
+	}
+	if rec := f.agentPost(t, "/api/postsale/agent/conversations/"+c.ID+"/compose", map[string]string{"text": composedText}); rec.Code != http.StatusOK {
+		t.Fatalf("compose %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := f.do(t, http.MethodPost, "/api/conversations/"+c.ID+"/approve", nil, admin()); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+	}
+	claim := f.claim(t)
+	if len(claim.Items) != 1 {
+		t.Fatalf("claim %+v", claim)
+	}
+	f.agentPost(t, "/api/postsale/agent/outbox/"+claim.Items[0].ID+"/delivered", nil)
+	inbound := struct {
+		Messages []agentTurn `json:"messages"`
+	}{Messages: []agentTurn{{Text: "o pix expirou e esqueci"}}}
+	resp := decodeBody[agentInboundResponse](t, f.agentPost(t, "/api/postsale/agent/conversations/"+c.ID+"/inbound", inbound))
+	if resp.Action != "answer" || resp.Context == nil || !resp.Context.Cancelled || resp.Context.CanAddHow != cancelHow {
+		t.Fatalf("inbound %+v", resp)
+	}
+}
+
+func TestLigaImportPaidBeforeCancelledForSameBuyer(t *testing.T) {
+	f := openBotServer(t)
+	if got := f.importLiga(t, cancelledLigaOrder("12389418", f.now.Add(-time.Hour)), ligaOrder("12390000", f.now.Add(-30*time.Minute))); got.Created != 1 || got.Skipped != 1 {
+		t.Fatalf("import %+v", got)
+	}
+	if c := f.only(t); c.Cancelled || c.OrderNumber != 12390000 {
+		t.Fatalf("buyer who paid a new order got the cancel message: %+v", c)
+	}
+}
+
+func TestAgentSkipClosesOnlyUnwrittenConversation(t *testing.T) {
+	f := openBotServer(t)
+	f.importLiga(t, cancelledLigaOrder("12386457", f.now.Add(-time.Hour)))
+	c := f.only(t)
+	path := "/api/postsale/agent/conversations/" + c.ID + "/skip"
+	if rec := f.agentPost(t, path, map[string]string{"reason": " "}); rec.Code != http.StatusBadRequest {
+		t.Fatalf("empty reason %d", rec.Code)
+	}
+	if rec := f.agentPost(t, path, map[string]string{"reason": "carrinho abordado há 2 dias"}); rec.Code != http.StatusOK {
+		t.Fatalf("skip %d %s", rec.Code, rec.Body.String())
+	}
+	c = f.only(t)
+	if c.State != conversations.StateClosed || c.Outcome != conversations.OutcomeSkipped || !strings.Contains(c.Messages[len(c.Messages)-1].Text, "carrinho abordado") {
+		t.Fatalf("after skip %+v", c)
+	}
+	if rec := f.agentPost(t, path, map[string]string{"reason": "de novo"}); rec.Code != http.StatusConflict {
+		t.Fatalf("second skip %d", rec.Code)
+	}
+	if list := f.composeList(t); len(list.Items) != 0 {
+		t.Fatalf("skipped still listed %+v", list)
+	}
+	other := ligaOrder("12392243", f.now.Add(-time.Minute))
+	if got := f.importLiga(t, other); got.Created != 1 {
+		t.Fatalf("skipped conversation blocked a later paid order for the same phone: %+v", got)
+	}
+}

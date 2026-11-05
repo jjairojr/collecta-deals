@@ -258,9 +258,9 @@ Liga bloqueada na rodada: não mexa na fila; as tarefas ficam pendentes para a p
 ## Pós-venda da Liga
 
 1. Da listagem da Liga, separe os pedidos pagos nas últimas 24 h (pela hora de `agora`) com status
-   `Pagamento efetuado - Aguardando envio` (`enviado: false`) ou `Enviado` (`enviado: true`). Retirado no Balcão,
-   Cancelado e Aguardando Pagamento ficam de fora. Entram também os que você não baixou nesta rodada (já baixados
-   antes): o servidor ignora o que já recebeu.
+   `Pagamento efetuado - Aguardando envio` (`enviado: false`) ou `Enviado` (`enviado: true`). Retirado no Balcão e
+   Aguardando Pagamento ficam de fora; Cancelado só entra pelo passo 4. Entram também os que você não baixou nesta
+   rodada (já baixados antes): o servidor ignora o que já recebeu.
 2. `retirada: true` quando a forma de envio da listagem diz `Retirada`/`Retirar no balcão`; transportadora, `false`.
 3. Reaproveite o detalhe já guardado em `window.__lv`; não abra o mesmo pedido duas vezes. Se precisar abrir, mesmo
    ritmo de 7 a 10 s. O script recorta dentro da página e devolve um objeto já filtrado, nunca o bloco do cliente:
@@ -270,9 +270,18 @@ Liga bloqueada na rodada: não mexa na fila; as tarefas ficam pendentes para a p
    - `itens`: nome e qty de cada item de `Itens do Pedido` (ex. `Shanks (OP09-004)`, 1);
    - `pago_em`: `Data do Pagamento` de `Confirmação de Pagamento` em RFC 3339 com `-03:00`. Sem hora no detalhe, use a
      hora do pedido na listagem.
-4. Uma chamada só: `posvenda_liga(pedidos)` com `codigo`, `primeiro_nome`, `telefone`, `pago_em`, `retirada`, `enviado`,
-   `itens`. Nenhum outro campo. Erro dizendo que o pós-venda não está ativo: anote e siga.
-5. No relatório, só `pós-venda Liga: N criados, M ignorados`. Nenhum nome, telefone ou item de cliente.
+4. **Cancelados.** Da mesma listagem, separe também os `Cancelado` sem data de pagamento criados nas últimas 48 h.
+   Pule o cancelado quando o mesmo cliente tem um pedido mais novo na listagem (pago ou aguardando pagamento): ele já
+   refez a compra. Para cada um que sobrou, abra o detalhe (mesmo ritmo) e veja o bloco `Histórico de Ações`:
+   - só entra se a linha for `<data hora> Sistema Status alterado para: Cancelado` (a Liga cancela sozinha umas 4 h
+     depois, quando não pagam). `COLLECTA` no lugar de `Sistema` foi a loja que cancelou: fica de fora;
+   - `cancelado_em`: essa data e hora, em RFC 3339 com `-03:00`. Deixe `pago_em` vazio;
+   - `primeiro_nome`, `telefone` e `itens` do mesmo jeito do passo 3; `retirada` e `enviado` como `false`.
+   Os cancelados vão na mesma chamada do passo 5. O servidor ignora o que tem mais de 24 h, o que já recebeu e o
+   telefone que já recebeu pós-venda na semana.
+5. Uma chamada só: `posvenda_liga(pedidos)` com `codigo`, `primeiro_nome`, `telefone`, `pago_em` ou `cancelado_em`,
+   `retirada`, `enviado`, `itens`. Nenhum outro campo. Erro dizendo que o pós-venda não está ativo: anote e siga.
+6. No relatório, só `pós-venda Liga: N criados, M ignorados`. Nenhum nome, telefone ou item de cliente.
 
 ## Relatório
 

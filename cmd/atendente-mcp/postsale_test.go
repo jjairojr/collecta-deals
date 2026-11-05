@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -23,8 +24,9 @@ type agentRequest struct {
 }
 
 type fakeAgentAPI struct {
-	mu       sync.Mutex
-	requests []agentRequest
+	mu        sync.Mutex
+	requests  []agentRequest
+	cancelled bool
 }
 
 func (a *fakeAgentAPI) handler(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +46,12 @@ func (a *fakeAgentAPI) handler(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `{"conversations":[{"conversationId":"c1","phone":"5562988887777","firstName":"Ana","orderNumber":7,"state":"waiting","windowEndsAt":"2026-11-03T02:00:00Z","lastMessages":[{"role":"assistant","text":"Oi Ana!","at":"2026-11-02T14:00:00Z"}]}]}`)
 	case strings.HasSuffix(r.URL.Path, "/inbound"):
 		_, _ = io.WriteString(w, `{"action":"answer","conversationId":"c1","context":{"firstName":"Ana","orderNumber":7,"status":"paid","bought":[{"nome":"Teach","qtd":1,"preco":250}],"offer":{"sku":"s1","name":"Teach (Parallel)","meta":"OP16","unitBRL":300},"windowOpen":true,"canAddUntil":"03/11 02:00","autoSend":false,"history":[{"role":"assistant","text":"Oi Ana!"},{"role":"customer","text":"quero"}]}}`)
+	case r.URL.Path == "/api/postsale/agent/compose" && a.cancelled:
+		_, _ = io.WriteString(w, `{"items":[
+			{"conversationId":"c10","channel":"liga","phone":"5562988887777","firstName":"Ana","orderNumber":12391287,"cancelled":true,"items":[{"name":"Budew (221/217)","qty":1}],"canAddHow":"liga, pedido cancelado sem pagamento"},
+			{"conversationId":"c11","channel":"liga","phone":"5511977776666","firstName":"Bia","orderNumber":12389418,"cancelled":true,"items":[{"name":"Dreepy (247/217)","qty":1}],"canAddHow":"liga, pedido cancelado sem pagamento"}]}`)
+	case strings.HasSuffix(r.URL.Path, "/skip"):
+		_, _ = io.WriteString(w, `{"ok":true}`)
 	case r.URL.Path == "/api/postsale/agent/compose":
 		_, _ = io.WriteString(w, `{"items":[{"conversationId":"c9","channel":"liga","firstName":"Ana","orderNumber":12376472,"pickup":true,"shipped":true,"items":[{"name":"Shanks (OP09-004)","qty":1}],"canAddHow":"liga: Adicionar a um pedido já existente"}]}`)
 	case strings.HasSuffix(r.URL.Path, "/compose"):
@@ -246,5 +254,32 @@ func TestWatchCarriesResponseRulesOnlyWithConversations(t *testing.T) {
 	}
 	if out, _ := callWith[struct{}, claimOutput](t, empty, "posvenda_envios", struct{}{}); out.Regras != "" {
 		t.Fatal("envios vazios com regras")
+	}
+}
+
+func TestComposeListSkipsCancelledAlreadyMessaged(t *testing.T) {
+	api := &fakeAgentAPI{cancelled: true}
+	f := newFixtureWith(t, modeLive, testToken, api.handler)
+	key, err := phoneKey("(62) 98888-7777")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.app.history.add(key, "Oii Ana, vi o Budew no seu carrinho", f.now.Add(-3*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	list, errText := callWith[struct{}, composeOutput](t, f, "posvenda_escrever", struct{}{})
+	if errText != "" || len(list.Items) != 1 || list.Items[0].ConversationID != "c11" || !list.Items[0].Cancelled || list.Items[0].CanAddHow != "liga, pedido cancelado sem pagamento" || !strings.Contains(list.ComoEscrever, "acabou cancelando") {
+		t.Fatalf("compose list %+v %q", list, errText)
+	}
+	reqs := api.all()
+	if len(reqs) != 2 || reqs[1].path != "/api/postsale/agent/conversations/c10/skip" || !strings.Contains(reqs[1].body, "7 dias") {
+		t.Fatalf("requests %+v", reqs)
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "5511977776666") {
+		t.Fatalf("phone leaked to the agent: %s", data)
 	}
 }

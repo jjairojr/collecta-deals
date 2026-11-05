@@ -111,7 +111,7 @@ func (a *app) server() *mcp.Server {
 	}, a.toolQueueError)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "posvenda_liga",
-		Description: "Manda para o pós-venda os pedidos da Liga pagos nas últimas 24h e ainda não retirados. Só primeiro nome, telefone, itens, data do pagamento, retirada e enviado.",
+		Description: "Manda para o pós-venda os pedidos da Liga pagos nas últimas 24h e ainda não retirados, e os cancelados pelo Sistema sem pagamento nas últimas 24h. Só primeiro nome, telefone, itens, data do pagamento ou do cancelamento, retirada e enviado.",
 	}, a.toolPostSale)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "relatorio",
@@ -592,7 +592,8 @@ type postSaleOrder struct {
 	Codigo       string         `json:"codigo" jsonschema:"número do pedido da Liga"`
 	PrimeiroNome string         `json:"primeiro_nome" jsonschema:"só o primeiro nome"`
 	Telefone     string         `json:"telefone" jsonschema:"(DD) NNNNNNNNN, do bloco Endereço do Cliente"`
-	PagoEm       string         `json:"pago_em" jsonschema:"Data do Pagamento em RFC 3339 com -03:00, ex. 2026-11-02T14:05:00-03:00"`
+	PagoEm       string         `json:"pago_em,omitempty" jsonschema:"pedido pago: Data do Pagamento em RFC 3339 com -03:00, ex. 2026-11-02T14:05:00-03:00"`
+	CanceladoEm  string         `json:"cancelado_em,omitempty" jsonschema:"pedido cancelado pelo Sistema sem pagamento: hora do 'Status alterado para: Cancelado' no Histórico de Ações, em RFC 3339 com -03:00. Deixe pago_em vazio"`
 	Retirada     bool           `json:"retirada"`
 	Enviado      bool           `json:"enviado" jsonschema:"true quando o status é Enviado"`
 	Itens        []postSaleItem `json:"itens"`
@@ -613,8 +614,15 @@ func (a *app) toolPostSale(ctx context.Context, _ *mcp.CallToolRequest, in postS
 	}
 	orders := make([]ligaOrder, 0, len(in.Pedidos))
 	for _, p := range in.Pedidos {
-		if _, err := time.Parse(time.RFC3339, p.PagoEm); err != nil {
-			return nil, postSaleOutput{}, fmt.Errorf("pedido %s: pago_em inválido %q (use 2026-11-02T14:05:00-03:00)", p.Codigo, p.PagoEm)
+		field, value := "pago_em", p.PagoEm
+		if p.CanceladoEm != "" {
+			if p.PagoEm != "" {
+				return nil, postSaleOutput{}, fmt.Errorf("pedido %s: cancelado depois de pago não vai para o pós-venda (mande só pago_em ou só cancelado_em)", p.Codigo)
+			}
+			field, value = "cancelado_em", p.CanceladoEm
+		}
+		if _, err := time.Parse(time.RFC3339, value); err != nil {
+			return nil, postSaleOutput{}, fmt.Errorf("pedido %s: %s inválido %q (use 2026-11-02T14:05:00-03:00)", p.Codigo, field, value)
 		}
 		first := strings.Fields(p.PrimeiroNome)
 		if len(first) == 0 {
@@ -625,7 +633,7 @@ func (a *app) toolPostSale(ctx context.Context, _ *mcp.CallToolRequest, in postS
 			items = append(items, ligaOrderItem{Name: it.Nome, Qty: it.Qty})
 		}
 		orders = append(orders, ligaOrder{
-			Code: p.Codigo, FirstName: first[0], Phone: p.Telefone, PaidAt: p.PagoEm,
+			Code: p.Codigo, FirstName: first[0], Phone: p.Telefone, PaidAt: p.PagoEm, CancelledAt: p.CanceladoEm,
 			Pickup: p.Retirada, Shipped: p.Enviado, Items: items,
 		})
 	}

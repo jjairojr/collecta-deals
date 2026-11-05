@@ -187,8 +187,8 @@ func EligibleForOffer(o orders.Order, existing []conversations.Conversation, now
 	return eligibleContact(o.ID, o.Buyer.Phone, existing, now)
 }
 
-func EligibleLigaOrder(orderID, phone string, paidAt time.Time, existing []conversations.Conversation, now time.Time) bool {
-	if paidAt.IsZero() || now.Sub(paidAt) > EligibleFor || paidAt.After(now.Add(time.Hour)) {
+func EligibleLigaOrder(orderID, phone string, at time.Time, existing []conversations.Conversation, now time.Time) bool {
+	if at.IsZero() || now.Sub(at) > EligibleFor || at.After(now.Add(time.Hour)) {
 		return false
 	}
 	if len(whatsapp.BrazilE164(phone)) < 12 {

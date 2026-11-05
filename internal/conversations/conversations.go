@@ -98,6 +98,7 @@ type Conversation struct {
 	OrderNumber int    `json:"orderNumber"`
 	Pickup      bool   `json:"pickup,omitempty"`
 	Shipped     bool   `json:"shipped,omitempty"`
+	Cancelled   bool   `json:"cancelled,omitempty"`
 	Items       []Item `json:"items,omitempty"`
 	State       State  `json:"state"`
 	Outcome     string `json:"outcome"`

@@ -33,6 +33,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/reply", s.agentOnly(s.handleAgentReply))
 	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/handoff", s.agentOnly(s.handleAgentHandoff))
 	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/link", s.agentOnly(s.handleAgentLink))
+	mux.HandleFunc("POST /api/postsale/agent/conversations/{id}/skip", s.agentOnly(s.handleAgentSkip))
 	mux.HandleFunc("GET /api/postsale/agent/pending", s.agentPeek(s.handleAgentPending))
 }
 
@@ -385,6 +386,7 @@ type agentContext struct {
 	FirstName   string                `json:"firstName"`
 	OrderNumber int                   `json:"orderNumber"`
 	Pickup      bool                  `json:"pickup,omitempty"`
+	Cancelled   bool                  `json:"cancelled,omitempty"`
 	CanAddHow   string                `json:"canAddHow"`
 	Status      orders.Status         `json:"status,omitempty"`
 	Rastreio    string                `json:"rastreio,omitempty"`
@@ -549,6 +551,7 @@ func (s *Server) agentContextFor(c conversations.Conversation) (*agentContext, e
 		FirstName:   postsale.FirstName(c.Name),
 		OrderNumber: c.OrderNumber,
 		Pickup:      c.Pickup,
+		Cancelled:   c.Cancelled,
 		CanAddHow:   canAddHow(c),
 		Offer:       c.Offer,
 		WindowOpen:  !c.WindowEndsAt.IsZero() && now.Before(c.WindowEndsAt),
@@ -666,6 +669,7 @@ const (
 	ligaAddHint = "pedido da Liga: oriente a usar 'Adicionar a um pedido já existente' na Liga"
 	siteAddHow  = "site: dá pra adicionar no mesmo envio sem frete extra. Se o cliente quiser, gere o link com posvenda_link depois que ele responder"
 	ligaAddHow  = "liga: o cliente faz um novo pedido na Liga e escolhe 'Adicionar a um pedido já existente'. Nunca venda fora da Liga"
+	cancelHow   = "liga, pedido cancelado sem pagamento: se ainda quiser, ele refaz o pedido na nossa loja da Liga. Confira no buscar_estoque se ainda tem antes de dizer que tem. Nunca venda fora da Liga nem pelo site neste caso"
 )
 
 func channelOf(c conversations.Conversation) string {
@@ -676,6 +680,9 @@ func channelOf(c conversations.Conversation) string {
 }
 
 func canAddHow(c conversations.Conversation) string {
+	if c.Cancelled {
+		return cancelHow
+	}
 	if c.IsLiga() {
 		return ligaAddHow
 	}
@@ -693,10 +700,12 @@ func itemsView(items []conversations.Item) []postsale.BoughtLine {
 type composeItem struct {
 	ConversationID string               `json:"conversationId"`
 	Channel        string               `json:"channel"`
+	Phone          string               `json:"phone"`
 	FirstName      string               `json:"firstName"`
 	OrderNumber    int                  `json:"orderNumber"`
 	Pickup         bool                 `json:"pickup"`
 	Shipped        bool                 `json:"shipped"`
+	Cancelled      bool                 `json:"cancelled"`
 	Items          []conversations.Item `json:"items"`
 	CanAddHow      string               `json:"canAddHow"`
 }
@@ -731,10 +740,12 @@ func (s *Server) handleAgentComposeList(w http.ResponseWriter, _ *http.Request) 
 		out.Items = append(out.Items, composeItem{
 			ConversationID: c.ID,
 			Channel:        channelOf(c),
+			Phone:          c.Phone,
 			FirstName:      postsale.FirstName(c.Name),
 			OrderNumber:    c.OrderNumber,
 			Pickup:         c.Pickup,
 			Shipped:        c.Shipped,
+			Cancelled:      c.Cancelled,
 			Items:          items,
 			CanAddHow:      canAddHow(c),
 		})
@@ -791,7 +802,42 @@ func (s *Server) handleAgentCompose(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": string(c.State)})
 }
 
+func (s *Server) handleAgentSkip(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		agentError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	reason := strings.TrimSpace(in.Reason)
+	if reason == "" {
+		agentError(w, http.StatusBadRequest, "diga por que pulou")
+		return
+	}
+	id := r.PathValue("id")
+	mu := s.conversationLock(id)
+	mu.Lock()
+	defer mu.Unlock()
+	_, err := s.PostSale.Conversations.Transact(id, func(cv *conversations.Conversation) error {
+		if cv.State != conversations.StateCompose {
+			return errNotCompose
+		}
+		cv.Messages = append(cv.Messages, conversations.NewMessage(conversations.RoleSystem, "mensagem pulada: "+reason, conversations.MsgReceived, s.psNow()))
+		cv.Close(conversations.OutcomeSkipped)
+		return nil
+	})
+	if err != nil {
+		agentConversationError(w, err)
+		return
+	}
+	writeJSON(w, map[string]bool{"ok": true})
+}
+
 func channelLabel(c conversations.Conversation) string {
+	if c.Cancelled {
+		return "Liga cancelado"
+	}
 	if c.IsLiga() {
 		return "Liga"
 	}
@@ -852,5 +898,5 @@ func (s *Server) alertIfAgentStale(p pendingWork, now time.Time) {
 		last = "visto às " + seen.In(saoPaulo).Format("15:04")
 	}
 	waiting := int(now.Sub(p.OldestAt).Minutes())
-	s.notify("OpenBot parado", fmt.Sprintf("%d item(ns) do pós-venda esperando o OpenBot há %d min (%s). Confira se o Mac está acordado, o OpenBot aberto e o vigia rodando.", p.Total(), waiting, last))
+	s.notify("OpenBot parado", fmt.Sprintf("%d item(ns) do pós-venda esperando o OpenBot há %d min (%s). Confira se o Mac está acordado, o OpenBot aberto e a rotina do atendente ligada.", p.Total(), waiting, last))
 }

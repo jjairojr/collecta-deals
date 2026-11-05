@@ -409,6 +409,24 @@ func TestPostSaleSendsOnlyAllowedFields(t *testing.T) {
 	if !strings.Contains(errText, "pago_em inválido") {
 		t.Fatalf("data errada devia falhar: %q", errText)
 	}
+	_, errText = callTool[postSaleOutput](t, f, "posvenda_liga", map[string]any{"pedidos": []map[string]any{{
+		"codigo": "12391287", "primeiro_nome": "Ana", "telefone": "(62) 99827-4848", "cancelado_em": "2026-11-04T19:29:00-03:00",
+		"retirada": false, "enviado": false, "itens": []map[string]any{{"nome": "Budew (221/217)", "qty": 1}},
+	}}})
+	if errText != "" {
+		t.Fatalf("cancelado falhou: %s", errText)
+	}
+	want = `{"orders":[{"code":"12391287","firstName":"Ana","phone":"(62) 99827-4848","cancelledAt":"2026-11-04T19:29:00-03:00","pickup":false,"shipped":false,"items":[{"name":"Budew (221/217)","qty":1}]}]}`
+	if got := f.writes()[1].body; got != want {
+		t.Fatalf("payload do cancelado errado:\n got %s\nwant %s", got, want)
+	}
+	_, errText = callTool[postSaleOutput](t, f, "posvenda_liga", map[string]any{"pedidos": []map[string]any{{
+		"codigo": "12373980", "primeiro_nome": "Ana", "telefone": "(62) 99827-4848", "pago_em": "2026-11-02T14:05:00-03:00",
+		"cancelado_em": "2026-11-02T18:00:00-03:00", "retirada": false, "enviado": false, "itens": []map[string]any{},
+	}}})
+	if !strings.Contains(errText, "cancelado depois de pago") {
+		t.Fatalf("cancelado depois de pago devia falhar: %q", errText)
+	}
 }
 
 func TestReport(t *testing.T) {

@@ -1497,6 +1497,7 @@ export interface Conversation {
   orderID: string;
   orderNumber: number;
   pickup?: boolean;
+  cancelled?: boolean;
   items?: ConversationItem[];
   state: ConversationState;
   outcome: ConversationOutcome;

@@ -82,6 +82,7 @@ type inboundContext struct {
 	FirstName   string       `json:"firstName"`
 	OrderNumber int          `json:"orderNumber"`
 	Pickup      bool         `json:"pickup,omitempty"`
+	Cancelled   bool         `json:"cancelled,omitempty"`
 	CanAddHow   string       `json:"canAddHow"`
 	Status      string       `json:"status,omitempty"`
 	Rastreio    string       `json:"rastreio,omitempty"`
@@ -121,6 +122,7 @@ type composeItem struct {
 	OrderNumber    int                `json:"orderNumber"`
 	Pickup         bool               `json:"pickup"`
 	Shipped        bool               `json:"shipped"`
+	Cancelled      bool               `json:"cancelled"`
 	Items          []composeOrderItem `json:"items"`
 	CanAddHow      string             `json:"canAddHow"`
 }
@@ -137,7 +139,8 @@ Balão 1 (shipped = true, o pedido já saiu): troque "já tá separado aqui" por
 Balão 2 (Liga, com envio): "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br 🩷"
 Balão 2 (site, com envio): "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido 🩷"
 Balão 2 (retirada): "Se quiser, separo mais alguma coisa pra você pegar junto 🩷"
-Nunca: "aqui é da Collecta", "recebemos seu pedido", número do pedido, lista de cartas, quantidades, preço, passo a passo da Liga, travessão.`
+Nunca: "aqui é da Collecta", "recebemos seu pedido", número do pedido, lista de cartas, quantidades, preço, passo a passo da Liga, travessão.
+Pedido cancelado (cancelled = true, a Liga cancelou porque não foi pago): nada de agradecer pela compra. Balão 1: "Oii [primeiro nome], tudo bem? Vi que seu pedido lá na nossa loja da Liga acabou cancelando antes do pagamento, aconteceu alguma coisa? 💙" (um produto: "o pedido do Jolteon"). Balão 2: "Se ainda quiser, me fala que eu te ajudo a fechar 🩷". Nunca: "por que cancelou", cupom, desconto, valor, pressa, prometer que ainda tem.`
 
 func (a *app) addPostSaleTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
@@ -368,25 +371,57 @@ func (a *app) toolReply(ctx context.Context, _ *mcp.CallToolRequest, in replyInp
 
 const ligaComposeHint = "liga: mande o site da Collecta (https://www.collectatcg.com.br) para ele ver mais coisa. Não explique a opção da Liga e não prometa frete junto"
 
+type serverComposeItem struct {
+	composeItem
+	Phone string `json:"phone"`
+}
+
+const cancelSkipReason = "o atendente já mandou mensagem para esse número nos últimos 7 dias"
+
 func (a *app) toolComposeList(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, composeOutput, error) {
 	out := composeOutput{Items: []composeItem{}}
 	data, err := a.agentRequest(ctx, http.MethodGet, "compose", nil)
 	if err != nil {
 		return nil, out, err
 	}
-	if err := json.Unmarshal(data, &out); err != nil {
+	var listed struct {
+		Items []serverComposeItem `json:"items"`
+	}
+	if err := json.Unmarshal(data, &listed); err != nil {
 		return nil, out, err
+	}
+	for _, it := range listed.Items {
+		item := it.composeItem
+		if item.Cancelled {
+			recent, err := a.messagedRecently(it.Phone)
+			if err != nil {
+				return nil, out, err
+			}
+			if recent {
+				if _, err := agentPost[reasonBody, okOutput](a, ctx, conversationPath(item.ConversationID, "skip"), reasonBody{Reason: cancelSkipReason}); err != nil {
+					return nil, out, err
+				}
+				continue
+			}
+		} else if item.Channel == "liga" {
+			item.CanAddHow = ligaComposeHint
+		}
+		out.Items = append(out.Items, item)
 	}
 	out.ComoEscrever = composeGuide
 	if len(out.Items) > 0 {
 		out.Regras = rules[rulesPostSaleCompose]
 	}
-	for i := range out.Items {
-		if out.Items[i].Channel == "liga" {
-			out.Items[i].CanAddHow = ligaComposeHint
-		}
-	}
 	return nil, out, nil
+}
+
+func (a *app) messagedRecently(phone string) (bool, error) {
+	key, err := phoneKey(phone)
+	if err != nil {
+		return false, nil
+	}
+	sent, err := a.history.since(key, a.now().Add(-historyWindow))
+	return len(sent) > 0, err
 }
 
 type composeInput struct {
