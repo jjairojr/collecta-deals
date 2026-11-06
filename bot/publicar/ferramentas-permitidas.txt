@@ -1,0 +1,14 @@
+# Ferramentas que o Publicador pode usar. Uma expressão regular por linha, comparada com o nome inteiro.
+# Qualquer outra ferramenta é bloqueada pelo guard.sh e anotada em /Users/Shared/collecta-bot/publicar/bloqueios.log.
+# pedir_aprovacao fica de fora: quem pede é o Social, quem publica não aprova.
+
+mcp__collecta-publicar__(inicio|aprovados|publicado|falhou)
+ToolSearch
+
+# OpenBot: busca e descrição de ferramentas (só listam). O tool_call do navegador é checado à parte no guard.sh:
+# só openbot_browser.*, sem script, senha ou download, upload só da pasta de aprovados, e só no Instagram e no TikTok.
+mcp__openbot__tool_search
+mcp__openbot__tool_describe
+mcp__openbot__routine_no_update
+mcp__openbot__routine_report_failure
+mcp__openbot__search_memories

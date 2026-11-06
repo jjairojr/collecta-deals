@@ -25,6 +25,7 @@ import (
 	"opdeals/internal/model"
 	"opdeals/internal/pipeline"
 	"opdeals/internal/promos"
+	"opdeals/internal/publishq"
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
 	"opdeals/internal/store"
@@ -53,6 +54,7 @@ func run() error {
 	purchasesPath := flag.String("purchases", "data/purchases.json", "path to the buy-order ledger (compras — one order mixes games)")
 	promosPath := flag.String("promos", "data/promos.json", "path to the storefront promo-code ledger (cupons da vitrine)")
 	syncQueuePath := flag.String("syncqueue", "data/syncqueue.json", "path to the Liga/MyP propagation queue (saídas de estoque fora da Liga)")
+	publishPath := flag.String("publishq", "data/publishq.json", "path to the social posting approval queue (fila do Publicador)")
 	ordersPath := flag.String("orders", "data/orders.json", "path to the storefront order ledger (pedidos pagos pelo site)")
 	conversationsPath := flag.String("conversations", "data/conversations.json", "path to the post-sale WhatsApp conversation ledger (pós-venda)")
 	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
@@ -483,6 +485,7 @@ func run() error {
 	srv.OwnLigaStoreID = *ligaStoreID
 	srv.PhotoDir = *photoDir
 	srv.SyncQueue = syncqueue.NewStore(*syncQueuePath)
+	srv.Publish = publishq.NewStore(*publishPath)
 	srv.JPImport = &api.JPImport{Store: jpStore, CardRushPath: *cardRushPath}
 	checkout, err := buildCheckout(*ordersPath, *storefrontToken, *collectaAPI, *collectaStoreToken, logger)
 	if err != nil {

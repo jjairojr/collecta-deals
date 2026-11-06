@@ -21,6 +21,7 @@ import (
 	"opdeals/internal/expenses"
 	"opdeals/internal/game"
 	"opdeals/internal/model"
+	"opdeals/internal/publishq"
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
 	"opdeals/internal/store"
@@ -65,6 +66,7 @@ type Server struct {
 	PostSale       PostSale
 	postSale       postSaleState
 	SyncQueue      *syncqueue.Store
+	Publish        *publishq.Store
 	JPImport       *JPImport
 	imports        *importsCache
 	releasing      sync.Map
@@ -220,6 +222,9 @@ func (s *Server) Handler() http.Handler {
 	if s.PostSaleEnabled() {
 		s.postSaleRoutes(mux)
 	}
+	if s.Publish != nil {
+		s.publishRoutes(mux)
+	}
 	if s.webDir != "" {
 		mux.Handle("/", s.spaHandler())
 	}
@@ -238,6 +243,7 @@ var publicAPIPrefixes = []string{
 	"/api/games",
 	"/api/whatsapp/",
 	"/api/postsale/",
+	"/api/aprovar/",
 }
 
 func isPublicAPI(path string) bool {
