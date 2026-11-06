@@ -11,6 +11,7 @@ import (
 
 	"opdeals/internal/conversations"
 	"opdeals/internal/orders"
+	"opdeals/internal/postsale"
 )
 
 const testAgentToken = "agent-token-0123456789abcdef0123456789"
@@ -486,7 +487,7 @@ func TestOpenBotPendingCountsWithoutTouchingAgent(t *testing.T) {
 	f.paidOrder(t, true)
 	f.s.postSaleTick(context.Background())
 	p := f.pending(t)
-	if p.Compose != 1 || p.Total() != 1 || !p.OldestAt.Equal(f.only(t).CreatedAt) {
+	if p.Compose != 1 || p.Total() != 1 || !p.OldestAt.Equal(postsale.NextAllowed(f.only(t).CreatedAt, saoPaulo)) {
 		t.Fatalf("compose %+v", p)
 	}
 	if !f.s.agentSeenAt().IsZero() {
