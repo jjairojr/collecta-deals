@@ -264,7 +264,7 @@ func TestComposeListSkipsCancelledAlreadyMessaged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.app.history.add(key, "Oii Ana, vi o Budew no seu carrinho", f.now.Add(-3*24*time.Hour)); err != nil {
+	if err := f.app.history.add(key, "Oii Ana, vi o Budew no seu carrinho", kindCart, f.now.Add(-3*24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	list, errText := callWith[struct{}, composeOutput](t, f, "posvenda_escrever", struct{}{})

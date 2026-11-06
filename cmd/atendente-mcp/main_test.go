@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -361,7 +362,7 @@ func TestHistoryIgnoresRepeatWithinTenMinutes(t *testing.T) {
 	h := newHistory(t.TempDir())
 	at := time.Date(2026, 11, 3, 19, 0, 0, 0, saoPaulo)
 	for _, d := range []time.Duration{0, 2 * time.Minute, 20 * time.Minute} {
-		if err := h.add("556299991111", "Oii, tudo bem?", at.Add(d)); err != nil {
+		if err := h.add("556299991111", "Oii, tudo bem?", "", at.Add(d)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -528,5 +529,78 @@ func TestRegisterOriginOncePerPhone(t *testing.T) {
 	}
 	if got := string(data); got != "data,telefone,origem\n02/11/2026 15:00,6299991111,Instagram da loja\n" {
 		t.Fatalf("csv = %q", got)
+	}
+}
+
+func cartArgs(phone, text string) map[string]string {
+	return map[string]string{"telefone": phone, "texto": text, "tipo": "carrinho"}
+}
+
+func TestAuthorizeCartAllowsTwoBalloonsOncePerWeek(t *testing.T) {
+	f := newFixture(t, modeLive)
+	for _, text := range []string{"Oii Ana, vi a case de Radiance no seu carrinho", "Deixei o cupom CONTINUE5 pra você 🩷"} {
+		if out, errText := callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-1111", text)); !out.Enviar || errText != "" {
+			t.Fatalf("balão de carrinho recusado: %+v %q", out, errText)
+		}
+		f.now = f.now.Add(time.Minute)
+	}
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-1111", "Terceiro balão"))
+	if out.Enviar || !strings.Contains(out.Motivo, "2 balões") {
+		t.Fatalf("terceiro balão devia ser recusado: %+v", out)
+	}
+	f.now = f.now.Add(3 * 24 * time.Hour)
+	out, _ = callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-1111", "Oii Ana, de novo"))
+	if out.Enviar || !strings.Contains(out.Motivo, "7 dias") {
+		t.Fatalf("segunda abordagem na semana devia ser recusada: %+v", out)
+	}
+	f.now = f.now.Add(5 * 24 * time.Hour)
+	if out, _ = callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-1111", "Oii Ana, chegou novidade")); !out.Enviar {
+		t.Fatalf("depois de 7 dias devia liberar: %+v", out)
+	}
+}
+
+func TestAuthorizeCartSkipsNumberWithRecentChat(t *testing.T) {
+	f := newFixture(t, modeLive)
+	callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 99999-1111", "texto": "Oii, tudo bem?"})
+	f.now = f.now.Add(5 * time.Minute)
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-1111", "Vi o Jolteon no seu carrinho"))
+	if out.Enviar || !strings.Contains(out.Motivo, "7 dias") {
+		t.Fatalf("número com conversa recente devia ser pulado: %+v", out)
+	}
+}
+
+func TestAuthorizeCartDailyLimit(t *testing.T) {
+	f := newFixture(t, modeLive)
+	for i := range cartPerDay {
+		phone := fmt.Sprintf("62 99999-%04d", i)
+		if out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs(phone, "Oii, vi seu carrinho "+phone)); !out.Enviar {
+			t.Fatalf("carrinho %d recusado: %+v", i, out)
+		}
+	}
+	out, _ := callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 98888-0000", "Oii, vi seu carrinho"))
+	if out.Enviar || !strings.Contains(out.Motivo, "limite de 10") {
+		t.Fatalf("11º carrinho do dia devia ser recusado: %+v", out)
+	}
+	if out, _ = callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-0000", "Deixei o cupom CONTINUE5")); !out.Enviar {
+		t.Fatalf("2º balão de quem já foi abordado hoje devia passar: %+v", out)
+	}
+	if out, _ = callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 98888-0000", "texto": "Oii, tudo bem?"}); !out.Enviar {
+		t.Fatalf("conversa normal não entra no limite de carrinho: %+v", out)
+	}
+	f.now = f.now.Add(24 * time.Hour)
+	if out, _ = callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 97777-0000", "Oii, vi seu carrinho")); !out.Enviar {
+		t.Fatalf("no dia seguinte o limite zera: %+v", out)
+	}
+	if _, errText := callTool[authorizeOutput](t, f, "autorizar_envio", map[string]string{"telefone": "62 97777-1111", "texto": "Oi", "tipo": "promo"}); !strings.Contains(errText, "tipo inválido") {
+		t.Fatalf("tipo desconhecido devia falhar: %q", errText)
+	}
+}
+
+func TestAuthorizeCartDraftModeDoesNotCount(t *testing.T) {
+	f := newFixture(t, modeDraft)
+	callTool[authorizeOutput](t, f, "autorizar_envio", cartArgs("62 99999-1111", "Oii, vi seu carrinho"))
+	today, err := f.app.history.keysOfKindOn(kindCart, f.now)
+	if err != nil || len(today) != 0 {
+		t.Fatalf("rascunho não devia contar no limite: %v %v", today, err)
 	}
 }

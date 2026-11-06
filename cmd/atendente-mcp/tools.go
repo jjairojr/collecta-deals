@@ -32,6 +32,11 @@ const (
 	searchLimit   = 8
 	soldOutLimit  = 4
 	historyWindow = 7 * 24 * time.Hour
+	cartPerDay    = 10
+	cartBalloons  = 2
+	cartBurst     = 30 * time.Minute
+	kindCart      = "carrinho"
+	kindChat      = "conversa"
 )
 
 var saoPaulo = mustLocation("America/Sao_Paulo")
@@ -114,7 +119,7 @@ func (a *app) server() *mcp.Server {
 	}, a.toolOrigin)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "autorizar_envio",
-		Description: "Obrigatório antes de digitar e enviar QUALQUER mensagem para um cliente. Informe o telefone e o texto exato. Só envie se a resposta trouxer enviar = true; caso contrário siga o motivo.",
+		Description: "Obrigatório antes de digitar e enviar QUALQUER mensagem para um cliente. Informe o telefone, o texto exato e o tipo (carrinho na abordagem de carrinho abandonado, conversa no resto). Só envie se a resposta trouxer enviar = true; caso contrário siga o motivo.",
 	}, a.toolAuthorize)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "historico_bot",
@@ -345,6 +350,7 @@ func (a *app) toolHighlights(ctx context.Context, _ *mcp.CallToolRequest, in hig
 type authorizeInput struct {
 	Telefone string `json:"telefone" jsonschema:"telefone do cliente com DDD, como aparece no WhatsApp (ex.: +55 62 99999-9999), ou ig: seguido do usuário no Instagram (ex.: ig:collecta.fan)"`
 	Texto    string `json:"texto" jsonschema:"o texto exato que você vai enviar"`
+	Tipo     string `json:"tipo,omitempty" jsonschema:"carrinho na abordagem de carrinho abandonado (lista [CARRINHOS]); conversa (ou vazio) no resto"`
 }
 
 type authorizeOutput struct {
@@ -382,6 +388,21 @@ func (a *app) toolAuthorize(ctx context.Context, _ *mcp.CallToolRequest, in auth
 	if strings.ContainsAny(text, "—–") {
 		return nil, authorizeOutput{Motivo: "troque o travessão por vírgula ou ponto e peça autorização de novo"}, nil
 	}
+	kind := strings.ToLower(strings.TrimSpace(in.Tipo))
+	switch kind {
+	case "", kindChat:
+		kind = ""
+	case kindCart:
+		refused, err := a.cartRefusal(key)
+		if err != nil {
+			return nil, authorizeOutput{}, err
+		}
+		if refused != "" {
+			return nil, authorizeOutput{Motivo: refused}, nil
+		}
+	default:
+		return nil, authorizeOutput{}, fmt.Errorf("tipo inválido: %q (use carrinho ou conversa)", in.Tipo)
+	}
 	switch a.cfg.Mode {
 	case modeDraft:
 		if err := a.notify(ctx, "Rascunho do atendente", fmt.Sprintf("Para %s:\n%s", in.Telefone, text), "default"); err != nil {
@@ -393,10 +414,39 @@ func (a *app) toolAuthorize(ctx context.Context, _ *mcp.CallToolRequest, in auth
 			return nil, authorizeOutput{Motivo: "modo teste: este número não é de teste. NÃO responda, marque a conversa como não lida e siga para a próxima."}, nil
 		}
 	}
-	if err := a.history.add(key, text, a.now()); err != nil {
+	if err := a.history.add(key, text, kind, a.now()); err != nil {
 		return nil, authorizeOutput{}, fmt.Errorf("não consegui registrar o envio: %v", err)
 	}
 	return nil, authorizeOutput{Enviar: true, Motivo: "pode enviar"}, nil
+}
+
+func (a *app) cartRefusal(key string) (string, error) {
+	now := a.now()
+	sent, err := a.history.since(key, now.Add(-historyWindow))
+	if err != nil {
+		return "", err
+	}
+	burst := 0
+	for _, m := range sent {
+		if m.Kind != kindCart || now.Sub(m.At) > cartBurst {
+			return "este número já recebeu mensagem do atendente nos últimos 7 dias: NÃO envie, pule este carrinho e siga para o próximo.", nil
+		}
+		burst++
+	}
+	if burst >= cartBalloons {
+		return "a abordagem deste carrinho já tem 2 balões: NÃO envie mais nada para este número.", nil
+	}
+	if burst > 0 {
+		return "", nil
+	}
+	today, err := a.history.keysOfKindOn(kindCart, now)
+	if err != nil {
+		return "", err
+	}
+	if len(today) >= cartPerDay {
+		return fmt.Sprintf("limite de %d carrinhos por dia atingido: NÃO envie. Pare as abordagens de carrinho e diga no resumo quantos ficaram para amanhã.", cartPerDay), nil
+	}
+	return "", nil
 }
 
 type historyInput struct {

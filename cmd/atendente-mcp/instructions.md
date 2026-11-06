@@ -228,8 +228,9 @@ os clientes: os balões são feitos para cada carrinho e o cupom vem das `novida
       - Nunca: "Aqui é da Collecta", "uns itens", "umas cartas", o valor do carrinho, lista de produtos, travessão.
       - Duas pessoas nunca recebem o mesmo texto trocando só o nome. Se o balão 1 serviria para qualquer carrinho,
         reescreva.
-   5. Para cada balão, na ordem, chame `autorizar_envio` com o telefone e o texto exato. Só digite e envie se vier
-      `enviar = true`. Se vier false, faça o que o `motivo` manda.
+   5. Para cada balão, na ordem, chame `autorizar_envio` com o telefone, o texto exato e `tipo = carrinho`. Só digite
+      e envie se vier `enviar = true`. Se vier false, faça o que o `motivo` manda. O servidor conta: 10 carrinhos por
+      dia, 2 balões por carrinho e nenhum número que recebeu mensagem do atendente nos últimos 7 dias.
 3. Se a pessoa responder depois, é conversa normal do atendimento geral: a mensagem de carrinho aparece na conversa e
    serve de contexto. Se pedir mais desconto, passe para o Jairo.
 4. No resumo final, diga quantos clientes chegaram, quantos você chamou e quantos pulou e por quê. Nunca use a lista

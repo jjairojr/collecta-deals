@@ -275,7 +275,7 @@ func (a *app) toolDelivered(ctx context.Context, _ *mcp.CallToolRequest, in outb
 	a.mu.Unlock()
 	if ok {
 		if key, err := phoneKey(it.Phone); err == nil {
-			if err := a.history.add(key, it.Text, a.now()); err != nil {
+			if err := a.history.add(key, it.Text, "", a.now()); err != nil {
 				return nil, okOutput{}, fmt.Errorf("envio confirmado, mas não consegui registrar no histórico: %v", err)
 			}
 		}
