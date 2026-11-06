@@ -10,4 +10,5 @@ ToolSearch
 mcp__openbot__tool_search
 mcp__openbot__tool_describe
 mcp__openbot__routine_no_update
+mcp__openbot__routine_report_failure
 mcp__openbot__search_memories
