@@ -2,7 +2,8 @@
 
 Um agente do OpenBot (Claude Code com o seu plano) dá baixa das vendas da Liga no dashboard de produção, executa a fila
 Sincronizar e manda o pós-venda da Liga. Ele substitui o launchd `com.collecta.baixa-vendas`, que parou em 28/10/2026 (o
-macOS bloqueia o node na pasta Documents) e foi descarregado em 03/11/2026. O MyPCards foi desativado em 03/11/2026: o
+macOS bloqueia o node na pasta Documents) e foi descarregado em 03/11/2026. O `scripts/baixa-vendas.mjs` saiu do repositório
+em 05/11/2026 e o plist foi guardado em `~/.collecta-baixa/legado/`. O MyPCards foi desativado em 03/11/2026: o
 agente não abre mais o MyP.
 
 No ar desde 03/11/2026: agente "Estoquista Collecta", pasta
@@ -58,10 +59,6 @@ No ar desde 03/11/2026: agente "Estoquista Collecta", pasta
    nome aparece em `bloqueios.log`. Ajuste o `guard.sh` e rode `make baixa` de novo.
 8. **Agendar.** Rotina nova no OpenBot às 9h, 14h e 20h, com o texto de `rotina.md`. Deixe "Manter computador
    acordado" ligado e o Mac na tomada. Com a tampa fechada ou o Mac dormindo, a rodada não acontece.
-9. **Desligar o cron antigo**, para as duas não rodarem juntas se o macOS voltar a deixar:
-   ```sh
-   launchctl unload ~/Library/LaunchAgents/com.collecta.baixa-vendas.plist
-   ```
 
 ## Editar o que a baixa sabe
 
@@ -86,8 +83,9 @@ No ar desde 03/11/2026: agente "Estoquista Collecta", pasta
 
 - O agente não cria lote extra e não reduz o dashboard. Liga acima ou abaixo do dashboard vira pendência no relatório.
 - Pedido ambíguo (dois registros possíveis, item que não casa pelo nome) nunca é gravado: vira pendência.
-- `URGENTE` no resumo é venda dupla (o mesmo item vendido na Liga e no MyP desde a última rodada). Chega com prioridade
-  alta no ntfy.
+- `URGENTE` no resumo é pedido cancelado depois da baixa ou baixa recusada por falta de estoque num item que a Liga ainda
+  anuncia. O servidor guarda o que já avisou (`~/.collecta-baixa/urgentes.json`): prioridade alta no ntfy só com URGENTE
+  novo e num lembrete por dia a partir das 9h. Pedido cancelado sai da lista quando a baixa é estornada no dashboard.
 - Rodada bloqueada pelo Cloudflare para aquele canal e segue no outro. A fila Sincronizar espera a próxima rodada.
 - Os riscos: o navegador do agente fica logado na sua conta da Liga e do MyP e pode rodar script nessas páginas. Ele não
   tem nenhum segredo (o token fica no MCP), mas um script nessas páginas enxerga o que a sua sessão enxerga.
