@@ -527,3 +527,96 @@ func TestPendingExpires(t *testing.T) {
 		t.Fatalf("motivo vazio devia falhar: %q", errText)
 	}
 }
+
+func urgentArgs(pedido string) map[string]any {
+	return map[string]any{"pedido": pedido, "item": "Monkey.D.Luffy OP15-119", "motivo": "cancelado depois da baixa"}
+}
+
+func lastPriority(t *testing.T, f *fixture, summary string) string {
+	t.Helper()
+	if _, errText := callTool[reportOutput](t, f, "relatorio", map[string]any{"resumo": summary, "corpo": ""}); errText != "" {
+		t.Fatal(errText)
+	}
+	p := f.pushed()
+	return p[len(p)-1].priority
+}
+
+func TestUrgentAlertsOnceUntilReverted(t *testing.T) {
+	f := newFixture(t)
+	callTool[startOutput](t, f, "inicio", nil)
+	out, errText := callTool[urgentOutput](t, f, "registrar_urgente", urgentArgs("#12000001"))
+	if errText != "" || out.JaAvisado {
+		t.Fatalf("primeiro aviso devia ser novo: %+v %s", out, errText)
+	}
+	if got := lastPriority(t, f, "0 baixas · 1 URGENTE"); got != "high" {
+		t.Fatalf("urgente novo devia ser high: %s", got)
+	}
+
+	start, _ := callTool[startOutput](t, f, "inicio", nil)
+	if len(start.Urgentes) != 1 || start.Urgentes[0].Pedido != "12000001" || !start.Urgentes[0].ComBaixa {
+		t.Fatalf("inicio devia listar o urgente já avisado: %+v", start.Urgentes)
+	}
+	out, _ = callTool[urgentOutput](t, f, "registrar_urgente", urgentArgs("12000001"))
+	if !out.JaAvisado {
+		t.Fatal("segunda vez devia vir ja_avisado")
+	}
+	if got := lastPriority(t, f, "0 baixas · 1 URGENTE já avisado"); got != "default" {
+		t.Fatalf("urgente repetido no mesmo dia não devia ser high: %s", got)
+	}
+
+	f.mu.Lock()
+	kept := f.ledgers["onepiece"][:0]
+	for _, tr := range f.ledgers["onepiece"] {
+		if tr.ID != "s1" {
+			kept = append(kept, tr)
+		}
+	}
+	f.ledgers["onepiece"] = kept
+	f.mu.Unlock()
+	start, _ = callTool[startOutput](t, f, "inicio", nil)
+	if len(start.Urgentes) != 0 {
+		t.Fatalf("pedido estornado devia sair dos urgentes: %+v", start.Urgentes)
+	}
+}
+
+func TestUrgentDailyReminder(t *testing.T) {
+	f := newFixture(t)
+	callTool[startOutput](t, f, "inicio", nil)
+	callTool[urgentOutput](t, f, "registrar_urgente", urgentArgs("12000001"))
+	lastPriority(t, f, "1 URGENTE")
+
+	next := f.app.now().Add(25 * time.Hour)
+	f.app.now = func() time.Time { return next }
+	callTool[startOutput](t, f, "inicio", nil)
+	callTool[urgentOutput](t, f, "registrar_urgente", urgentArgs("12000001"))
+	if got := lastPriority(t, f, "1 URGENTE já avisado"); got != "high" {
+		t.Fatalf("lembrete do dia seguinte devia ser high: %s", got)
+	}
+	callTool[startOutput](t, f, "inicio", nil)
+	callTool[urgentOutput](t, f, "registrar_urgente", urgentArgs("12000001"))
+	if got := lastPriority(t, f, "1 URGENTE já avisado"); got != "default" {
+		t.Fatalf("segundo relatório do dia não devia lembrar de novo: %s", got)
+	}
+}
+
+func TestUrgentWithoutSaleExpires(t *testing.T) {
+	f := newFixture(t)
+	callTool[startOutput](t, f, "inicio", nil)
+	out, _ := callTool[urgentOutput](t, f, "registrar_urgente", urgentArgs("19999999"))
+	if out.JaAvisado {
+		t.Fatal("devia ser novo")
+	}
+	start, _ := callTool[startOutput](t, f, "inicio", nil)
+	if len(start.Urgentes) != 1 || start.Urgentes[0].ComBaixa {
+		t.Fatalf("urgente sem baixa devia continuar: %+v", start.Urgentes)
+	}
+	later := f.app.now().Add(15 * 24 * time.Hour)
+	f.app.now = func() time.Time { return later }
+	start, _ = callTool[startOutput](t, f, "inicio", nil)
+	if len(start.Urgentes) != 0 {
+		t.Fatalf("urgente de 15 dias devia expirar: %+v", start.Urgentes)
+	}
+	if _, errText := callTool[urgentOutput](t, f, "registrar_urgente", map[string]any{"pedido": "12a", "item": "x", "motivo": "y"}); !strings.Contains(errText, "pedido inválido") {
+		t.Fatalf("pedido com letra devia falhar: %q", errText)
+	}
+}

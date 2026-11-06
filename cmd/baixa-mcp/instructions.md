@@ -60,8 +60,8 @@ para criar lote extra nem para reduzir o dashboard, e isso é de propósito.
 
 ## Rodada
 
-1. **`inicio()`**, sempre primeiro. Guarde `carimbo`, `agora`, `versao_regras`, o conjunto `pedidos_liga` e
-   `pendencias_abertas`.
+1. **`inicio()`**, sempre primeiro. Guarde `carimbo`, `agora`, `versao_regras`, o conjunto `pedidos_liga`,
+   `pendencias_abertas` e `urgentes_ja_avisados`.
 2. **Liga → dashboard.** Leia a listagem de pedidos da Liga e separe os pedidos novos e pagos. Para cada um: abra o
    detalhe, extraia os itens, case cada um (`estoque_buscar`, de novo a cada item), confira baixa manual, faça o alerta
    de preço, `dar_baixa` com `canal liga` e `flag_liga` do lote que sobrou. Item que não deu para baixar:
@@ -75,7 +75,9 @@ para criar lote extra nem para reduzir o dashboard, e isso é de propósito.
    comprador `... — Liga #N` e a qty certa. Baixa que não aparecer é pendência. Gravações na Liga já foram conferidas na
    hora, relendo; a que não confirmou é pendência.
 5. **Pós-venda da Liga.** Monte e mande `posvenda_liga` (seção Pós-venda).
-6. **`relatorio(resumo, corpo)`**, uma vez só, no fim, sempre: mesmo com "nada novo", mesmo com canal bloqueado, mesmo
+6. **`registrar_urgente(pedido, item, motivo)`** para cada URGENTE da rodada, um por item, antes do relatório (seção
+   Relatório).
+7. **`relatorio(resumo, corpo)`**, uma vez só, no fim, sempre: mesmo com "nada novo", mesmo com canal bloqueado, mesmo
    se a rodada parou no meio.
 
 ## Baixa manual do dono
@@ -291,11 +293,18 @@ Liga bloqueada na rodada: não mexa na fila; as tarefas ficam pendentes para a p
 `3 baixas · 1 pendência · 0 URGENTE`, ou `nada novo` quando não houve venda, tarefa nem pendência. Com
 Liga bloqueada, diga no resumo: `Liga bloqueada (Cloudflare) · fila 2 pendentes`.
 
+URGENTE avisado uma vez só: antes do relatório, chame `registrar_urgente` para cada URGENTE da rodada. O servidor
+guarda o que já foi avisado e decide a prioridade do aviso no celular: alta só com URGENTE novo e num lembrete por dia.
+No `resumo`, `N URGENTE` conta só os que vieram com `ja_avisado = false`; os outros entram como `M já avisados`
+(ex.: `2 baixas · 0 URGENTE · 3 já avisados`). Um pedido cancelado depois da baixa sai sozinho da lista quando o dono
+estorna a baixa no dashboard.
+
 `corpo`, nesta ordem:
 
 1. Linha de cabeçalho: `carimbo`, `versao_regras`.
 2. **URGENTE** primeiro (baixa recusada por falta de estoque num item que a Liga ainda anuncia, pedido cancelado
-   depois da baixa), um por linha, com o pedido e o item.
+   depois da baixa), um por linha, com o pedido e o item, só os novos. Os já avisados vão numa linha só, depois:
+   `Já avisados: #12000001, #12000002 (cancelados depois da baixa)`.
 3. **Pendências**, uma por linha: canal, pedido, item, motivo. Inclua cancelamentos depois da baixa, dashboard < Liga,
    dashboard > Liga, vendas sem lastro, ambíguos, tarefas com erro, gravações que não confirmaram.
 4. Tabela das baixas: `Pedido | Data | Comprador | Item | Qty | Total R$ | Jogo | id | Propagado`. Em

@@ -59,16 +59,20 @@ func mustLocation(name string) *time.Location {
 }
 
 type app struct {
-	cfg     config
-	client  *http.Client
-	now     func() time.Time
-	pending *pendingStore
-	mu      sync.Mutex
-	stamp   string
+	cfg         config
+	client      *http.Client
+	now         func() time.Time
+	pending     *pendingStore
+	urgent      *urgentStore
+	mu          sync.Mutex
+	stamp       string
+	withSale    map[string]bool
+	urgentCalls int
+	urgentNew   int
 }
 
 func newApp(cfg config, client *http.Client, now func() time.Time) *app {
-	return &app{cfg: cfg, client: client, now: now, pending: newPendingStore(cfg.DataDir)}
+	return &app{cfg: cfg, client: client, now: now, pending: newPendingStore(cfg.DataDir), urgent: newUrgentStore(cfg.DataDir), withSale: map[string]bool{}}
 }
 
 func (a *app) server() *mcp.Server {
@@ -114,6 +118,10 @@ func (a *app) server() *mcp.Server {
 		Description: "Manda para o pós-venda os pedidos da Liga pagos nas últimas 24h e ainda não retirados, e os cancelados pelo Sistema sem pagamento nas últimas 24h. Só primeiro nome, telefone, itens, data do pagamento ou do cancelamento, retirada e enviado.",
 	}, a.toolPostSale)
 	mcp.AddTool(s, &mcp.Tool{
+		Name:        "registrar_urgente",
+		Description: "Registra um URGENTE da rodada (pedido cancelado depois da baixa, baixa recusada por falta de estoque num item que a Liga ainda anuncia). Chame para cada URGENTE antes do relatorio. Se vier ja_avisado = true, o dono já recebeu esse aviso: ele vai na linha de já avisados, não como URGENTE novo.",
+	}, a.toolUrgent)
+	mcp.AddTool(s, &mcp.Tool{
 		Name:        "relatorio",
 		Description: "Fecha a rodada: grava o relatório e manda o resumo para o celular do dono. Chame uma vez no fim de toda rodada, mesmo sem venda nova ou com canal bloqueado.",
 	}, a.toolReport)
@@ -138,11 +146,14 @@ type startOutput struct {
 	Regras      string        `json:"regras"`
 	PedidosLiga []string      `json:"pedidos_liga"`
 	Pendencias  []pendingItem `json:"pendencias_abertas"`
+	Urgentes    []urgentItem  `json:"urgentes_ja_avisados"`
 }
 
 func (a *app) toolStart(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, startOutput, error) {
 	a.mu.Lock()
 	a.stamp = ""
+	a.urgentCalls = 0
+	a.urgentNew = 0
 	a.mu.Unlock()
 	done := map[string]bool{}
 	ledgers := map[string][]trades.Trade{}
@@ -165,8 +176,16 @@ func (a *app) toolStart(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) 
 	if err != nil {
 		return nil, startOutput{}, fmt.Errorf("não consegui ler as pendências: %v", err)
 	}
+	urgents, err := a.urgent.prune(a.now(), done)
+	if err != nil {
+		return nil, startOutput{}, fmt.Errorf("não consegui ler os urgentes: %v", err)
+	}
+	a.mu.Lock()
+	a.withSale = done
+	a.mu.Unlock()
 	return nil, startOutput{
 		Pendencias:  open,
+		Urgentes:    urgents,
 		Carimbo:     a.currentStamp(),
 		Agora:       a.now().In(saoPaulo).Format("02/01/2006 15:04"),
 		Versao:      rulesVersion,
@@ -644,6 +663,54 @@ func (a *app) toolPostSale(ctx context.Context, _ *mcp.CallToolRequest, in postS
 	return nil, postSaleOutput{Criados: res.Created, Ignorados: res.Skipped}, nil
 }
 
+type urgentInput struct {
+	Pedido string `json:"pedido" jsonschema:"número do pedido da Liga, só dígitos"`
+	Item   string `json:"item" jsonschema:"o item, como no relatório (ex.: Monkey.D.Luffy OP15-119)"`
+	Motivo string `json:"motivo" jsonschema:"por que é urgente (ex.: cancelado depois da baixa)"`
+}
+
+type urgentOutput struct {
+	JaAvisado bool `json:"ja_avisado"`
+}
+
+func (a *app) toolUrgent(_ context.Context, _ *mcp.CallToolRequest, in urgentInput) (*mcp.CallToolResult, urgentOutput, error) {
+	pedido := strings.TrimPrefix(strings.TrimSpace(in.Pedido), "#")
+	if pedido == "" || strings.Trim(pedido, "0123456789") != "" {
+		return nil, urgentOutput{}, fmt.Errorf("pedido inválido: %q (só os dígitos do número do pedido)", in.Pedido)
+	}
+	if cleanText(in.Item) == "" || cleanText(in.Motivo) == "" {
+		return nil, urgentOutput{}, errors.New("informe o item e o motivo")
+	}
+	a.mu.Lock()
+	withSale := a.withSale[pedido]
+	a.mu.Unlock()
+	known, err := a.urgent.register(urgentItem{Pedido: pedido, Item: cleanText(in.Item), Motivo: cleanText(in.Motivo), ComBaixa: withSale, Criado: a.now()})
+	if err != nil {
+		return nil, urgentOutput{}, fmt.Errorf("não consegui guardar o urgente: %v", err)
+	}
+	a.mu.Lock()
+	a.urgentCalls++
+	if !known {
+		a.urgentNew++
+	}
+	a.mu.Unlock()
+	return nil, urgentOutput{JaAvisado: known}, nil
+}
+
+func (a *app) priority(summary string) (string, error) {
+	a.mu.Lock()
+	calls, fresh := a.urgentCalls, a.urgentNew
+	a.mu.Unlock()
+	remind, err := a.urgent.takeReminder(a.now())
+	if err != nil {
+		return "", fmt.Errorf("não consegui ler os urgentes: %v", err)
+	}
+	if remind || fresh > 0 || (calls == 0 && urgentRe.MatchString(summary)) {
+		return "high", nil
+	}
+	return "default", nil
+}
+
 type reportInput struct {
 	Resumo string `json:"resumo" jsonschema:"uma linha, até 120 caracteres. Ex.: 3 baixas (Liga 2, MyP 1) · 1 pendência · 0 URGENTE, ou nada novo"`
 	Corpo  string `json:"corpo" jsonschema:"o relatório em markdown: baixas, pendências (URGENTE primeiro), pedidos pulados, canais que não rodaram"`
@@ -688,9 +755,9 @@ func (a *app) toolReport(ctx context.Context, _ *mcp.CallToolRequest, in reportI
 	if err := a.appendRun(stamp, summary); err != nil {
 		return nil, reportOutput{}, err
 	}
-	priority := "default"
-	if urgentRe.MatchString(summary) {
-		priority = "high"
+	priority, err := a.priority(summary)
+	if err != nil {
+		return nil, reportOutput{Arquivo: path}, err
 	}
 	push := summary
 	if body != "" {
