@@ -239,18 +239,8 @@ func (a *app) askAdApproval(ctx context.Context, t adtestq.Test, left int64) err
 	if preview == "" {
 		preview = t.Creatives[0].Path
 	}
-	info, err := os.Stat(preview)
-	if err != nil || info.Size() > attachMax {
-		return a.push(ctx, headers, strings.NewReader(b.String()))
-	}
-	fh, err := os.Open(preview)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	headers["Filename"] = filepath.Base(preview)
-	headers["Message"] = b.String()
-	return a.push(ctx, headers, fh)
+	_, err := a.pushWithPreview(ctx, headers, b.String(), preview)
+	return err
 }
 
 type adStatusAd struct {

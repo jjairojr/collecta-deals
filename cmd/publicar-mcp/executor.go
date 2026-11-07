@@ -48,9 +48,11 @@ type metaConfig struct {
 	IGUsername string
 	PixelID    string
 	BaseURL    string
+	RuploadURL string
 }
 
 func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
+	version := cmp.Or(getenv("META_VERSAO"), "v27.0")
 	cfg := metaConfig{
 		Token:      getenv("META_TOKEN"),
 		Account:    getenv("META_CONTA"),
@@ -58,7 +60,8 @@ func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
 		IGUserID:   getenv("META_INSTAGRAM_ID"),
 		IGUsername: cmp.Or(getenv("META_INSTAGRAM_USUARIO"), "tcgcollecta"),
 		PixelID:    getenv("META_PIXEL"),
-		BaseURL:    strings.TrimRight(cmp.Or(getenv("META_URL"), "https://graph.facebook.com"), "/") + "/" + cmp.Or(getenv("META_VERSAO"), "v27.0"),
+		BaseURL:    strings.TrimRight(cmp.Or(getenv("META_URL"), "https://graph.facebook.com"), "/") + "/" + version,
+		RuploadURL: strings.TrimRight(cmp.Or(getenv("META_RUPLOAD"), "https://rupload.facebook.com/ig-api-upload"), "/") + "/" + version,
 	}
 	for name, v := range map[string]string{"META_TOKEN": cfg.Token, "META_CONTA": cfg.Account, "META_PAGINA": cfg.PageID, "META_INSTAGRAM_ID": cfg.IGUserID} {
 		if v == "" {
@@ -216,11 +219,11 @@ func (e *executor) list(ctx context.Context, status string) ([]adtestq.Test, err
 }
 
 func (e *executor) run(ctx context.Context) error {
+	errs := e.publishTrials(ctx)
 	approved, err := e.list(ctx, adtestq.StatusApproved)
 	if err != nil {
-		return err
+		return errors.Join(append(errs, err)...)
 	}
-	var errs []error
 	for _, t := range approved {
 		if err := e.launch(ctx, t); err != nil {
 			errs = append(errs, fmt.Errorf("teste %s: %w", t.ID, err))

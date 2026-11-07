@@ -88,6 +88,22 @@ O `com.collecta.anuncios` (launchd, a cada 30 min) roda `publicar-mcp anuncios`:
   One Piece e card game, medido em compras, ou visitas à página enquanto não houver compra.
 - Registro em `/Users/Shared/collecta-bot/publicar/anuncios.log`; o vigia `com.collecta.saude` avisa se o job parar.
 
+## Reels de teste no Instagram
+
+O Instagram pelo navegador não tem a opção de Reels de teste (conferido em 07/11/2026), então eles saem pela API:
+
+- O Social pede com `pedir_aprovacao` no canal `instagram`, formato `teste`. O pedido já entra aprovado, como o
+  TikTok, e o Jairo recebe só o aviso "Reels de teste agendado pela Collecta" com a prévia.
+- O Publicador não vê esses itens em `aprovados`. Quem publica é o mesmo `com.collecta.anuncios` (a cada 30 min):
+  cria o container `REELS` com `upload_type=resumable` e `trial_params` `{"graduation_strategy":"SS_PERFORMANCE"}`,
+  envia o vídeo para `rupload.facebook.com/ig-api-upload/<versão>/<container>`, espera o `status_code` `FINISHED` e
+  chama `media_publish`. Registra o link como publicado e avisa "Reels de teste no ar".
+- O reel aparece só para quem não segue a conta; se for bem, o Instagram coloca no perfil sozinho.
+- Falha passageira volta na rodada seguinte, até 3 tentativas; na última avisa "Reels de teste não saiu".
+- Limite da Meta: 100 posts por API em 24 horas.
+- Precisa do mesmo `anuncios.env` dos testes de anúncio, com `instagram_content_publish` no token. A Meta só aceita
+  o envio resumível para apps com Login do Facebook para Empresas.
+
 ### Uma vez só
 
 1. **Saldo:** recarregue o pré-pago da conta de anúncios. Sem saldo nada entrega.
@@ -97,7 +113,8 @@ O `com.collecta.anuncios` (launchd, a cada 30 min) roda `publicar-mcp anuncios`:
    Em "Atribuir ativos", dê controle total da **conta de anúncios**, da **Página** e da **conta do Instagram**
    @tcgcollecta. Em Apps, adicione o app do passo 2.
 4. **Token:** no usuário do sistema, "Gerar novo token", escolha o app, validade **Nunca** e marque `ads_management`,
-   `ads_read`, `business_management`, `pages_show_list`, `pages_read_engagement` e `instagram_basic`. Copie o token
+   `ads_read`, `business_management`, `pages_show_list`, `pages_read_engagement`, `instagram_basic` e
+   `instagram_content_publish` (esta última é a dos Reels de teste). Copie o token
    direto para o arquivo do passo 6; não mande por chat.
 5. **Ids:** conta de anúncios (`act_...`, no Gerenciador de Anúncios), Página (Configurações da Página > id) e o
    id do Instagram (Configurações do negócio > Contas do Instagram > @tcgcollecta). O Pixel já é `959341777245828`.

@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -33,7 +34,7 @@ const (
 	feedMax        = 20 << 20
 	photoMax       = 15 << 20
 	renderTimeout  = 8 * time.Minute
-	rendersPerDay  = 12
+	rendersPerDay  = 30
 	productsMax    = 3
 	stagingKeep    = 3 * 24 * time.Hour
 	countdownLimit = 30
@@ -87,6 +88,7 @@ type pecaInput struct {
 type pecaPreco struct {
 	Produto string  `json:"produto"`
 	Preco   float64 `json:"preco_pix"`
+	Cartao  float64 `json:"preco_cartao,omitempty"`
 	Parcela int     `json:"parcelas,omitempty"`
 	Link    string  `json:"link"`
 }
@@ -106,6 +108,7 @@ type pecaProduto struct {
 	Imagem    string  `json:"imagem"`
 	Proporcao float64 `json:"proporcao"`
 	Preco     float64 `json:"preco"`
+	Cartao    float64 `json:"cartao,omitempty"`
 	Parcelas  int     `json:"parcelas,omitempty"`
 }
 
@@ -142,6 +145,7 @@ type feedItem struct {
 	Description  string
 	Availability string
 	Price        float64
+	Card         float64
 	Link         string
 	Image        string
 }
@@ -154,7 +158,7 @@ type feedCache struct {
 func (a *app) addPecaTool(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "criar_peca",
-		Description: "Só para o Social Collecta. Gera o vídeo (Reels e TikTok) ou a arte (post) da Collecta a partir de um modelo pronto: produto, carta ou contagem para a inauguração. Preço e foto vêm do site; você escreve só os textos. Devolve o caminho do arquivo e as prévias em PNG: olhe as prévias com Read antes de pedir aprovação. Uma peça por vez, até 12 por dia.",
+		Description: "Só para o Social Collecta. Gera o vídeo (Reels e TikTok) ou a arte (post) da Collecta a partir de um modelo pronto: produto, carta ou contagem para a inauguração. Preço e foto vêm do site; você escreve só os textos. Devolve o caminho do arquivo e as prévias em PNG: olhe as prévias com Read antes de pedir aprovação. Uma peça por vez, até 30 por dia somando criar_peca e criar_lista.",
 	}, a.toolPeca)
 }
 
@@ -361,7 +365,7 @@ func (a *app) resolveProduct(ctx context.Context, id string, index int, in pecaP
 	if m := installmentRe.FindStringSubmatch(item.Description); m != nil {
 		installments, _ = strconv.Atoi(m[1])
 	}
-	prod := pecaProduto{Nome: name, Preco: item.Price, Parcelas: installments}
+	prod := pecaProduto{Nome: name, Preco: item.Price, Cartao: item.Card, Parcelas: installments}
 	if img := strings.TrimSpace(in.Imagem); img != "" {
 		prod.Imagem, prod.Proporcao, err = a.localPhoto(img)
 	} else {
@@ -370,7 +374,7 @@ func (a *app) resolveProduct(ctx context.Context, id string, index int, in pecaP
 	if err != nil {
 		return pecaProduto{}, pecaPreco{}, err
 	}
-	return prod, pecaPreco{Produto: name, Preco: item.Price, Parcela: installments, Link: link}, nil
+	return prod, pecaPreco{Produto: name, Preco: item.Price, Cartao: item.Card, Parcela: installments, Link: link}, nil
 }
 
 func normalizeProductLink(raw string) (string, error) {
@@ -411,8 +415,34 @@ func (a *app) loadFeed(ctx context.Context) (map[string]feedItem, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := a.addCardPrices(ctx, items); err != nil {
+		return nil, err
+	}
 	a.feed = feedCache{at: a.now(), items: items}
 	return items, nil
+}
+
+func (a *app) addCardPrices(ctx context.Context, items map[string]feedItem) error {
+	var catalog struct {
+		Items []struct {
+			Slug    string  `json:"slug"`
+			CardBRL float64 `json:"cardBRL"`
+		} `json:"items"`
+	}
+	if err := a.call(ctx, http.MethodGet, "/api/storefront", nil, &catalog); err != nil {
+		return fmt.Errorf("preço no cartão indisponível: %v", err)
+	}
+	cards := map[string]float64{}
+	for _, it := range catalog.Items {
+		if it.Slug != "" && it.CardBRL > 0 {
+			cards[it.Slug] = it.CardBRL
+		}
+	}
+	for link, item := range items {
+		item.Card = cards[path.Base(link)]
+		items[link] = item
+	}
+	return nil
 }
 
 func parseFeed(r io.Reader) (map[string]feedItem, error) {

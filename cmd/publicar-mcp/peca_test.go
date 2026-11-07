@@ -109,7 +109,7 @@ func TestPecaUsesSitePriceAndPhoto(t *testing.T) {
 	}
 	props := site.renders[0]
 	first, second := props.Produtos[0], props.Produtos[1]
-	if first.Preco != 389.5 || first.Parcelas != 6 || first.Nome != "Booster Box" || first.Proporcao != 2 {
+	if first.Preco != 389.5 || first.Cartao != 410 || second.Cartao != 0 || out.Precos[0].Cartao != 410 || first.Parcelas != 6 || first.Nome != "Booster Box" || first.Proporcao != 2 {
 		t.Fatalf("primeiro produto = %+v", first)
 	}
 	if !strings.HasPrefix(first.Imagem, "agente/") {

@@ -108,3 +108,15 @@ func TestFailedRetriesUntilLimit(t *testing.T) {
 		t.Fatalf("falha permanente devia encerrar: %+v", got)
 	}
 }
+
+func TestTrialReelFormat(t *testing.T) {
+	if !ValidFormat("instagram", "teste") || ValidFormat("tiktok", "teste") {
+		t.Fatal("teste só existe no instagram")
+	}
+	if !ViaAPI("instagram", "teste") || ViaAPI("instagram", "reels") || ViaAPI("tiktok", "video") {
+		t.Fatal("só o reels de teste sai pela API")
+	}
+	if !SelfApproved("tiktok", "video") || !SelfApproved("instagram", "teste") || SelfApproved("instagram", "reels") || SelfApproved("instagram", "post") {
+		t.Fatal("aprovação sozinha só no TikTok e no reels de teste")
+	}
+}

@@ -105,12 +105,20 @@ func (s *Store) persist(all []Item) error {
 }
 
 var formats = map[string]map[string]bool{
-	"instagram": {"reels": true, "post": true, "carrossel": true},
+	"instagram": {"reels": true, "post": true, "carrossel": true, "teste": true},
 	"tiktok":    {"video": true},
 }
 
 func ValidFormat(channel, format string) bool {
 	return formats[channel][format]
+}
+
+func ViaAPI(channel, format string) bool {
+	return channel == "instagram" && format == "teste"
+}
+
+func SelfApproved(channel, format string) bool {
+	return channel == "tiktok" || ViaAPI(channel, format)
 }
 
 func (s *Store) Add(it Item) (Item, error) {

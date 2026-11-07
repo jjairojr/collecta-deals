@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"opdeals/internal/adtestq"
+	"opdeals/internal/publishq"
 )
 
 func (f *fixture) serveAds(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +102,18 @@ type fakeMeta struct {
 }
 
 func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/rupload/v27.0/") {
+		body, _ := io.ReadAll(r.Body)
+		m.mu.Lock()
+		m.calls = append(m.calls, metaCall{method: r.Method, path: strings.TrimPrefix(r.URL.Path, "/"), form: map[string]string{"body": string(body), "file_size": r.Header.Get("file_size"), "offset": r.Header.Get("offset")}})
+		m.mu.Unlock()
+		if r.Header.Get("Authorization") != "OAuth token-meta" || r.Header.Get("file_size") != strconv.Itoa(len(body)) {
+			http.Error(w, `{"error":{"message":"upload"}}`, http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": "Upload successful."})
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/v27.0/")
 	form := map[string]string{}
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
@@ -131,6 +146,10 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": insights})
 	case path == "search":
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": []map[string]string{{"id": "6003", "name": r.URL.Query().Get("q")}}})
+	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "status_code,status":
+		_ = json.NewEncoder(w).Encode(map[string]string{"status_code": "FINISHED", "status": "Finished: Media has been uploaded"})
+	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "permalink":
+		_ = json.NewEncoder(w).Encode(map[string]string{"permalink": "https://www.instagram.com/reel/teste123/"})
 	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "status":
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": map[string]string{"video_status": "ready"}})
 	case r.Method == http.MethodPost && !strings.Contains(path, "/"):
@@ -170,7 +189,7 @@ func newAdFixture(t *testing.T) (*fixture, *fakeMeta, *executor) {
 	meta := &fakeMeta{}
 	srv := httptest.NewServer(http.HandlerFunc(meta.serve))
 	t.Cleanup(srv.Close)
-	mc := metaConfig{Token: "token-meta", Account: "act_1", PageID: "page", IGUserID: "ig", IGUsername: "tcgcollecta", PixelID: "px", BaseURL: srv.URL + "/v27.0"}
+	mc := metaConfig{Token: "token-meta", Account: "act_1", PageID: "page", IGUserID: "ig", IGUsername: "tcgcollecta", PixelID: "px", BaseURL: srv.URL + "/v27.0", RuploadURL: srv.URL + "/rupload/v27.0"}
 	ex := newExecutor(f.app, mc, http.DefaultClient)
 	ex.pollEvery = time.Millisecond
 	return f, meta, ex
@@ -428,5 +447,112 @@ func TestReadEnvFile(t *testing.T) {
 	cfg, err = loadMetaConfig(func(k string) string { return env[k] })
 	if err != nil || cfg.Token != "abc" || cfg.Account != "act_123" || !strings.HasSuffix(cfg.BaseURL, "/v27.0") {
 		t.Fatalf("cfg = %+v %v", cfg, err)
+	}
+}
+
+func (f *fixture) metaEnv(t *testing.T) {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "anuncios.env")
+	if err := os.WriteFile(p, []byte("META_TOKEN=x\nMETA_INSTAGRAM_ID=ig\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.app.cfg.AdsEnv = p
+}
+
+func TestRequestTrialReelNeedsMetaToken(t *testing.T) {
+	f := newFixture(t)
+	f.app.cfg.AdsEnv = filepath.Join(t.TempDir(), "nao-existe.env")
+	video := f.file(t, "lista.mp4", "v")
+	if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video)); !strings.Contains(errText, "token do Meta") {
+		t.Fatalf("devia recusar sem token: %s", errText)
+	}
+	if all, _ := f.store.List(""); len(all) != 0 {
+		t.Fatalf("não devia criar pedido: %+v", all)
+	}
+}
+
+func trialArgs(path string) map[string]any {
+	args := reelsArgs(path)
+	args["formato"] = "teste"
+	return args
+}
+
+func TestRequestTrialReelApprovesItselfAndSkipsPublicador(t *testing.T) {
+	f := newFixture(t)
+	f.metaEnv(t)
+	video := f.file(t, "lista.mp4", "v")
+	out, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video))
+	if errText != "" || !strings.Contains(out.Proximo, "API do Instagram") {
+		t.Fatalf("saída errada: %+v %s", out, errText)
+	}
+	approved, _ := f.store.List(publishq.StatusApproved)
+	if len(approved) != 1 || approved[0].Format != "teste" {
+		t.Fatalf("reels de teste devia ficar aprovado: %+v", approved)
+	}
+	p := f.pushed()
+	if len(p) != 1 || p[0].title != "Reels de teste agendado pela Collecta" || p[0].actions != "" {
+		t.Fatalf("aviso errado: %+v", p)
+	}
+	f.now = f.now.Add(6 * time.Hour)
+	ready, errText := callTool[approvedOutput](t, f, "aprovados", map[string]any{})
+	if errText != "" || len(ready.Itens) != 0 || ready.Agendados != 0 {
+		t.Fatalf("Publicador não devia ver o reels de teste: %+v %s", ready, errText)
+	}
+}
+
+func TestExecutorPublishesTrialReel(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	f.metaEnv(t)
+	video := f.file(t, "lista.mp4", "video da lista")
+	out, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video))
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.find("ig/media")) != 0 {
+		t.Fatal("publicou antes do horário")
+	}
+	f.now = f.now.Add(5*time.Hour + time.Minute)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	created := meta.find("ig/media")
+	if len(created) != 1 || created[0].form["media_type"] != "REELS" || created[0].form["upload_type"] != "resumable" || created[0].form["trial_params"] != `{"graduation_strategy":"SS_PERFORMANCE"}` || !strings.Contains(created[0].form["caption"], "Faltam 10 dias") {
+		t.Fatalf("container errado: %+v", created)
+	}
+	up := meta.find("rupload/v27.0/" + "id1")
+	if len(up) != 1 || up[0].form["body"] != "video da lista" || up[0].form["offset"] != "0" {
+		t.Fatalf("envio errado: %+v", meta.calls)
+	}
+	if pub := meta.find("ig/media_publish"); len(pub) != 1 || pub[0].form["creation_id"] != "id1" {
+		t.Fatalf("publish errado: %+v", pub)
+	}
+	done, _ := f.store.List(publishq.StatusPublished)
+	if len(done) != 1 || done[0].ID != out.ID || done[0].Link != "https://www.instagram.com/reel/teste123/" {
+		t.Fatalf("não registrou publicado: %+v", done)
+	}
+	p := f.pushed()
+	if last := p[len(p)-1]; last.title != "Reels de teste no ar" || !strings.Contains(last.body, "reel/teste123") {
+		t.Fatalf("aviso errado: %+v", last)
+	}
+}
+
+func TestExecutorTrialReelFailureRetries(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	f.metaEnv(t)
+	meta.failOn = "/media_publish"
+	video := f.file(t, "lista.mp4", "v")
+	if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video)); errText != "" {
+		t.Fatal(errText)
+	}
+	f.now = f.now.Add(6 * time.Hour)
+	if err := ex.run(context.Background()); err == nil || !strings.Contains(err.Error(), "Objetivo indisponível") {
+		t.Fatalf("devia falhar: %v", err)
+	}
+	approved, _ := f.store.List(publishq.StatusApproved)
+	if len(approved) != 1 || approved[0].Attempts != 1 {
+		t.Fatalf("falha passageira devia voltar na próxima rodada: %+v", approved)
 	}
 }

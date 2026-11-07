@@ -25,6 +25,9 @@ type config struct {
 	MotionDir  string
 	FeedURL    string
 	Node       string
+	TCGCSVURL  string
+	LigaDir    string
+	AdsEnv     string
 }
 
 func loadConfig(getenv func(string) string) (config, error) {
@@ -35,6 +38,9 @@ func loadConfig(getenv func(string) string) (config, error) {
 		MotionDir:  filepath.Clean(cmp.Or(getenv("PUBLICAR_MOTION"), "/Users/jjairo/Documents/www/collecta-app/store/motion")),
 		FeedURL:    cmp.Or(getenv("PUBLICAR_CATALOGO"), "https://www.collectatcg.com.br/feed/meta.csv"),
 		Node:       cmp.Or(getenv("PUBLICAR_NODE"), "/opt/homebrew/bin/node"),
+		TCGCSVURL:  strings.TrimRight(cmp.Or(getenv("PUBLICAR_TCGCSV"), "https://tcgcsv.com"), "/"),
+		LigaDir:    filepath.Clean(cmp.Or(getenv("PUBLICAR_LIGA_DADOS"), "/Users/jjairo/Documents/www/opdeals/data")),
+		AdsEnv:     cmp.Or(getenv("PUBLICAR_ANUNCIOS_ENV"), defaultAdsEnv),
 	}
 	if cfg.AdminToken == "" {
 		return cfg, errors.New("OPDEALS_ADMIN_TOKEN não definido: sem ele não há fila de publicação")
@@ -56,10 +62,13 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
-const adsRunTimeout = 25 * time.Minute
+const (
+	adsRunTimeout = 25 * time.Minute
+	defaultAdsEnv = "/Users/Shared/collecta-bot/publicar/anuncios.env"
+)
 
 func runAds() error {
-	envPath := cmp.Or(os.Getenv("PUBLICAR_ANUNCIOS_ENV"), "/Users/Shared/collecta-bot/publicar/anuncios.env")
+	envPath := cmp.Or(os.Getenv("PUBLICAR_ANUNCIOS_ENV"), defaultAdsEnv)
 	file, err := readEnvFile(envPath)
 	if err != nil {
 		return fmt.Errorf("não consegui ler %s: %w", envPath, err)

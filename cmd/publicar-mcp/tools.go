@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"net/http"
 	"net/url"
@@ -28,13 +29,13 @@ import (
 //go:embed instructions.md
 var instructions string
 
-const serverInstructions = "Fila de publicação da Collecta TCG. O Social Collecta usa criar_peca, pedir_aprovacao, situacao, propor_teste e testes_anuncio; o Estrategista só situacao e testes_anuncio. O Publicador Collecta começa toda rodada pela ferramenta inicio, que traz as regras completas: leia inteiras e siga todas. Nada é postado sem aprovação do dono pelo celular."
+const serverInstructions = "Fila de publicação da Collecta TCG. O Social Collecta usa criar_peca, pedir_aprovacao, situacao, propor_teste e testes_anuncio; o Estrategista só situacao e testes_anuncio. O Publicador Collecta começa toda rodada pela ferramenta inicio, que traz as regras completas: leia inteiras e siga todas. No Instagram nada é postado sem aprovação do dono pelo celular; no TikTok o pedido já sai aprovado, para aquecer a conta."
 
 const (
 	captionMax    = 2200
 	hashtagMax    = 30
 	fileMax       = 250 << 20
-	attachMax     = 15 << 20
+	attachMax     = 2 << 20
 	scheduleAhead = 14 * 24 * time.Hour
 	scheduleSlack = 10 * time.Minute
 	carouselMin   = 2
@@ -66,17 +67,19 @@ type app struct {
 	renderMu sync.Mutex
 	feedMu   sync.Mutex
 	feed     feedCache
+	tcgMu    sync.Mutex
+	tcgCache map[string]tcgCache
 }
 
 func newApp(cfg config, client *http.Client, now func() time.Time) *app {
-	return &app{cfg: cfg, client: client, now: now, render: nodeRender(cfg.Node, cfg.MotionDir)}
+	return &app{cfg: cfg, client: client, now: now, render: nodeRender(cfg.Node, cfg.MotionDir), tcgCache: map[string]tcgCache{}}
 }
 
 func (a *app) server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "collecta-publicar", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "pedir_aprovacao",
-		Description: "Só para o Social Collecta. Manda uma peça pronta para o dono aprovar pelo celular: canal (instagram ou tiktok), formato (instagram: reels, post ou carrossel; tiktok: video), os arquivos (caminho completo dentro de store/), a legenda final e quando postar. Nada é postado sem o dono tocar em Aprovar.",
+		Description: "Só para o Social Collecta. Manda uma peça pronta para a fila do Publicador: canal (instagram ou tiktok), formato (instagram: reels, post, carrossel ou teste; tiktok: video), os arquivos (caminho completo dentro de store/), a legenda final e quando postar. Instagram só sai depois que o dono toca em Aprovar no celular. TikTok e Reels de teste (instagram teste) já saem aprovados e o dono só recebe o aviso.",
 	}, a.toolRequest)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "situacao",
@@ -99,13 +102,14 @@ func (a *app) server() *mcp.Server {
 		Description: "Só para o Publicador Collecta. Registra que a publicação não saiu e avisa o dono. permanente = true só quando tentar de novo não resolve (arquivo recusado pela rede, legenda recusada). Falha passageira volta na próxima rodada, até 3 tentativas.",
 	}, a.toolFailed)
 	a.addPecaTool(s)
+	a.addListaTool(s)
 	a.addAdTools(s)
 	return s
 }
 
 type requestInput struct {
 	Canal      string   `json:"canal" jsonschema:"instagram ou tiktok"`
-	Formato    string   `json:"formato" jsonschema:"instagram: reels, post ou carrossel; tiktok: video"`
+	Formato    string   `json:"formato" jsonschema:"instagram: reels, post, carrossel ou teste (Reels de teste: só para quem não segue, sai pela API sem aprovação e entra no perfil sozinho se for bem); tiktok: video"`
 	Arquivos   []string `json:"arquivos" jsonschema:"caminhos completos dos arquivos, na ordem do post (ex.: /Users/jjairo/Documents/www/collecta-app/store/motion/out/collecta-tcg-loja-feed.mp4)"`
 	Legenda    string   `json:"legenda" jsonschema:"a legenda final, exatamente como vai ao ar, com hashtags"`
 	PublicarEm string   `json:"publicar_em" jsonschema:"quando postar, horário de Goiânia: 2026-11-06T15:00"`
@@ -124,7 +128,10 @@ func (a *app) toolRequest(ctx context.Context, _ *mcp.CallToolRequest, in reques
 	canal := strings.ToLower(strings.TrimSpace(in.Canal))
 	formato := strings.ToLower(strings.TrimSpace(in.Formato))
 	if !publishq.ValidFormat(canal, formato) {
-		return nil, requestOutput{}, fmt.Errorf("canal %q com formato %q não existe: instagram (reels, post, carrossel) ou tiktok (video)", in.Canal, in.Formato)
+		return nil, requestOutput{}, fmt.Errorf("canal %q com formato %q não existe: instagram (reels, post, carrossel, teste) ou tiktok (video)", in.Canal, in.Formato)
+	}
+	if publishq.ViaAPI(canal, formato) && !a.metaReady() {
+		return nil, requestOutput{}, errors.New("Reels de teste ainda não está ligado: falta o token do Meta em anuncios.env. Mande a peça só para o TikTok e anote em Pendências do Jairo")
 	}
 	caption, err := checkCaption(in.Legenda)
 	if err != nil {
@@ -143,17 +150,47 @@ func (a *app) toolRequest(ctx context.Context, _ *mcp.CallToolRequest, in reques
 	if err := a.call(ctx, http.MethodPost, "/api/publish", item, &created); err != nil {
 		return nil, requestOutput{}, err
 	}
+	out := requestOutput{ID: created.ID, Quando: when.In(saoPaulo).Format("02/01 15:04"), Arquivos: len(files)}
+	if publishq.SelfApproved(canal, formato) {
+		if err := a.selfApprove(ctx, created); err != nil {
+			return nil, requestOutput{}, fmt.Errorf("pedido %s criado, mas não foi aprovado sozinho: %v", created.ID, err)
+		}
+		out.Previa = a.tellOwner(ctx, created)
+		out.Proximo = "TikTok não espera o dono: já está aprovado e o Publicador posta no horário. Anote o id na seção Peças do seu arquivo do dia e não peça de novo a mesma peça."
+		if publishq.ViaAPI(canal, formato) {
+			out.Proximo = "Reels de teste não espera o dono: já está aprovado e sai pela API do Instagram no horário (até 30 min depois), só para quem não segue a conta; se for bem, entra no perfil sozinho. Anote o id na seção Peças do seu arquivo do dia e não peça de novo a mesma peça."
+		}
+		return nil, out, nil
+	}
 	preview, err := a.askOwner(ctx, created)
 	if err != nil {
 		return nil, requestOutput{}, fmt.Errorf("pedido %s criado, mas o aviso não chegou ao dono: %v", created.ID, err)
 	}
-	return nil, requestOutput{
-		ID:       created.ID,
-		Quando:   when.In(saoPaulo).Format("02/01 15:04"),
-		Previa:   preview,
-		Arquivos: len(files),
-		Proximo:  "o dono decide pelo celular. Anote o id na seção Peças do seu arquivo do dia e não peça de novo a mesma peça.",
-	}, nil
+	out.Previa = preview
+	out.Proximo = "o dono decide pelo celular. Anote o id na seção Peças do seu arquivo do dia e não peça de novo a mesma peça."
+	return nil, out, nil
+}
+
+func (a *app) metaReady() bool {
+	env, err := readEnvFile(a.cfg.AdsEnv)
+	return err == nil && env["META_TOKEN"] != "" && env["META_INSTAGRAM_ID"] != ""
+}
+
+func (a *app) selfApprove(ctx context.Context, it publishq.Item) error {
+	q := url.Values{"acao": {"aprovar"}, "t": {it.Token}}
+	return a.call(ctx, http.MethodPost, "/api/aprovar/"+url.PathEscape(it.ID)+"?"+q.Encode(), nil, nil)
+}
+
+func (a *app) tellOwner(ctx context.Context, it publishq.Item) bool {
+	headers := map[string]string{"Title": "TikTok agendado pela Collecta", "Tags": "clapper"}
+	if publishq.ViaAPI(it.Channel, it.Format) {
+		headers["Title"] = "Reels de teste agendado pela Collecta"
+	}
+	preview, err := a.pushWithPreview(ctx, headers, ownerBody(it), previewOf(it.Files[0].Path))
+	if err != nil {
+		a.logLine(fmt.Sprintf("aviso do TikTok %s não chegou: %v", it.ID, err))
+	}
+	return preview
 }
 
 func checkCaption(raw string) (string, error) {
@@ -227,7 +264,7 @@ func (a *app) checkFiles(formato string, paths []string) ([]publishq.File, error
 		}
 		ext := strings.ToLower(filepath.Ext(real))
 		switch formato {
-		case "reels", "video":
+		case "reels", "video", "teste":
 			if !videoExt[ext] {
 				return nil, fmt.Errorf("%s precisa de vídeo .mp4 ou .mov, veio %s", formato, filepath.Base(real))
 			}
@@ -281,7 +318,7 @@ func (a *app) decideURL(it publishq.Item, action string) string {
 	return a.cfg.OpdealsURL + "/api/aprovar/" + url.PathEscape(it.ID) + "?" + q.Encode()
 }
 
-func (a *app) askOwner(ctx context.Context, it publishq.Item) (bool, error) {
+func ownerBody(it publishq.Item) string {
 	caption := it.Caption
 	if r := []rune(caption); len(r) > pushCaption {
 		caption = string(r[:pushCaption]) + "…"
@@ -294,21 +331,48 @@ func (a *app) askOwner(ctx context.Context, it publishq.Item) (bool, error) {
 	if it.Note != "" {
 		body += "Por quê: " + it.Note + "\n"
 	}
-	body += "\n" + caption
+	return body + "\n" + caption
+}
+
+func (a *app) askOwner(ctx context.Context, it publishq.Item) (bool, error) {
+	body := ownerBody(it)
 	actions := fmt.Sprintf("http, Aprovar, %s, method=POST, clear=true; http, Rejeitar, %s, method=POST, clear=true", a.decideURL(it, "aprovar"), a.decideURL(it, "rejeitar"))
 	headers := map[string]string{"Title": "Aprovar post da Collecta", "Actions": actions, "Tags": "camera", "Priority": "high"}
-	first := it.Files[0]
-	if first.Size > attachMax {
-		return false, a.push(ctx, headers, strings.NewReader(body))
+	return a.pushWithPreview(ctx, headers, body, previewOf(it.Files[0].Path))
+}
+
+func previewOf(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	if videoExt[ext] {
+		return strings.TrimSuffix(path, filepath.Ext(path)) + "-previa-1.png"
 	}
-	fh, err := os.Open(first.Path)
+	return path
+}
+
+func (a *app) pushWithPreview(ctx context.Context, headers map[string]string, body, preview string) (bool, error) {
+	if a.pushAttached(ctx, headers, body, preview) == nil {
+		return true, nil
+	}
+	return false, a.push(ctx, headers, strings.NewReader(body))
+}
+
+func (a *app) pushAttached(ctx context.Context, headers map[string]string, body, preview string) error {
+	info, err := os.Stat(preview)
 	if err != nil {
-		return false, err
+		return err
+	}
+	if info.Size() > attachMax {
+		return fmt.Errorf("prévia com %d bytes passa do limite do ntfy", info.Size())
+	}
+	fh, err := os.Open(preview)
+	if err != nil {
+		return err
 	}
 	defer fh.Close()
-	headers["Filename"] = filepath.Base(first.Path)
-	headers["Message"] = body
-	return true, a.push(ctx, headers, fh)
+	attached := maps.Clone(headers)
+	attached["Filename"] = filepath.Base(preview)
+	attached["Message"] = body
+	return a.push(ctx, attached, fh)
 }
 
 func (a *app) push(ctx context.Context, headers map[string]string, body io.Reader) error {
@@ -514,6 +578,9 @@ func (a *app) toolApproved(ctx context.Context, _ *mcp.CallToolRequest, _ noInpu
 	out := approvedOutput{Itens: []readyItem{}, Instrucoes: "publique um por vez, na ordem, e chame publicado ou falhou para cada um"}
 	now := a.now()
 	for _, it := range list.Items {
+		if publishq.ViaAPI(it.Channel, it.Format) {
+			continue
+		}
 		if it.PostAt.After(now) {
 			out.Agendados++
 			continue

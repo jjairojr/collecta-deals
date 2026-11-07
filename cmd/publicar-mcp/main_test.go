@@ -40,6 +40,7 @@ type fixture struct {
 	now     time.Time
 	mu      sync.Mutex
 	pushes  []ntfyCall
+	refuse  bool
 }
 
 func decodeHeader(v string) string {
@@ -53,6 +54,10 @@ func decodeHeader(v string) string {
 func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("X-Admin-Token") != "segredo" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if r.URL.Path == "/api/storefront" {
+		_, _ = w.Write([]byte(`{"items":[{"slug":"reinado-box","cardBRL":410},{"slug":"luffy","cardBRL":0}]}`))
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/api/adtests") {
@@ -89,6 +94,10 @@ func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string][]publishq.Item{"items": all})
+	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/aprovar/"):
+		if _, err := f.store.Decide(strings.TrimPrefix(r.URL.Path, "/api/aprovar/"), r.URL.Query().Get("t"), r.URL.Query().Get("acao") == "aprovar"); err != nil {
+			writeErr(err)
+		}
 	case strings.HasSuffix(r.URL.Path, "/published"):
 		var in struct {
 			Link string `json:"link"`
@@ -139,7 +148,11 @@ func newFixture(t *testing.T) *fixture {
 			title: decodeHeader(r.Header.Get("Title")), message: decodeHeader(r.Header.Get("Message")),
 			filename: r.Header.Get("Filename"), actions: r.Header.Get("Actions"), priority: r.Header.Get("Priority"), body: string(body),
 		})
+		refuse := f.refuse && r.Header.Get("Filename") != ""
 		f.mu.Unlock()
+		if refuse {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		}
 	}))
 	t.Cleanup(ntfy.Close)
 	cfg := config{OpdealsURL: dash.URL, AdminToken: "segredo", NtfyURL: ntfy.URL + "/topico", DataDir: f.data, MediaRoots: []string{f.media}}
@@ -245,6 +258,7 @@ func TestLoadConfig(t *testing.T) {
 func TestRequestSendsPreviewWithApproveButtons(t *testing.T) {
 	f := newFixture(t)
 	video := f.file(t, "loja.mp4", "video")
+	f.file(t, "loja-previa-1.png", "png")
 	out, errText := callTool[requestOutput](t, f, "pedir_aprovacao", reelsArgs(video))
 	if errText != "" {
 		t.Fatal(errText)
@@ -253,7 +267,7 @@ func TestRequestSendsPreviewWithApproveButtons(t *testing.T) {
 		t.Fatalf("saída errada: %+v", out)
 	}
 	p := f.pushed()
-	if len(p) != 1 || p[0].filename != "loja.mp4" || p[0].body != "video" || p[0].title != "Aprovar post da Collecta" {
+	if len(p) != 1 || p[0].filename != "loja-previa-1.png" || p[0].body != "png" || !strings.Contains(p[0].message, "loja.mp4") || p[0].title != "Aprovar post da Collecta" {
 		t.Fatalf("push errado: %+v", p)
 	}
 	if !strings.Contains(p[0].message, "Faltam 10 dias pra inauguração 💙") || !strings.Contains(p[0].message, "Por quê: ação de hoje") {
@@ -281,6 +295,43 @@ func TestRequestBigVideoGoesWithoutAttachment(t *testing.T) {
 	p := f.pushed()
 	if len(p) != 1 || p[0].filename != "" || !strings.Contains(p[0].body, "grande.mp4") {
 		t.Fatalf("push errado: %+v", p[0])
+	}
+}
+
+func TestRequestFallsBackToTextWhenAttachmentRefused(t *testing.T) {
+	f := newFixture(t)
+	f.refuse = true
+	image := f.file(t, "arte.png", "png")
+	args := reelsArgs(image)
+	args["formato"] = "post"
+	out, errText := callTool[requestOutput](t, f, "pedir_aprovacao", args)
+	if errText != "" || out.Previa {
+		t.Fatalf("devia cair para texto: %+v %s", out, errText)
+	}
+	p := f.pushed()
+	if len(p) != 2 || p[0].filename == "" || p[1].filename != "" || !strings.Contains(p[1].body, "arte.png") || !strings.Contains(p[1].actions, "acao=aprovar") {
+		t.Fatalf("push errado: %+v", p)
+	}
+}
+
+func TestRequestTiktokApprovesItself(t *testing.T) {
+	f := newFixture(t)
+	video := f.file(t, "peca.mp4", "v")
+	f.file(t, "peca-previa-1.png", "png")
+	args := reelsArgs(video)
+	args["canal"] = "tiktok"
+	args["formato"] = "video"
+	out, errText := callTool[requestOutput](t, f, "pedir_aprovacao", args)
+	if errText != "" || !out.Previa || !strings.Contains(out.Proximo, "já está aprovado") {
+		t.Fatalf("saída errada: %+v %s", out, errText)
+	}
+	approved, _ := f.store.List(publishq.StatusApproved)
+	if len(approved) != 1 || approved[0].ID != out.ID || approved[0].Channel != "tiktok" {
+		t.Fatalf("TikTok devia ficar aprovado: %+v", approved)
+	}
+	p := f.pushed()
+	if len(p) != 1 || p[0].actions != "" || p[0].title != "TikTok agendado pela Collecta" || p[0].filename != "peca-previa-1.png" {
+		t.Fatalf("aviso errado: %+v", p)
 	}
 }
 
