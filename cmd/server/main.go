@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"opdeals/internal/adtestq"
 	"opdeals/internal/api"
 	"opdeals/internal/cardimg"
 	"opdeals/internal/clearance"
@@ -55,6 +56,7 @@ func run() error {
 	promosPath := flag.String("promos", "data/promos.json", "path to the storefront promo-code ledger (cupons da vitrine)")
 	syncQueuePath := flag.String("syncqueue", "data/syncqueue.json", "path to the Liga/MyP propagation queue (saídas de estoque fora da Liga)")
 	publishPath := flag.String("publishq", "data/publishq.json", "path to the social posting approval queue (fila do Publicador)")
+	adTestsPath := flag.String("adtests", "data/adtests.json", "path to the Meta ad test approval queue (testes de anúncio do Social)")
 	ordersPath := flag.String("orders", "data/orders.json", "path to the storefront order ledger (pedidos pagos pelo site)")
 	conversationsPath := flag.String("conversations", "data/conversations.json", "path to the post-sale WhatsApp conversation ledger (pós-venda)")
 	photoDir := flag.String("item-photos", "data/item-photos", "directory for photos uploaded to holdings (served under /api/item-photos/)")
@@ -486,6 +488,7 @@ func run() error {
 	srv.PhotoDir = *photoDir
 	srv.SyncQueue = syncqueue.NewStore(*syncQueuePath)
 	srv.Publish = publishq.NewStore(*publishPath)
+	srv.AdTests = adtestq.NewStore(*adTestsPath)
 	srv.JPImport = &api.JPImport{Store: jpStore, CardRushPath: *cardRushPath}
 	checkout, err := buildCheckout(*ordersPath, *storefrontToken, *collectaAPI, *collectaStoreToken, logger)
 	if err != nil {

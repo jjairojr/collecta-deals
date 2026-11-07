@@ -17,6 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"opdeals/internal/adtestq"
 	"opdeals/internal/publishq"
 )
 
@@ -33,6 +34,7 @@ type fixture struct {
 	app     *app
 	session *mcp.ClientSession
 	store   *publishq.Store
+	ads     *adtestq.Store
 	media   string
 	data    string
 	now     time.Time
@@ -51,6 +53,10 @@ func decodeHeader(v string) string {
 func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("X-Admin-Token") != "segredo" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/adtests") {
+		f.serveAds(w, r)
 		return
 	}
 	writeErr := func(err error) {
@@ -123,6 +129,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f.store = publishq.NewStoreWithClock(filepath.Join(root, "publishq.json"), func() time.Time { return f.now })
+	f.ads = adtestq.NewStoreWithClock(filepath.Join(root, "adtests.json"), func() time.Time { return f.now })
 	dash := httptest.NewServer(http.HandlerFunc(f.serveDashboard))
 	t.Cleanup(dash.Close)
 	ntfy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -19,7 +19,7 @@ AIR_ARGS := $(if $(MYP),-build.args_bin "-web= $(MYP)")
 ARGS     ?=
 
 .DEFAULT_GOAL := dev
-.PHONY: dev server web cli build web-build cfgate cfgate-once atendente baixa publicar test tidy clean ensure-air help
+.PHONY: dev server web cli build web-build cfgate cfgate-once atendente baixa publicar anuncios test tidy clean ensure-air help
 
 ## dev: Go server (air) + Vite web dev, together; Ctrl-C stops both.
 dev: web/node_modules ensure-air
@@ -69,6 +69,9 @@ baixa:
 ## publicar: build the social posting MCP and install it under /Users/Shared/collecta-bot/publicar (see bot/publicar/SETUP.md).
 publicar:
 	sh bot/publicar/install.sh
+
+anuncios: publicar
+	sh bot/publicar/anuncios-install.sh
 
 web-build: web/node_modules
 	cd web && npm run build

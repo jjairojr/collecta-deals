@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"opdeals/internal/adtestq"
 	"opdeals/internal/cardimg"
 	"opdeals/internal/compare"
 	"opdeals/internal/expenses"
@@ -67,6 +68,7 @@ type Server struct {
 	postSale       postSaleState
 	SyncQueue      *syncqueue.Store
 	Publish        *publishq.Store
+	AdTests        *adtestq.Store
 	JPImport       *JPImport
 	imports        *importsCache
 	releasing      sync.Map
@@ -225,6 +227,9 @@ func (s *Server) Handler() http.Handler {
 	if s.Publish != nil {
 		s.publishRoutes(mux)
 	}
+	if s.AdTests != nil {
+		s.adTestRoutes(mux)
+	}
 	if s.webDir != "" {
 		mux.Handle("/", s.spaHandler())
 	}
@@ -244,6 +249,7 @@ var publicAPIPrefixes = []string{
 	"/api/whatsapp/",
 	"/api/postsale/",
 	"/api/aprovar/",
+	"/api/aprovar-anuncio/",
 }
 
 func isPublicAPI(path string) bool {

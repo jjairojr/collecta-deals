@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,9 @@ type config struct {
 	NtfyURL    string
 	DataDir    string
 	MediaRoots []string
+	MotionDir  string
+	FeedURL    string
+	Node       string
 }
 
 func loadConfig(getenv func(string) string) (config, error) {
@@ -28,6 +32,9 @@ func loadConfig(getenv func(string) string) (config, error) {
 		OpdealsURL: strings.TrimRight(cmp.Or(getenv("OPDEALS_URL"), "https://collecta-deals-production.up.railway.app"), "/"),
 		AdminToken: getenv("OPDEALS_ADMIN_TOKEN"),
 		DataDir:    cmp.Or(getenv("PUBLICAR_DADOS"), "/Users/Shared/collecta-bot/publicar"),
+		MotionDir:  filepath.Clean(cmp.Or(getenv("PUBLICAR_MOTION"), "/Users/jjairo/Documents/www/collecta-app/store/motion")),
+		FeedURL:    cmp.Or(getenv("PUBLICAR_CATALOGO"), "https://www.collectatcg.com.br/feed/meta.csv"),
+		Node:       cmp.Or(getenv("PUBLICAR_NODE"), "/opt/homebrew/bin/node"),
 	}
 	if cfg.AdminToken == "" {
 		return cfg, errors.New("OPDEALS_ADMIN_TOKEN não definido: sem ele não há fila de publicação")
@@ -49,7 +56,42 @@ func loadConfig(getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
+const adsRunTimeout = 25 * time.Minute
+
+func runAds() error {
+	envPath := cmp.Or(os.Getenv("PUBLICAR_ANUNCIOS_ENV"), "/Users/Shared/collecta-bot/publicar/anuncios.env")
+	file, err := readEnvFile(envPath)
+	if err != nil {
+		return fmt.Errorf("não consegui ler %s: %w", envPath, err)
+	}
+	getenv := func(k string) string {
+		if v, ok := file[k]; ok {
+			return v
+		}
+		return os.Getenv(k)
+	}
+	cfg, err := loadConfig(getenv)
+	if err != nil {
+		return err
+	}
+	mc, err := loadMetaConfig(getenv)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Timeout: 5 * time.Minute}
+	a := newApp(cfg, client, time.Now)
+	ctx, cancel := context.WithTimeout(context.Background(), adsRunTimeout)
+	defer cancel()
+	return newExecutor(a, mc, client).run(ctx)
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "anuncios" {
+		if err := runAds(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	cfg, err := loadConfig(os.Getenv)
 	if err != nil {
 		log.Fatal(err)

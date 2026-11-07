@@ -15,8 +15,14 @@ manda o link no ntfy.
 - O Publicador só consegue enviar arquivo de `/Users/Shared/collecta-bot/publicar/aprovados/<id>/`, que só recebe o
   que foi aprovado. Ele só abre `instagram.com` e `tiktok.com` (sem DM, conta, anúncio, live), não roda script, não
   pede aprovação e não fala com outro agente.
-- Quem usa o quê: Social `pedir_aprovacao` e `situacao`; Estrategista `situacao`; Publicador `inicio`, `aprovados`,
-  `publicado` e `falhou`. A trava de cada pasta garante.
+- Quem usa o quê: Social `criar_peca`, `pedir_aprovacao` e `situacao`; Estrategista `situacao`; Publicador `inicio`,
+  `aprovados`, `publicado` e `falhou`. A trava de cada pasta garante.
+- `criar_peca` gera o vídeo (1080x1920, Reels e TikTok) ou a arte (1080x1350) com os modelos `Peca-Story` e `Arte-Feed`
+  de `collecta-app/store/motion` (`scripts/peca.mjs`, Chrome do sistema na porta 3123). Preço e foto vêm do catálogo
+  do site (`/feed/meta.csv`); o agente só escreve os textos, com limite de letras e sem travessão. Saída em
+  `store/motion/out/agente/`, fotos baixadas em `store/motion/public/agente/` (apagadas depois de 3 dias), registro em
+  `pecas.log`. Uma peça por vez, até 12 por dia. Variáveis opcionais: `PUBLICAR_MOTION`, `PUBLICAR_CATALOGO`,
+  `PUBLICAR_NODE`.
 - Registro: `/Users/Shared/collecta-bot/publicar/publicacoes.log` e `bloqueios.log`.
 - Fora por enquanto: story, música da biblioteca do Instagram e carrossel com música.
 
@@ -61,3 +67,46 @@ manda o link no ntfy.
 - Pedido parado em "esperando o dono": o Jairo não tocou em Aprovar. O botão só funciona uma vez.
 - Falha passageira volta na próxima rodada, até 3 tentativas; depois disso, ou com `permanente`, a peça sai da fila e
   o Social precisa pedir de novo.
+
+## Testes de anúncio no Meta
+
+O Social propõe com `propor_teste` (2 a 5 criativos, objetivo `seguidores` ou `vendas`, público `goiania` ou `brasil`,
+verba total de R$ 30 a R$ 150 e 3 a 7 dias). O Jairo recebe o ntfy com a capa do primeiro criativo e os botões
+**Aprovar** e **Rejeitar** (`POST /api/aprovar-anuncio/{id}`). O teto é de R$ 150 em 7 dias somando todos os testes que
+não foram rejeitados, conferido no dashboard (`internal/adtestq`, `data/adtests.json`).
+
+O `com.collecta.anuncios` (launchd, a cada 30 min) roda `publicar-mcp anuncios`:
+
+- Teste aprovado: cria a campanha, o conjunto com `lifetime_budget` igual à verba aprovada e `end_time`, sobe os
+  vídeos e as imagens, cria um anúncio por criativo, tudo pausado, e só no fim liga anúncios, conjunto e campanha.
+  Se algo falhar no meio, pausa a campanha, marca o teste como falho e avisa. O arquivo é conferido pelo SHA-256.
+- Teste no ar: lê os números por anúncio. Depois de R$ 15 gastos, pausa o criativo sem resultado ou com custo por
+  resultado acima do dobro do melhor, sempre deixando 2 ligados. Nunca aumenta verba nem liga nada sozinho.
+- Uma hora depois do fim: grava o resumo com o vencedor (o Social lê em `testes_anuncio`) e avisa.
+- Seguidores: `OUTCOME_TRAFFIC` com destino perfil do Instagram (`PROFILE_VISIT`), 30 km da loja, 18 a 45 anos,
+  medido em cliques para o perfil. Vendas: `OUTCOME_SALES` com o Pixel em `PURCHASE`, Brasil com interesse em Pokémon,
+  One Piece e card game, medido em compras, ou visitas à página enquanto não houver compra.
+- Registro em `/Users/Shared/collecta-bot/publicar/anuncios.log`; o vigia `com.collecta.saude` avisa se o job parar.
+
+### Uma vez só
+
+1. **Saldo:** recarregue o pré-pago da conta de anúncios. Sem saldo nada entrega.
+2. **App:** em developers.facebook.com, crie um app do tipo Empresa ligado ao portfólio Collecta TCG (ou use um que
+   já exista) e adicione o produto **Marketing API**. Para a conta da própria loja não precisa de revisão do app.
+3. **Usuário do sistema:** Configurações do negócio > Usuários > Usuários do sistema > Adicionar (função Admin).
+   Em "Atribuir ativos", dê controle total da **conta de anúncios**, da **Página** e da **conta do Instagram**
+   @tcgcollecta. Em Apps, adicione o app do passo 2.
+4. **Token:** no usuário do sistema, "Gerar novo token", escolha o app, validade **Nunca** e marque `ads_management`,
+   `ads_read`, `business_management`, `pages_show_list`, `pages_read_engagement` e `instagram_basic`. Copie o token
+   direto para o arquivo do passo 6; não mande por chat.
+5. **Ids:** conta de anúncios (`act_...`, no Gerenciador de Anúncios), Página (Configurações da Página > id) e o
+   id do Instagram (Configurações do negócio > Contas do Instagram > @tcgcollecta). O Pixel já é `959341777245828`.
+6. **Ligar:**
+   ```sh
+   cd ~/Documents/www/opdeals && make anuncios
+   ```
+   Na primeira vez ele cria `/Users/Shared/collecta-bot/publicar/anuncios.env` (chmod 600) e para. Preencha o
+   arquivo (token, ids, `OPDEALS_ADMIN_TOKEN` e o `NTFY_TOPIC` do radar) e rode `make anuncios` de novo.
+7. **Primeiro teste assistido:** peça ao Social um teste de seguidores com R$ 30 em 3 dias, aprove e confira no
+   Gerenciador de Anúncios, depois de até 30 min, a campanha "Collecta teste ...". O objetivo de visitas ao perfil
+   está em liberação gradual no Meta: se a conta não tiver, o teste falha com o motivo no ntfy e nada é gasto.

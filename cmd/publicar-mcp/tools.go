@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -27,7 +28,7 @@ import (
 //go:embed instructions.md
 var instructions string
 
-const serverInstructions = "Fila de publicação da Collecta TCG. O Social Collecta usa pedir_aprovacao e situacao, o Estrategista só situacao. O Publicador Collecta começa toda rodada pela ferramenta inicio, que traz as regras completas: leia inteiras e siga todas. Nada é postado sem aprovação do dono pelo celular."
+const serverInstructions = "Fila de publicação da Collecta TCG. O Social Collecta usa criar_peca, pedir_aprovacao, situacao, propor_teste e testes_anuncio; o Estrategista só situacao e testes_anuncio. O Publicador Collecta começa toda rodada pela ferramenta inicio, que traz as regras completas: leia inteiras e siga todas. Nada é postado sem aprovação do dono pelo celular."
 
 const (
 	captionMax    = 2200
@@ -58,13 +59,17 @@ func mustLocation(name string) *time.Location {
 }
 
 type app struct {
-	cfg    config
-	client *http.Client
-	now    func() time.Time
+	cfg      config
+	client   *http.Client
+	now      func() time.Time
+	render   renderFunc
+	renderMu sync.Mutex
+	feedMu   sync.Mutex
+	feed     feedCache
 }
 
 func newApp(cfg config, client *http.Client, now func() time.Time) *app {
-	return &app{cfg: cfg, client: client, now: now}
+	return &app{cfg: cfg, client: client, now: now, render: nodeRender(cfg.Node, cfg.MotionDir)}
 }
 
 func (a *app) server() *mcp.Server {
@@ -93,6 +98,8 @@ func (a *app) server() *mcp.Server {
 		Name:        "falhou",
 		Description: "Só para o Publicador Collecta. Registra que a publicação não saiu e avisa o dono. permanente = true só quando tentar de novo não resolve (arquivo recusado pela rede, legenda recusada). Falha passageira volta na próxima rodada, até 3 tentativas.",
 	}, a.toolFailed)
+	a.addPecaTool(s)
+	a.addAdTools(s)
 	return s
 }
 
