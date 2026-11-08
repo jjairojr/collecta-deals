@@ -35,7 +35,7 @@ var adStatusLabel = map[string]string{
 func (a *app) addAdTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "propor_teste",
-		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Teto de R$ 150 por semana somando todos os testes.",
+		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 500 por semana somando todos os testes.",
 	}, a.toolProposeAdTest)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "testes_anuncio",
@@ -55,7 +55,7 @@ type proposeInput struct {
 	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, 18 a 45 anos) ou brasil (Brasil, interesse em Pokémon, One Piece e card game)"`
 	Link       string            `json:"link,omitempty" jsonschema:"só em vendas: página do site para onde o anúncio leva (https://www.collectatcg.com.br/...)"`
 	Criativos  []adCreativeInput `json:"criativos" jsonschema:"de 2 a 5 criativos, cada um com um gancho diferente"`
-	VerbaReais int               `json:"verba_reais" jsonschema:"verba total do teste em reais, de 30 a 150, dentro do que cabe na semana"`
+	VerbaReais int               `json:"verba_reais" jsonschema:"verba total do teste em reais, de 30 a 300, dentro do que cabe na semana"`
 	Dias       int               `json:"dias" jsonschema:"duração, de 3 a 7 dias"`
 	Motivo     string            `json:"motivo" jsonschema:"uma linha para o dono decidir: o que o teste quer descobrir"`
 }
@@ -84,8 +84,8 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, proposeOutput{}, fmt.Errorf("objetivo %q não existe: seguidores ou vendas", in.Objetivo)
 	case t.Audience != "goiania" && t.Audience != "brasil":
 		return nil, proposeOutput{}, fmt.Errorf("publico %q não existe: goiania ou brasil", in.Publico)
-	case t.BudgetCents < adtestq.MinBudgetCents || t.BudgetCents > adtestq.WeeklyCapCents:
-		return nil, proposeOutput{}, fmt.Errorf("verba_reais vai de %d a %d", adtestq.MinBudgetCents/100, adtestq.WeeklyCapCents/100)
+	case t.BudgetCents < adtestq.MinBudgetCents || t.BudgetCents > adtestq.MaxBudgetCents:
+		return nil, proposeOutput{}, fmt.Errorf("verba_reais vai de %d a %d", adtestq.MinBudgetCents/100, adtestq.MaxBudgetCents/100)
 	case t.Days < adtestq.MinDays || t.Days > adtestq.MaxDays:
 		return nil, proposeOutput{}, fmt.Errorf("dias vai de %d a %d", adtestq.MinDays, adtestq.MaxDays)
 	case len(in.Criativos) < adtestq.MinCreatives || len(in.Criativos) > adtestq.MaxCreatives:

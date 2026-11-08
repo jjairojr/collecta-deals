@@ -135,6 +135,18 @@ func TestPecaUsesSitePriceAndPhoto(t *testing.T) {
 	}
 }
 
+func TestPecaPriceMode(t *testing.T) {
+	f, site := newPecaFixture(t)
+	args := pecaArgs("produto", "video", map[string]any{"link": "https://www.collectatcg.com.br/selado/reinado-box", "nome": "Box"})
+	args["preco"] = " Parcela "
+	if _, errText := callTool[pecaOutput](t, f, "criar_peca", args); errText != "" {
+		t.Fatal(errText)
+	}
+	if site.renders[0].Preco != "parcela" {
+		t.Fatalf("preco = %q", site.renders[0].Preco)
+	}
+}
+
 func TestPecaArteReturnsImageAsPreview(t *testing.T) {
 	f, _ := newPecaFixture(t)
 	out, errText := callTool[pecaOutput](t, f, "criar_peca", pecaArgs("carta", "arte", map[string]any{"link": "https://www.collectatcg.com.br/carta/luffy"}))
@@ -192,7 +204,7 @@ func TestPecaRefuses(t *testing.T) {
 			return a
 		}, "gancho com 41 letras"},
 		{"carta com dois", func() map[string]any { return pecaArgs("carta", "video", box, box) }, "exatamente 1"},
-		{"sem produto", func() map[string]any { return pecaArgs("produto", "video") }, "de 1 a 3"},
+		{"sem produto", func() map[string]any { return pecaArgs("produto", "video") }, "de 1 a 5"},
 		{"site de fora", func() map[string]any {
 			return pecaArgs("produto", "video", map[string]any{"link": "https://www.ligapokemon.com.br/selado/reinado-box"})
 		}, "não é de um produto do site"},
@@ -214,6 +226,11 @@ func TestPecaRefuses(t *testing.T) {
 			a["final"] = map[string]any{"titulo": "Oi", "oferta": "x", "linhas": []string{"a", "b", "c", "d"}, "cta": "Link"}
 			return a
 		}, "de 1 a 3 linhas"},
+		{"preco inventado", func() map[string]any {
+			a := pecaArgs("produto", "video", map[string]any{"link": box["link"], "nome": "Box"})
+			a["preco"] = "boleto"
+			return a
+		}, "pix, parcela ou desconto"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

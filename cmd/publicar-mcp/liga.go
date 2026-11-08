@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ligaStale      = 48 * time.Hour
+	ligaStale      = 60 * time.Hour
 	ligaWindow     = 7 * 24 * time.Hour
 	ligaWindowMax  = 21 * 24 * time.Hour
 	ligaSetLag     = 24 * time.Hour
@@ -109,7 +109,7 @@ func (a *app) ligaSets(store *tracking.Store, game listaGame) ([]ligaSet, error)
 		return nil, fmt.Errorf("sem snapshots da Liga de %s com 7 dias de histórico", game.name)
 	}
 	if a.now().Sub(newest) > ligaStale {
-		return nil, fmt.Errorf("os dados da Liga de %s estão parados desde %s: sem dado novo não dá para dizer o que subiu ou vendeu. Anote em Pendências do Jairo (o coletor do opdeals precisa rodar)", game.name, newest.Format("02/01 15h"))
+		return nil, fmt.Errorf("os dados da Liga de %s estão parados desde %s: sem dado novo não dá para dizer o que subiu ou vendeu. Anote em Pendências do Jairo (o container opdeals no Docker coleta a cada 48h e não completou o último ciclo)", game.name, newest.Format("02/01 15h"))
 	}
 	fresh := found[:0]
 	for _, s := range found {

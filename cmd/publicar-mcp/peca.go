@@ -35,7 +35,8 @@ const (
 	photoMax       = 15 << 20
 	renderTimeout  = 8 * time.Minute
 	rendersPerDay  = 30
-	productsMax    = 3
+	productsMax    = 5
+	countdownMax   = 3
 	stagingKeep    = 3 * 24 * time.Hour
 	countdownLimit = 30
 	siteHost       = "www.collectatcg.com.br"
@@ -51,6 +52,8 @@ var (
 	pecaKinds     = map[string]string{"video": ".mp4", "arte": ".png"}
 	photoTypes    = map[string]string{"image/jpeg": ".jpg", "image/png": ".png"}
 )
+
+var priceModes = map[string]bool{"pix": true, "parcela": true, "desconto": true}
 
 type textLimit struct {
 	field string
@@ -74,7 +77,7 @@ type pecaFinalInput struct {
 }
 
 type pecaInput struct {
-	Modelo   string             `json:"modelo" jsonschema:"produto (1 a 3 produtos com preço), carta (1 carta avulsa com preço) ou contagem (faltam N dias para a inauguração, com até 3 produtos)"`
+	Modelo   string             `json:"modelo" jsonschema:"produto (1 a 5 produtos com preço, cada um com a sua cena de preço), carta (1 carta avulsa com preço) ou contagem (faltam N dias para a inauguração, com até 3 produtos)"`
 	Formato  string             `json:"formato" jsonschema:"video (Reels e TikTok, 1080x1920) ou arte (post do Instagram, 1080x1350)"`
 	Etiqueta string             `json:"etiqueta" jsonschema:"linha pequena no topo, até 32 letras (ex.: Pokémon · Selado)"`
 	Gancho   string             `json:"gancho" jsonschema:"frase grande dos primeiros segundos, de 4 a 40 letras, sem travessão"`
@@ -82,6 +85,7 @@ type pecaInput struct {
 	Selos    []string           `json:"selos,omitempty" jsonschema:"até 2 selos curtos, até 22 letras cada (ex.: Em português, Lacrado). Na contagem o primeiro vira o selo de baixo"`
 	Produtos []pecaProdutoInput `json:"produtos,omitempty" jsonschema:"produtos do site; o preço e a foto vêm do site, nunca digite preço"`
 	ParaODia string             `json:"para_o_dia,omitempty" jsonschema:"só na contagem: o dia em que a peça vai ao ar, AAAA-MM-DD (padrão: hoje). Os dias que faltam são contados daí"`
+	Preco    string             `json:"preco,omitempty" jsonschema:"como o cartão de preço aparece: pix (só o preço no Pix), parcela (6x sem juros de R$ X, com o total no cartão) ou desconto (de R$ cartão riscado por R$ Pix, com o desconto). Sem ele: preço no Pix com o cartão embaixo"`
 	Final    pecaFinalInput     `json:"final"`
 }
 
@@ -130,6 +134,7 @@ type pecaProps struct {
 	Produtos []pecaProduto `json:"produtos"`
 	Dias     int           `json:"dias"`
 	Final    pecaFinal     `json:"final"`
+	Preco    string        `json:"preco,omitempty"`
 }
 
 type renderResult struct {
@@ -235,8 +240,8 @@ func checkProductCount(modelo string, n int) error {
 		return errors.New("carta leva exatamente 1 produto (a carta do site)")
 	case modelo == "produto" && (n < 1 || n > productsMax):
 		return fmt.Errorf("produto leva de 1 a %d produtos", productsMax)
-	case modelo == "contagem" && n > productsMax:
-		return fmt.Errorf("contagem leva até %d produtos", productsMax)
+	case modelo == "contagem" && n > countdownMax:
+		return fmt.Errorf("contagem leva até %d produtos", countdownMax)
 	}
 	return nil
 }
@@ -250,6 +255,7 @@ func (a *app) pecaTexts(modelo string, in pecaInput) (pecaProps, error) {
 		Destaque: cleanList(in.Destaque),
 		Selos:    cleanList(in.Selos),
 		Produtos: []pecaProduto{},
+		Preco:    strings.ToLower(strings.TrimSpace(in.Preco)),
 		Final: pecaFinal{
 			Titulo:   cleanLine(in.Final.Titulo),
 			Destaque: cleanList(in.Final.Destaque),
@@ -288,6 +294,8 @@ func (a *app) pecaTexts(modelo string, in pecaInput) (pecaProps, error) {
 		return pecaProps{}, errors.New("até 2 selos")
 	case len(props.Final.Linhas) < 1 || len(props.Final.Linhas) > 3:
 		return pecaProps{}, errors.New("final.linhas leva de 1 a 3 linhas")
+	case props.Preco != "" && !priceModes[props.Preco]:
+		return pecaProps{}, fmt.Errorf("preco %q não existe: pix, parcela ou desconto", in.Preco)
 	}
 	return props, nil
 }

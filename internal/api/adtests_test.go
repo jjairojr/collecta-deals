@@ -9,7 +9,7 @@ import (
 	"opdeals/internal/adtestq"
 )
 
-const adTestBody = `{"objective":"seguidores","audience":"goiania","budgetCents":10000,"days":4,"creatives":[
+const adTestBody = `{"objective":"seguidores","audience":"goiania","budgetCents":30000,"days":4,"creatives":[
 {"path":"/x/a.mp4","sha256":"a","size":1,"kind":"video","thumb":"/x/a.png","text":"oi","hook":"preço"},
 {"path":"/x/b.png","sha256":"b","size":1,"kind":"imagem","text":"oi","hook":"loja"}]}`
 
@@ -46,7 +46,7 @@ func TestAdTestFlow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err)
 	}
-	if len(list.Items) != 1 || list.Items[0].Token != "" || list.AvailableCents != 5000 {
+	if len(list.Items) != 1 || list.Items[0].Token != "" || list.AvailableCents != 20000 {
 		t.Fatalf("lista = %+v", list)
 	}
 	started := `{"meta":{"campaignId":"c","adSetId":"s","ads":[{"id":"a1"}]},"endsAt":"2026-11-10T23:59:00-03:00"}`

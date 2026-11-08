@@ -20,17 +20,23 @@ func newStore(t *testing.T, now *time.Time) *Store {
 func TestWeeklyCap(t *testing.T) {
 	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
 	s := newStore(t, &now)
-	first, err := s.Add(sample(10000))
+	first, err := s.Add(sample(30000))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add(sample(6000)); !errors.Is(err, ErrOverBudget) {
+	if _, err := s.Add(sample(25000)); !errors.Is(err, ErrOverBudget) {
 		t.Fatalf("passou do teto: %v", err)
 	}
 	if _, err := s.Decide(first.ID, first.Token, false); err != nil {
 		t.Fatal(err)
 	}
-	second, err := s.Add(sample(15000))
+	if _, err := s.Add(sample(MaxBudgetCents + 100)); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("acima do teto por teste devia ser recusado: %v", err)
+	}
+	if _, err := s.Add(sample(20000)); err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.Add(sample(30000))
 	if err != nil {
 		t.Fatalf("rejeitado devia liberar a verba: %v", err)
 	}

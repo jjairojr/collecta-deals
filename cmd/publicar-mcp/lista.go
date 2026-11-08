@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -22,11 +24,15 @@ const (
 	headlinesMax   = 3
 	headlineMaxAge = 7 * 24 * time.Hour
 	cardTitleMax   = 32
+	chaseDefault   = 4
+	chaseFloorUSD  = 5
 )
 
 var (
-	listaTipos = map[string]bool{"lancamentos": true, "subiram": true, "em_alta": true, "noticias": true}
+	listaTipos = map[string]bool{"lancamentos": true, "subiram": true, "em_alta": true, "noticias": true, "podem_vir": true}
 	listaKinds = map[string]string{"video": "lista", "arte": "lista-arte"}
+	chaseHook  = regexp.MustCompile(`(?i)\bpodem?\s+(vir|sair)\b`)
+	pulledWord = regexp.MustCompile(`(?i)\b(tiramos|tirei|tirou|abrimos|abri|puxamos|puxei|puxou|saiu pra|saíram pra|nosso pull|pegamos)\b`)
 	months     = []string{"JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"}
 )
 
@@ -38,16 +44,17 @@ type listaManchete struct {
 }
 
 type listaInput struct {
-	Tipo      string            `json:"tipo" jsonschema:"lancamentos (sets do mês, data do TCGplayer EUA), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (cartas mais vendidas na Liga em 7 dias) ou noticias (1 a 3 manchetes com link)"`
+	Tipo      string            `json:"tipo" jsonschema:"lancamentos (sets do mês, data do TCGplayer EUA), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (cartas mais vendidas na Liga em 7 dias), noticias (1 a 3 manchetes com link) ou podem_vir (cartas mais caras que podem vir no set, preço de mercado do TCGplayer EUA, e no fim o produto do site com o nosso preço; para anúncio)"`
 	Jogo      string            `json:"jogo" jsonschema:"pokemon, onepiece, riftbound, magic, yugioh ou lorcana. subiram e em_alta: só pokemon, onepiece e riftbound"`
 	Formato   string            `json:"formato" jsonschema:"video (Reels e TikTok, 1080x1920) ou arte (post do Instagram, 1080x1350)"`
 	Mes       string            `json:"mes,omitempty" jsonschema:"só em lancamentos: AAAA-MM (padrão: o mês de hoje)"`
-	Itens     int               `json:"itens,omitempty" jsonschema:"só em subiram e em_alta: quantas cartas, de 3 a 5 (padrão 5)"`
+	Set       string            `json:"set,omitempty" jsonschema:"só em podem_vir: sigla ou nome do set no TCGplayer (ex.: DLR ou Delta Reign, OP18)"`
+	Itens     int               `json:"itens,omitempty" jsonschema:"só em subiram, em_alta e podem_vir: quantas cartas, de 3 a 5 (padrão 5; em podem_vir padrão 4)"`
 	Etiqueta  string            `json:"etiqueta" jsonschema:"linha pequena no topo, até 32 letras (ex.: One Piece · Liga)"`
 	Gancho    string            `json:"gancho" jsonschema:"frase grande dos primeiros segundos, de 4 a 40 letras, sem travessão (ex.: AS CARTAS QUE MAIS SUBIRAM)"`
 	Destaque  []string          `json:"destaque,omitempty" jsonschema:"palavras do gancho pintadas de verde, até 4"`
 	Manchetes []listaManchete   `json:"manchetes,omitempty" jsonschema:"só em noticias: de 1 a 3 manchetes"`
-	Produto   *pecaProdutoInput `json:"produto,omitempty" jsonschema:"só em lancamentos, opcional: produto do site desse lançamento; entra no fim com o preço do site"`
+	Produto   *pecaProdutoInput `json:"produto,omitempty" jsonschema:"lancamentos (opcional) e podem_vir (obrigatório): produto do site; entra no fim com o preço do site no Pix e no cartão"`
 	Final     pecaFinalInput    `json:"final"`
 }
 
@@ -61,6 +68,7 @@ type listaItem struct {
 	Agora     float64      `json:"agora,omitempty"`
 	Alta      int          `json:"alta,omitempty"`
 	Unidades  int          `json:"unidades,omitempty"`
+	Dolar     float64      `json:"dolar,omitempty"`
 	Produto   *pecaProduto `json:"produto,omitempty"`
 }
 
@@ -84,6 +92,7 @@ type listaSaida struct {
 	Agora    float64 `json:"preco_agora,omitempty"`
 	Alta     int     `json:"alta_pct,omitempty"`
 	Unidades int     `json:"unidades,omitempty"`
+	Dolar    float64 `json:"preco_mercado_usd,omitempty"`
 	Link     string  `json:"link,omitempty"`
 }
 
@@ -107,7 +116,7 @@ type listaBuild struct {
 func (a *app) addListaTool(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "criar_lista",
-		Description: "Só para o Social Collecta. Gera vídeo ou arte de conteúdo com dados reais que a própria ferramenta busca: lancamentos (sets do mês no TCGplayer), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (mais vendidas na Liga em 7 dias) ou noticias (manchetes com link). Você escreve só os textos; datas, preços e vendas vêm da fonte e voltam em itens. Olhe as prévias com Read antes de pedir aprovação. Conta no limite de 30 peças por dia junto com criar_peca.",
+		Description: "Só para o Social Collecta. Gera vídeo ou arte de conteúdo com dados reais que a própria ferramenta busca: lancamentos (sets do mês no TCGplayer), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (mais vendidas na Liga em 7 dias) noticias (manchetes com link) ou podem_vir (anúncio: as cartas mais caras que podem vir no set, com preço de mercado do TCGplayer EUA, e o produto do site com o nosso preço). Você escreve só os textos; datas, preços e vendas vêm da fonte e voltam em itens. Olhe as prévias com Read antes de pedir aprovação. Conta no limite de 30 peças por dia junto com criar_peca.",
 	}, a.toolLista)
 }
 
@@ -119,14 +128,18 @@ func (a *app) toolLista(ctx context.Context, _ *mcp.CallToolRequest, in listaInp
 		ext = ".png"
 	}
 	if !listaTipos[tipo] || !ok {
-		return nil, listaOutput{}, fmt.Errorf("tipo %q ou formato %q não existe: tipo lancamentos, subiram, em_alta ou noticias; formato video ou arte", in.Tipo, in.Formato)
+		return nil, listaOutput{}, fmt.Errorf("tipo %q ou formato %q não existe: tipo lancamentos, subiram, em_alta, noticias ou podem_vir; formato video ou arte", in.Tipo, in.Formato)
 	}
 	jogo := strings.ToLower(strings.TrimSpace(in.Jogo))
 	game, ok := listaGames[jogo]
 	if !ok {
 		return nil, listaOutput{}, fmt.Errorf("jogo %q não existe: pokemon, onepiece, riftbound, magic, yugioh ou lorcana", in.Jogo)
 	}
-	texts, err := a.pecaTexts("lista", pecaInput{Etiqueta: in.Etiqueta, Gancho: in.Gancho, Destaque: in.Destaque, Final: in.Final})
+	textIn := pecaInput{Etiqueta: in.Etiqueta, Gancho: in.Gancho, Destaque: in.Destaque, Final: in.Final}
+	if in.Produto != nil {
+		textIn.Produtos = []pecaProdutoInput{*in.Produto}
+	}
+	texts, err := a.pecaTexts("lista", textIn)
 	if err != nil {
 		return nil, listaOutput{}, err
 	}
@@ -148,6 +161,8 @@ func (a *app) toolLista(ctx context.Context, _ *mcp.CallToolRequest, in listaInp
 		b, err = a.buildReleases(ctx, id, game, in)
 	case "noticias":
 		b, err = a.buildNews(ctx, id, game, in.Manchetes)
+	case "podem_vir":
+		b, err = a.buildChase(ctx, id, game, in)
 	default:
 		b, err = a.buildLiga(ctx, id, game, tipo, in.Itens)
 	}
@@ -192,12 +207,22 @@ func checkListaShape(tipo string, in listaInput) error {
 		return errors.New("manchetes só valem no tipo noticias")
 	case tipo == "noticias" && (len(in.Manchetes) < 1 || len(in.Manchetes) > headlinesMax):
 		return fmt.Errorf("noticias leva de 1 a %d manchetes", headlinesMax)
-	case tipo != "lancamentos" && (in.Produto != nil || strings.TrimSpace(in.Mes) != ""):
-		return errors.New("produto e mes só valem no tipo lancamentos")
-	case (tipo == "subiram" || tipo == "em_alta") && in.Itens != 0 && (in.Itens < listaMin || in.Itens > listaDefault):
+	case tipo != "lancamentos" && strings.TrimSpace(in.Mes) != "":
+		return errors.New("mes só vale no tipo lancamentos")
+	case tipo != "lancamentos" && tipo != "podem_vir" && in.Produto != nil:
+		return errors.New("produto só vale em lancamentos e podem_vir")
+	case tipo != "podem_vir" && strings.TrimSpace(in.Set) != "":
+		return errors.New("set só vale em podem_vir")
+	case tipo == "podem_vir" && (in.Produto == nil || strings.TrimSpace(in.Set) == ""):
+		return errors.New("podem_vir precisa de set (sigla do TCGplayer, ex.: DLR) e produto (link do site)")
+	case tipo == "podem_vir" && !chaseHook.MatchString(in.Gancho):
+		return errors.New(`em podem_vir o gancho tem que dizer "pode vir" ou "podem vir" (ex.: AS MAIS CARAS QUE PODEM VIR): nunca dê a entender que a carta já saiu pra gente`)
+	case pulledWord.MatchString(in.Gancho + " " + in.Etiqueta + " " + in.Final.Titulo + " " + in.Final.Oferta):
+		return errors.New("o texto dá a entender que a gente abriu ou tirou a carta: diga que ela pode vir")
+	case (tipo == "subiram" || tipo == "em_alta" || tipo == "podem_vir") && in.Itens != 0 && (in.Itens < listaMin || in.Itens > listaDefault):
 		return fmt.Errorf("itens vai de %d a %d", listaMin, listaDefault)
-	case tipo != "subiram" && tipo != "em_alta" && in.Itens != 0:
-		return errors.New("itens só vale em subiram e em_alta")
+	case tipo != "subiram" && tipo != "em_alta" && tipo != "podem_vir" && in.Itens != 0:
+		return errors.New("itens só vale em subiram, em_alta e podem_vir")
 	}
 	for _, m := range in.Manchetes {
 		if err := (textLimit{"manchetes.texto", cleanLine(m.Texto), 10, 90}).check(); err != nil {
@@ -351,6 +376,60 @@ func (a *app) buildLiga(ctx context.Context, id string, game listaGame, tipo str
 	if len(b.props.Itens) < listaMin {
 		return listaBuild{}, fmt.Errorf("só %d cartas de %s passaram nos filtros da Liga (preço, lojas e foto): escolha outro jogo ou formato", len(b.props.Itens), game.name)
 	}
+	return b, nil
+}
+
+func (a *app) buildChase(ctx context.Context, id string, game listaGame, in listaInput) (listaBuild, error) {
+	want := in.Itens
+	if want == 0 {
+		want = chaseDefault
+	}
+	today := a.now().In(saoPaulo)
+	day := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, saoPaulo)
+	all, err := a.releases(ctx, game)
+	if err != nil {
+		return listaBuild{}, err
+	}
+	release, ok := pickRelease(all, in.Set, day)
+	if !ok {
+		return listaBuild{}, fmt.Errorf("o TCGplayer não tem set de %s com %q: sem fonte de preço de mercado, esse produto fica sem podem_vir", game.name, in.Set)
+	}
+	cards, presale, err := a.chaseCards(ctx, game, release.Group)
+	if err != nil {
+		return listaBuild{}, err
+	}
+	stamp := today.Format("02/01")
+	b := listaBuild{props: listaProps{Selo: "MERCADO EUA · " + stamp, Fonte: "Preço de mercado nos EUA: TCGplayer, " + stamp}}
+	for _, c := range cards {
+		if len(b.props.Itens) == want {
+			break
+		}
+		if c.Market < chaseFloorUSD || c.Title == "" || utf8.RuneCountInString(c.Title) > cardTitleMax {
+			continue
+		}
+		rel, ratio, err := a.listaPhoto(ctx, id, &b, c.Image)
+		if err != nil {
+			continue
+		}
+		market := math.Round(c.Market*100) / 100
+		item := listaItem{Titulo: c.Title, Imagem: rel, Proporcao: ratio, Rotulo: fmt.Sprintf("#%d", len(b.props.Itens)+1), Detalhe: c.Detail, Dolar: market}
+		b.props.Itens = append(b.props.Itens, item)
+		b.out.Itens = append(b.out.Itens, listaSaida{Titulo: item.Titulo, Rotulo: item.Rotulo, Detalhe: item.Detalhe, Dolar: market})
+	}
+	if len(b.props.Itens) < listaMin {
+		if presale > 0 {
+			return listaBuild{}, fmt.Errorf("%s ainda está em pré-venda no TCGplayer (lançamento %s): as cartas ainda não têm preço de mercado. Tente depois do lançamento", cleanLine(release.Group.Name), release.Date.Format("02/01"))
+		}
+		return listaBuild{}, fmt.Errorf("só %d cartas de %s têm preço de mercado de pelo menos US$ %d e foto no TCGplayer", len(b.props.Itens), cleanLine(release.Group.Name), chaseFloorUSD)
+	}
+	prod, price, err := a.resolveProduct(ctx, id, len(b.photos), *in.Produto)
+	if err != nil {
+		return listaBuild{}, err
+	}
+	b.props.Itens = append(b.props.Itens, listaItem{Titulo: prod.Nome, Imagem: prod.Imagem, Proporcao: prod.Proporcao, Rotulo: "Na Collecta", Detalhe: "Pix ou cartão", Produto: &prod})
+	b.out.Itens = append(b.out.Itens, listaSaida{Titulo: prod.Nome, Rotulo: "Na Collecta", Agora: prod.Preco, Link: price.Link})
+	b.out.Precos = append(b.out.Precos, price)
+	b.out.Avisos = append(b.out.Avisos, fmt.Sprintf("preços em dólar do mercado dos EUA (TCGplayer, %s), não são preço da Collecta: a legenda diz isso e cita a fonte. Diga sempre que as cartas podem vir, nunca que saíram pra gente", stamp))
 	return b, nil
 }
 

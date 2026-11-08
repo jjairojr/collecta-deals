@@ -234,18 +234,18 @@ func approveAds(t *testing.T, f *fixture) {
 
 func TestProposeAdTestAsksOwner(t *testing.T) {
 	f, _, _ := newAdFixture(t)
-	out, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 100))
+	out, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 300))
 	if errText != "" {
 		t.Fatal(errText)
 	}
-	if out.ID == "" || out.SobraSemana != "R$ 50,00" {
+	if out.ID == "" || out.SobraSemana != "R$ 200,00" {
 		t.Fatalf("saída = %+v", out)
 	}
 	pushes := f.pushed()
 	if len(pushes) != 1 || pushes[0].title != "Aprovar teste de anúncio" || !strings.Contains(pushes[0].actions, "/api/aprovar-anuncio/"+out.ID) {
 		t.Fatalf("push = %+v", pushes)
 	}
-	if pushes[0].filename != "01-capa.png" || !strings.Contains(pushes[0].message, "R$ 100,00 em 4 dias") {
+	if pushes[0].filename != "01-capa.png" || !strings.Contains(pushes[0].message, "R$ 300,00 em 4 dias") {
 		t.Fatalf("anexo ou texto = %+v", pushes[0])
 	}
 	list, _ := f.ads.List("")
@@ -255,7 +255,7 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if _, err := os.Stat(list[0].Creatives[0].Thumb); err != nil {
 		t.Fatal(err)
 	}
-	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 60)); !strings.Contains(errText, "cabem só R$ 50,00") {
+	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 250)); !strings.Contains(errText, "cabem só R$ 200,00") {
 		t.Fatalf("teto: %q", errText)
 	}
 }
@@ -280,7 +280,7 @@ func TestProposeAdTestRefuses(t *testing.T) {
 			a["objetivo"] = "vendas"
 			a["link"] = "https://www.mercadolivre.com.br/x"
 		}, "precisa ser uma página"},
-		{"verba alta", func(_ *fixture, a map[string]any) { a["verba_reais"] = 200 }, "verba_reais vai"},
+		{"verba alta", func(_ *fixture, a map[string]any) { a["verba_reais"] = 400 }, "verba_reais vai"},
 		{"dias demais", func(_ *fixture, a map[string]any) { a["dias"] = 10 }, "dias vai"},
 	}
 	for _, c := range cases {

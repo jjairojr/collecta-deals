@@ -32,7 +32,8 @@ const (
 )
 
 const (
-	WeeklyCapCents = 15000
+	WeeklyCapCents = 50000
+	MaxBudgetCents = 30000
 	BudgetWindow   = 7 * 24 * time.Hour
 	MinBudgetCents = 3000
 	MinDays        = 3
@@ -98,7 +99,7 @@ func (t Test) Public() Test {
 }
 
 func Valid(t Test) bool {
-	if !objectives[t.Objective] || !audiences[t.Audience] || t.BudgetCents < MinBudgetCents || t.Days < MinDays || t.Days > MaxDays {
+	if !objectives[t.Objective] || !audiences[t.Audience] || t.BudgetCents < MinBudgetCents || t.BudgetCents > MaxBudgetCents || t.Days < MinDays || t.Days > MaxDays {
 		return false
 	}
 	if len(t.Creatives) < MinCreatives || len(t.Creatives) > MaxCreatives {

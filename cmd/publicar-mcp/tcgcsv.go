@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"regexp"
@@ -41,7 +42,19 @@ var (
 		regexp.MustCompile(`(?i)\bbox$`),
 		regexp.MustCompile(`(?i)booster pack$`),
 	}
-	smallImage = regexp.MustCompile(`_\d+w\.jpg$`)
+	smallImage  = regexp.MustCompile(`_\d+w\.jpg$`)
+	numberTail  = regexp.MustCompile(`\s+-\s+\S*\d\S*$`)
+	parenthesis = regexp.MustCompile(`\s*\([^()]*\)`)
+	rarityShort = map[string]string{
+		"special illustration rare": "SIR",
+		"illustration rare":         "IR",
+		"mega hyper rare":           "MHR",
+		"hyper rare":                "HR",
+		"ultra rare":                "UR",
+		"double rare":               "RR",
+		"secret rare":               "SEC",
+		"super rare":                "SR",
+	}
 )
 
 type tcgGroup struct {
@@ -57,8 +70,24 @@ type tcgProduct struct {
 	Name     string `json:"name"`
 	ImageURL string `json:"imageUrl"`
 	Extended []struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		Value string `json:"value"`
 	} `json:"extendedData"`
+	Presale struct {
+		IsPresale bool `json:"isPresale"`
+	} `json:"presaleInfo"`
+}
+
+type tcgPrice struct {
+	ProductID int      `json:"productId"`
+	Market    *float64 `json:"marketPrice"`
+}
+
+type tcgChase struct {
+	Title  string
+	Detail string
+	Image  string
+	Market float64
 }
 
 type tcgRelease struct {
@@ -156,12 +185,78 @@ func (a *app) boxImage(ctx context.Context, game listaGame, group tcgGroup) (str
 }
 
 func isSingle(p tcgProduct) bool {
+	return p.extended("Number") != ""
+}
+
+func (p tcgProduct) extended(name string) string {
 	for _, e := range p.Extended {
-		if e.Name == "Number" {
-			return true
+		if e.Name == name {
+			if v := strings.TrimSpace(e.Value); v != "" {
+				return v
+			}
+			return "-"
 		}
 	}
-	return false
+	return ""
+}
+
+func (a *app) chaseCards(ctx context.Context, game listaGame, group tcgGroup) ([]tcgChase, int, error) {
+	var products []tcgProduct
+	if err := a.tcgcsv(ctx, fmt.Sprintf("/tcgplayer/%d/%d/products", game.category, group.ID), &products); err != nil {
+		return nil, 0, err
+	}
+	var prices []tcgPrice
+	if err := a.tcgcsv(ctx, fmt.Sprintf("/tcgplayer/%d/%d/prices", game.category, group.ID), &prices); err != nil {
+		return nil, 0, err
+	}
+	byID := map[int]tcgProduct{}
+	for _, p := range products {
+		byID[p.ID] = p
+	}
+	best := map[int]float64{}
+	presale := 0
+	for _, pr := range prices {
+		p, ok := byID[pr.ProductID]
+		if !ok || pr.Market == nil || *pr.Market <= 0 || !isSingle(p) || p.ImageURL == "" {
+			continue
+		}
+		if p.Presale.IsPresale {
+			presale++
+			continue
+		}
+		if *pr.Market > best[p.ID] {
+			best[p.ID] = *pr.Market
+		}
+	}
+	out := []tcgChase{}
+	for id, market := range best {
+		p := byID[id]
+		out = append(out, tcgChase{Title: chaseTitle(p.Name), Detail: chaseDetail(p), Image: largeImage(p.ImageURL), Market: market})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Market != out[j].Market {
+			return out[i].Market > out[j].Market
+		}
+		return out[i].Detail < out[j].Detail
+	})
+	return out, presale, nil
+}
+
+func chaseTitle(name string) string {
+	name = numberTail.ReplaceAllString(html.UnescapeString(name), "")
+	return cleanLine(parenthesis.ReplaceAllString(name, ""))
+}
+
+func chaseDetail(p tcgProduct) string {
+	number := p.extended("Number")
+	rarity := p.extended("Rarity")
+	if short, ok := rarityShort[strings.ToLower(rarity)]; ok {
+		rarity = short
+	}
+	if rarity == "" || rarity == "-" || len(rarity) > 6 {
+		return number
+	}
+	return rarity + " · " + number
 }
 
 func largeImage(raw string) string {

@@ -42,6 +42,9 @@ func newListaFixture(t *testing.T) (*fixture, *pecaSite, *listaSite) {
 			{"groupId": 24900, "name": "Delta Reign Prerelease Cards", "abbreviation": "DLRP", "isSupplemental": false, "publishedOn": "2026-11-01T00:00:00"},
 			{"groupId": 24700, "name": "ME05: Ascended Heroes", "abbreviation": "ASC", "isSupplemental": false, "publishedOn": "2026-09-26T00:00:00"}
 		]`,
+		68: `[
+			{"groupId": 24833, "name": "The Dominance of God", "abbreviation": "OP18", "isSupplemental": false, "publishedOn": "2026-11-20T00:00:00"}
+		]`,
 		71: `[
 			{"groupId": 24740, "name": "Hyperia City", "abbreviation": "14", "isSupplemental": false, "publishedOn": "2026-10-16T00:00:00"},
 			{"groupId": 24990, "name": "Winterspell", "abbreviation": "15", "isSupplemental": false, "publishedOn": "2026-12-12T00:00:00"}
@@ -70,12 +73,32 @@ func newListaFixture(t *testing.T) (*fixture, *pecaSite, *listaSite) {
 				return
 			}
 			img := func(id int) string { return fmt.Sprintf("%s/product/%d_200w.jpg", ls.srv.URL, id) }
+			presale := group == 24833
 			_, _ = fmt.Fprintf(w, `{"success": true, "results": [
 				{"productId": 1, "name": "Some Card", "imageUrl": "%s", "extendedData": [{"name": "Number"}]},
 				{"productId": 2, "name": "Set Booster Box Case", "imageUrl": "%s", "extendedData": []},
 				{"productId": 3, "name": "Set Booster Pack", "imageUrl": "%s", "extendedData": []},
-				{"productId": %d, "name": "Set Booster Box", "imageUrl": "%s", "extendedData": []}
-			]}`, img(1), img(2), img(3), group, img(group))
+				{"productId": %d, "name": "Set Booster Box", "imageUrl": "%s", "extendedData": []},
+				{"productId": 11, "name": "Mega Rayquaza ex - 138/103", "imageUrl": "%s", "extendedData": [{"name": "Number", "value": "138/103"}, {"name": "Rarity", "value": "Special Illustration Rare"}], "presaleInfo": {"isPresale": %t}},
+				{"productId": 12, "name": "Mega Rayquaza ex - 141/103", "imageUrl": "%s", "extendedData": [{"name": "Number", "value": "141/103"}, {"name": "Rarity", "value": "Mega Hyper Rare"}], "presaleInfo": {"isPresale": %t}},
+				{"productId": 13, "name": "Raikou ex", "imageUrl": "%s", "extendedData": [{"name": "Number", "value": "136/103"}, {"name": "Rarity", "value": "Special Illustration Rare"}], "presaleInfo": {"isPresale": %t}},
+				{"productId": 14, "name": "Nami (055) (Kentaro Yabuki) (Gold Stamped)", "imageUrl": "%s", "extendedData": [{"name": "Number", "value": "EB05-055"}, {"name": "Rarity", "value": "SR"}], "presaleInfo": {"isPresale": %t}},
+				{"productId": 15, "name": "Zinnia&#39;s Trust - 140/103", "imageUrl": "%s", "extendedData": [{"name": "Number", "value": "140/103"}, {"name": "Rarity", "value": "Special Illustration Rare"}], "presaleInfo": {"isPresale": %t}},
+				{"productId": 16, "name": "Sem Foto", "imageUrl": "", "extendedData": [{"name": "Number", "value": "999/103"}]}
+			]}`, img(1), img(2), img(3), group, img(group), img(11), presale, img(12), presale, img(13), presale, img(14), presale, img(15), presale)
+		case strings.HasSuffix(r.URL.Path, "/prices"):
+			_, _ = fmt.Fprint(w, `{"success": true, "results": [
+				{"productId": 1, "marketPrice": 2.1, "subTypeName": "Normal"},
+				{"productId": 11, "marketPrice": 280.5, "subTypeName": "Normal"},
+				{"productId": 11, "marketPrice": 319.524, "subTypeName": "Holofoil"},
+				{"productId": 12, "marketPrice": 284.88, "subTypeName": "Holofoil"},
+				{"productId": 13, "marketPrice": 79.74, "subTypeName": "Holofoil"},
+				{"productId": 14, "marketPrice": 4.5, "subTypeName": "Foil"},
+				{"productId": 15, "marketPrice": 32.3, "subTypeName": "Holofoil"},
+				{"productId": 15, "marketPrice": null, "subTypeName": "Reverse Holofoil"},
+				{"productId": 16, "marketPrice": 900, "subTypeName": "Holofoil"},
+				{"productId": 24831, "marketPrice": 211.35, "subTypeName": "Normal"}
+			]}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -142,6 +165,14 @@ func listaArgs(tipo, jogo string) map[string]any {
 		"destaque": []string{"subiram"},
 		"final":    map[string]any{"titulo": "Siga a Collecta", "oferta": "Envio pra todo o Brasil", "linhas": []string{"collectatcg.com.br"}, "cta": "Link na bio"},
 	}
+}
+
+func chaseArgs() map[string]any {
+	a := listaArgs("podem_vir", "pokemon")
+	a["etiqueta"], a["gancho"], a["destaque"] = "Pokémon · Reinado Delta", "As mais caras que podem vir", []string{"podem", "vir"}
+	a["set"] = "DLR"
+	a["produto"] = map[string]any{"link": "https://www.collectatcg.com.br/selado/reinado-box", "nome": "Booster Box Reinado Delta"}
+	return a
 }
 
 func lastLista(t *testing.T, f *fixture) listaProps {
@@ -308,6 +339,70 @@ func TestListaNews(t *testing.T) {
 	}
 }
 
+func TestListaChaseCards(t *testing.T) {
+	f, _, ls := newListaFixture(t)
+	out, errText := callTool[listaOutput](t, f, "criar_lista", chaseArgs())
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	props := lastLista(t, f)
+	if props.Tipo != "podem_vir" || props.Selo != "MERCADO EUA · 06/11" || props.Fonte != "Preço de mercado nos EUA: TCGplayer, 06/11" || len(props.Itens) != 5 {
+		t.Fatalf("props = %+v", props)
+	}
+	got := []string{}
+	for _, it := range props.Itens[:4] {
+		got = append(got, fmt.Sprintf("%s|%s|%s|%.2f", it.Rotulo, it.Titulo, it.Detalhe, it.Dolar))
+	}
+	want := "#1|Mega Rayquaza ex|SIR · 138/103|319.52,#2|Mega Rayquaza ex|MHR · 141/103|284.88,#3|Raikou ex|SIR · 136/103|79.74,#4|Zinnia's Trust|SIR · 140/103|32.30"
+	if strings.Join(got, ",") != want {
+		t.Fatalf("cartas = %v", got)
+	}
+	product := props.Itens[4]
+	if product.Produto == nil || product.Produto.Preco != 389.5 || product.Rotulo != "Na Collecta" || product.Dolar != 0 {
+		t.Fatalf("produto = %+v", product)
+	}
+	if len(out.Itens) != 5 || out.Itens[0].Dolar != 319.52 || out.Itens[4].Agora != 389.5 || len(out.Precos) != 1 || out.Fonte != props.Fonte {
+		t.Fatalf("saída = %+v", out)
+	}
+	if len(out.Avisos) != 1 || !strings.Contains(out.Avisos[0], "não são preço da Collecta") {
+		t.Fatalf("avisos = %v", out.Avisos)
+	}
+	if !contains(ls.requests, "/product/11_in_1000x1000.jpg") || contains(ls.requests, "/product/16_in_1000x1000.jpg") {
+		t.Fatalf("fotos pedidas = %v", ls.requests)
+	}
+	if !strings.Contains(out.Arquivo, "-lista-podem-vir-pokemon-") {
+		t.Fatalf("arquivo = %s", out.Arquivo)
+	}
+}
+
+func TestListaChaseCardsThree(t *testing.T) {
+	f, _, _ := newListaFixture(t)
+	args := chaseArgs()
+	args["itens"], args["formato"] = 3, "arte"
+	out, errText := callTool[listaOutput](t, f, "criar_lista", args)
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	if props := lastLista(t, f); len(props.Itens) != 4 || props.Itens[2].Titulo != "Raikou ex" || !strings.HasSuffix(out.Arquivo, ".png") {
+		t.Fatalf("props = %+v %s", props.Itens, out.Arquivo)
+	}
+}
+
+func TestChaseTitle(t *testing.T) {
+	cases := map[string]string{
+		"Mega Rayquaza ex - 138/103":                 "Mega Rayquaza ex",
+		"Nami (055) (Kentaro Yabuki) (Gold Stamped)": "Nami",
+		"Monkey.D.Luffy (022)":                       "Monkey.D.Luffy",
+		"Zinnia&#39;s Trust - 140/103":               "Zinnia's Trust",
+		"Raikou ex":                                  "Raikou ex",
+	}
+	for raw, want := range cases {
+		if got := chaseTitle(raw); got != want {
+			t.Errorf("chaseTitle(%q) = %q, queria %q", raw, got, want)
+		}
+	}
+}
+
 func TestListaRefuses(t *testing.T) {
 	cases := []struct {
 		name string
@@ -347,7 +442,37 @@ func TestListaRefuses(t *testing.T) {
 			a := listaArgs("em_alta", "pokemon")
 			a["produto"] = map[string]any{"link": "https://www.collectatcg.com.br/selado/reinado-box"}
 			return a
-		}, "só valem no tipo lancamentos"},
+		}, "produto só vale em lancamentos e podem_vir"},
+		{"podem_vir sem produto", func(*listaSite) map[string]any {
+			a := chaseArgs()
+			delete(a, "produto")
+			return a
+		}, "podem_vir precisa de set"},
+		{"podem_vir sem pode vir", func(*listaSite) map[string]any {
+			a := chaseArgs()
+			a["gancho"] = "As cartas mais caras do set"
+			return a
+		}, `tem que dizer "pode vir"`},
+		{"podem_vir diz que tirou", func(*listaSite) map[string]any {
+			a := chaseArgs()
+			a["gancho"] = "Tiramos e podem vir pra você"
+			return a
+		}, "abriu ou tirou"},
+		{"set fora de podem_vir", func(*listaSite) map[string]any {
+			a := listaArgs("lancamentos", "pokemon")
+			a["set"] = "DLR"
+			return a
+		}, "set só vale em podem_vir"},
+		{"podem_vir set sem fonte", func(*listaSite) map[string]any {
+			a := chaseArgs()
+			a["set"] = "GEM Pack Vol. 7"
+			return a
+		}, "sem fonte de preço de mercado"},
+		{"podem_vir em pré-venda", func(*listaSite) map[string]any {
+			a := chaseArgs()
+			a["jogo"], a["set"] = "onepiece", "OP18"
+			return a
+		}, "ainda está em pré-venda no TCGplayer (lançamento 20/11)"},
 		{"gancho longo", func(*listaSite) map[string]any {
 			a := listaArgs("lancamentos", "pokemon")
 			a["gancho"] = strings.Repeat("a", 41)
