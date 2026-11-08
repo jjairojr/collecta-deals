@@ -1,6 +1,7 @@
 import { absoluteURL, siteURL } from "@/lib/site";
 import { feedID, maker } from "@/lib/product-id";
-import { SHIPPING, STORE, STORE_MAPS_URL, STORE_PHOTOS } from "@/lib/store";
+import { collectionOf, contentsOf } from "@/lib/sealed-guide";
+import { SHIPPING, STORE, STORE_MAPS_URL, STORE_PHOTOS, STORE_PROFILES } from "@/lib/store";
 import type { Accessory, Sealed, Single } from "@/lib/types";
 
 const ORGANIZATION_ID = `${siteURL}/#organization`;
@@ -29,7 +30,7 @@ export function organizationJsonLd() {
     logo: absoluteURL("/mascot.png"),
     telephone: STORE.phone,
     address: postalAddress(),
-    sameAs: [STORE.instagram],
+    sameAs: STORE_PROFILES,
     hasMerchantReturnPolicy: returnPolicy(),
     contactPoint: {
       "@type": "ContactPoint",
@@ -63,7 +64,7 @@ export function storeJsonLd() {
         closes: STORE.closes,
       },
     ],
-    sameAs: [STORE.instagram],
+    sameAs: STORE_PROFILES,
     parentOrganization: { "@id": ORGANIZATION_ID },
     areaServed: ["Goiânia", "Brasil"],
   };
@@ -163,14 +164,32 @@ export function singleProductJsonLd(item: Single) {
   };
 }
 
+function property(name: string, value: string | undefined) {
+  return value ? [{ "@type": "PropertyValue", name, value }] : [];
+}
+
 export function sealedProductJsonLd(item: Sealed) {
+  const collection = collectionOf(item);
+  const contents = contentsOf(item);
   return {
     "@context": "https://schema.org",
     "@type": "Product",
     name: item.name,
     sku: feedID(item.slug),
     gtin: item.gtin,
-    description: `${item.name} — produto selado de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, lacre original.`,
+    description: [
+      `${item.name} — produto selado de ${item.gameLabel}${item.language ? ` em ${item.language}` : ""}, lacre original.`,
+      contents ? `O que vem: ${contents}` : "",
+      collection?.summary ?? "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+    releaseDate: collection?.released,
+    additionalProperty: [
+      ...property("Formato", item.format),
+      ...property("Idioma", item.language),
+      ...property("Coleção", collection?.name),
+    ],
     image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
     brand: { "@type": "Brand", name: maker(item.game, item.gameLabel) },
     category: "Trading Card Game",
@@ -227,6 +246,23 @@ export function itemListJsonLd(name: string, paths: string[]) {
       "@type": "ListItem",
       position: i + 1,
       url: absoluteURL(path),
+    })),
+  };
+}
+
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
+export function faqJsonLd(items: FaqItem[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((it) => ({
+      "@type": "Question",
+      name: it.q,
+      acceptedAnswer: { "@type": "Answer", text: it.a },
     })),
   };
 }

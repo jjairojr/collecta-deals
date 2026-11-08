@@ -35,11 +35,11 @@ const pressStart = Press_Start_2P({
 export const metadata: Metadata = {
   metadataBase: new URL(siteURL),
   title: {
-    default: "Collecta TCG — Loja de cartas Pokémon, One Piece e Riftbound em Goiânia",
+    default: "Collecta TCG — Loja de cartinhas Pokémon e card games em Goiânia",
     template: "%s — Collecta",
   },
   description:
-    "Loja de cartas TCG: singles avulsas e produto selado de Pokémon, One Piece, Riftbound, Lorcana e Gundam, conferidos carta por carta. Pix ou cartão em até 12x, envio para todo o Brasil e retirada na loja em Goiânia.",
+    "Loja de card games (TCG) com cartinhas Pokémon, One Piece e Riftbound: booster box, ETB, blister e cartas avulsas originais, conferidos um a um. Pix ou cartão, envio para todo o Brasil e loja física em Goiânia.",
   applicationName: "Collecta",
   // Merchant Center verifies by reading the served HTML, so the tag has to be
   // rendered server-side — the GA snippet only appears after hydration and is

@@ -10,6 +10,7 @@ import {
 } from "@/lib/mock";
 import { sealedToCartLine, singleToCartLine } from "@/lib/cart-lines";
 import { gameSurface } from "@/lib/games";
+import { ownPhotoURL } from "@/lib/photo";
 import { setsOf } from "@/lib/sets";
 import LEGACY_SLUGS from "@/lib/legacy-slugs.json";
 import LEGACY_SOLD from "@/lib/legacy-sold.json";
@@ -212,6 +213,8 @@ function sealedHeadline(name: string, format: string | undefined): string {
   }
   const rest = name
     .replace(matched[0], "")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s{2,}/g, " ")
     .replace(/^[\s\-–—·|]+|[\s\-–—·|]+$/g, "")
     .trim();
   return rest ? `${format} ${rest}` : format;
@@ -255,7 +258,7 @@ function mapSealed(it: RawItem, version: string): Sealed {
     shipsFrom: it.shipsFrom || undefined,
     qty: Math.max(it.qty, 0),
     badge: it.shipsFrom ? "PRE-VENDA" : "LACRADO",
-    imageURL: resolveImage(it, version),
+    imageURL: ownPhotoURL(resolveImage(it, version)),
     featured: it.featured,
     addedAt: it.addedAt,
     gtin: it.gtin,
@@ -281,7 +284,7 @@ function mapAccessory(it: RawItem, version: string): Accessory {
     shipsFrom: it.shipsFrom || undefined,
     qty: Math.max(it.qty, 0),
     badge: it.shipsFrom ? "PRE-VENDA" : "ACESSORIO",
-    imageURL: resolveImage(it, version),
+    imageURL: ownPhotoURL(resolveImage(it, version)),
     featured: it.featured,
     addedAt: it.addedAt,
     gtin: it.gtin,
@@ -364,6 +367,31 @@ function dedupProducts<T extends Product>(items: T[], aliases: Map<string, strin
   return [...bySKU.values()].map((g) => g.item);
 }
 
+function sealedKey(p: Sealed): string {
+  return `${p.game}|${slugify(p.name.replace(/\blacrad[oa]\b/gi, ""))}`;
+}
+
+function compatibleLanguage(a: string | undefined, b: string | undefined): boolean {
+  return !a || !b || a === b;
+}
+
+function retireSealedTwins(live: Sealed[], gone: Sealed[], aliases: Map<string, string>): Sealed[] {
+  const kept: Sealed[] = [];
+  const newestFirst = [...gone].sort((a, b) => (b.addedAt ?? "").localeCompare(a.addedAt ?? ""));
+  for (const p of newestFirst) {
+    const key = sealedKey(p);
+    const twin = [...live, ...kept].find(
+      (q) => sealedKey(q) === key && compatibleLanguage(q.language, p.language),
+    );
+    if (twin) {
+      aliases.set(p.slug, twin.slug);
+      continue;
+    }
+    kept.push(p);
+  }
+  return gone.filter((p) => kept.includes(p));
+}
+
 function resolveAliases(aliases: Map<string, string>): Map<string, string> {
   const out = new Map<string, string>();
   for (const from of aliases.keys()) {
@@ -439,10 +467,19 @@ export async function loadCatalog(): Promise<Catalog> {
   const { singles, sealed, accessories } = shelf(data.items ?? []);
   const gone = shelf([...(data.soldOut ?? []), ...legacySold]);
   const taken = new Set([...singles, ...sealed, ...accessories].map((p) => p.slug));
+  const known = new Set([
+    ...taken,
+    ...[...gone.singles, ...gone.sealed, ...gone.accessories].map((p) => p.slug),
+  ]);
+  const legacy: Record<string, string> = LEGACY_SLUGS;
+  const keep = (p: { slug: string }) => {
+    const target = legacy[p.slug];
+    return !taken.has(p.slug) && !(target && target !== p.slug && known.has(target));
+  };
   const soldOut: SoldOut = {
-    singles: gone.singles.filter((p) => !taken.has(p.slug)).map((p) => ({ ...p, soldOut: true })),
-    sealed: gone.sealed.filter((p) => !taken.has(p.slug)).map((p) => ({ ...p, soldOut: true })),
-    accessories: gone.accessories.filter((p) => !taken.has(p.slug)).map((p) => ({ ...p, soldOut: true })),
+    singles: gone.singles.filter(keep).map((p) => ({ ...p, soldOut: true })),
+    sealed: retireSealedTwins(sealed, gone.sealed.filter(keep), aliases).map((p) => ({ ...p, soldOut: true })),
+    accessories: gone.accessories.filter(keep).map((p) => ({ ...p, soldOut: true })),
   };
   return {
     singles,
@@ -510,7 +547,7 @@ function productRedirects(
   }
   const legacy: Record<string, string> = LEGACY_SLUGS;
   for (const [from, to] of Object.entries(legacy)) {
-    add(from, to);
+    add(from, aliases.get(to) ?? to);
   }
   return out;
 }

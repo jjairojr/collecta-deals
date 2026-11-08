@@ -5,10 +5,30 @@ import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import SingleCard from "@/components/SingleCard";
 import SealedCard from "@/components/SealedCard";
+import FaqSection from "@/components/ui/FaqSection";
 import TrackViewItemList from "@/components/analytics/TrackViewItemList";
 import { loadCatalog } from "@/lib/catalog";
 import { pixelText } from "@/lib/format";
+import { SEALED_PAYMENT, SEALED_SHIPPING } from "@/lib/sealed-faq";
+import type { FaqItem } from "@/lib/seo";
 import { STORE, STORE_ADDRESS_LINE } from "@/lib/store";
+
+const HOME_FAQ: FaqItem[] = [
+  {
+    q: "A Collecta tem loja física?",
+    a: `Sim. Fica na ${STORE_ADDRESS_LINE}, aberta todos os dias das ${STORE.opens} às ${STORE.closes}. Dá para comprar na hora, retirar pedidos do site e jogar nas mesas da loja.`,
+  },
+  {
+    q: "Quais card games a Collecta vende?",
+    a: "Pokémon, One Piece Card Game, Riftbound, Disney Lorcana e Gundam Card Game: produto selado, cartas avulsas e acessórios.",
+  },
+  {
+    q: "A Collecta vende cartinhas Pokémon originais?",
+    a: "Sim, só produto oficial: booster box, ETB e blister com lacre de fábrica, e cartas avulsas conferidas uma a uma.",
+  },
+  SEALED_SHIPPING,
+  SEALED_PAYMENT,
+];
 
 export const revalidate = 60;
 
@@ -64,7 +84,7 @@ export default async function HomePage() {
             </span>
             <h1 className="font-display hero-shadow mt-6 text-5xl font-bold leading-[.92] text-white sm:text-6xl lg:text-[76px]">
               <span className="mb-4 block font-pixel text-[11px] leading-relaxed text-brand-soft [text-shadow:none] sm:text-[12px]">
-                {pixelText("LOJA DE CARTAS TCG EM GOIÂNIA")}
+                {pixelText("LOJA DE CARD GAMES E CARTINHAS POKÉMON EM GOIÂNIA")}
               </span>
               SUA COLEÇÃO
               <br />
@@ -207,13 +227,21 @@ export default async function HomePage() {
           style={{ ["--sh" as string]: "6px" }}
         >
           <h2 className="font-display text-3xl font-bold leading-none text-white">
-            Loja de cartas TCG em Goiânia
+            Loja de card games em Goiânia
           </h2>
           <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-muted">
-            A Collecta vende cartas avulsas (singles), produto selado e
-            acessórios de trading card games. Cada carta é conferida uma a uma,
-            com a condição descrita no anúncio. Você monta o carrinho no site,
-            paga por Pix ou cartão e retira na loja ou recebe em todo o Brasil.
+            A Collecta é uma loja de TCG: vende{" "}
+            <Link href="/selado" className="text-brand-soft underline-offset-4 hover:underline">
+              produto selado
+            </Link>{" "}
+            (booster box, ETB, blister e decks), cartas avulsas e acessórios de
+            Pokémon, One Piece, Riftbound e mais. Procurando{" "}
+            <Link href="/cartinhas-pokemon" className="text-brand-soft underline-offset-4 hover:underline">
+              cartinhas Pokémon
+            </Link>
+            ? Tem selado em português, inglês, japonês e chinês. Cada produto é
+            conferido antes do envio; você paga por Pix ou cartão e retira na
+            loja ou recebe em todo o Brasil.
           </p>
           <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
             Loja física na {STORE_ADDRESS_LINE}, aberta todos os dias das{" "}
@@ -235,6 +263,7 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
+        <FaqSection title="Perguntas sobre a loja" items={HOME_FAQ} />
       </Container>
     </>
   );

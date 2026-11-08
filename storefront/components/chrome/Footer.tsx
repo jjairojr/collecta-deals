@@ -51,6 +51,12 @@ export default function Footer() {
             Produto selado
           </Link>
           <Link
+            href="/cartinhas-pokemon"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Cartinhas Pokémon
+          </Link>
+          <Link
             href="/acessorios"
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
           >

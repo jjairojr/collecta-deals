@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { loadCatalog } from "@/lib/catalog";
 import { pageCount } from "@/lib/paging";
+import { collectionPath, liveCollections } from "@/lib/sealed-guide";
 import { setsOf } from "@/lib/sets";
 import { absoluteURL } from "@/lib/site";
 
@@ -14,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteURL("/singles"), changeFrequency: "daily", priority: 0.9 },
     { url: absoluteURL("/selado"), changeFrequency: "daily", priority: 0.9 },
     { url: absoluteURL("/loja"), changeFrequency: "monthly", priority: 0.8 },
+    { url: absoluteURL("/cartinhas-pokemon"), changeFrequency: "daily", priority: 0.9 },
     {
       url: absoluteURL("/politica-de-devolucao"),
       changeFrequency: "yearly",
@@ -75,6 +77,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const id of sealedGames) {
     urls.push({
       url: absoluteURL(`/selado/${id}`),
+      changeFrequency: "daily",
+      priority: 0.8,
+    });
+  }
+  for (const { collection } of liveCollections(sealed)) {
+    urls.push({
+      url: absoluteURL(collectionPath(collection)),
       changeFrequency: "daily",
       priority: 0.8,
     });

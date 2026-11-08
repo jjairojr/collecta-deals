@@ -16,7 +16,12 @@ export const STORE = {
   closes: "22:00",
   instagram: "https://www.instagram.com/tcgcollecta",
   instagramHandle: "@tcgcollecta",
+  facebook: "https://www.facebook.com/profile.php?id=61594894131382",
+  ligaStore: "https://www.ligacollectatcg.com.br/",
+  mypcards: "https://mypcards.com/CollectaTCG",
 } as const;
+
+export const STORE_PROFILES = [STORE.instagram, STORE.facebook, STORE.ligaStore, STORE.mypcards];
 
 export const SHIPPING = {
   minBRL: 25,

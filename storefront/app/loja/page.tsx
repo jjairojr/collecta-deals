@@ -11,9 +11,9 @@ import { breadcrumbJsonLd } from "@/lib/seo";
 import { STORE, STORE_ADDRESS_LINE, STORE_MAPS_EMBED_URL, STORE_MAPS_URL, STORE_PHOTOS, STORE_WHATSAPP_URL } from "@/lib/store";
 
 export const metadata: Metadata = {
-  title: "Loja de cartas Pokémon, One Piece e TCG em Goiânia",
+  title: "Loja de card games e cartinhas Pokémon em Goiânia",
   description:
-    "Visite a Collecta TCG na Galeria Badra, Setor Oeste, Goiânia: singles, produto selado e acessórios de Pokémon, One Piece, Riftbound, Lorcana e Gundam, mesas para jogar e compra de coleções. Aberta todos os dias das 12h às 22h.",
+    "Loja de card games (TCG) na Galeria Badra, Setor Oeste, Goiânia: produto selado, cartas avulsas e acessórios de Pokémon, One Piece, Riftbound, Lorcana e Gundam, mesas para jogar e compra de coleções. Aberta todos os dias das 12h às 22h.",
   alternates: { canonical: "/loja" },
   openGraph: {
     title: "Collecta TCG — loja de cartas em Goiânia",
