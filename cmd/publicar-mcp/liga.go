@@ -142,7 +142,7 @@ func storesWithStock(card tracking.CardDay) int {
 
 func (a *app) ligaReport(game listaGame, tipo string) (ligaReport, error) {
 	if game.liga == "" {
-		return ligaReport{}, fmt.Errorf("a Liga não tem dados de %s: subiram e em_alta só valem para pokemon, onepiece e riftbound", game.name)
+		return ligaReport{}, fmt.Errorf("a Liga não tem dados de %s: subiram, em_alta, mais_caras, caiu, chuta e duelo só valem para pokemon, onepiece e riftbound", game.name)
 	}
 	dir := filepath.Join(a.cfg.LigaDir, game.liga)
 	store := tracking.NewStore(dir, logx.New(io.Discard))
@@ -178,8 +178,13 @@ func (a *app) ligaReport(game listaGame, tipo string) (ligaReport, error) {
 		}
 	}
 	sort.SliceStable(report.Cards, func(i, j int) bool {
-		if tipo == "subiram" {
+		switch tipo {
+		case "subiram":
 			return report.Cards[i].Change > report.Cards[j].Change
+		case "caiu":
+			return report.Cards[i].Change < report.Cards[j].Change
+		case "mais_caras", "chuta", "duelo":
+			return report.Cards[i].Now > report.Cards[j].Now
 		}
 		if report.Cards[i].Units != report.Cards[j].Units {
 			return report.Cards[i].Units > report.Cards[j].Units
@@ -225,12 +230,26 @@ func (a *app) ligaSetCards(store *tracking.Store, s ligaSet, tipo string) ([]lig
 	}
 	out := []ligaCard{}
 	for _, c := range cur.Cards {
-		old := before[c.Number]
-		if old < moverFloorBRL || c.LowBRL < moverFloorBRL || c.LowBRL <= old || storesWithStock(c) < moverMinStores {
+		if c.LowBRL < moverFloorBRL || storesWithStock(c) < moverMinStores {
 			continue
 		}
-		change := math.Round((c.LowBRL - old) / old * 100)
-		out = append(out, ligaCard{Set: s.name, Number: c.Number, Name: cardName(c.Name), Before: old, Now: c.LowBRL, Change: change})
+		card := ligaCard{Set: s.name, Number: c.Number, Name: cardName(c.Name), Now: c.LowBRL}
+		old := before[c.Number]
+		switch tipo {
+		case "subiram":
+			if old < moverFloorBRL || c.LowBRL <= old {
+				continue
+			}
+		case "caiu":
+			if old < moverFloorBRL || c.LowBRL >= old {
+				continue
+			}
+		default:
+			out = append(out, card)
+			continue
+		}
+		card.Before, card.Change = old, math.Round((c.LowBRL-old)/old*100)
+		out = append(out, card)
 	}
 	return out, nil
 }

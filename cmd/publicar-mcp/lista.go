@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -26,10 +27,17 @@ const (
 	cardTitleMax   = 32
 	chaseDefault   = 4
 	chaseFloorUSD  = 5
+	quizPool       = 15
+	duelPool       = 30
+	duelMinRatio   = 1.2
+	duelMaxRatio   = 3.0
+	releaseAhead   = 90 * 24 * time.Hour
 )
 
 var (
-	listaTipos = map[string]bool{"lancamentos": true, "subiram": true, "em_alta": true, "noticias": true, "podem_vir": true}
+	listaTipos = map[string]bool{"lancamentos": true, "subiram": true, "em_alta": true, "noticias": true, "podem_vir": true, "mais_caras": true, "caiu": true, "chuta": true, "duelo": true, "faltam": true}
+	listaItens = map[string]bool{"subiram": true, "em_alta": true, "podem_vir": true, "mais_caras": true, "caiu": true}
+	storeWord  = regexp.MustCompile(`(?i)\b(inaugur\p{L}*|loja)\b`)
 	listaKinds = map[string]string{"video": "lista", "arte": "lista-arte"}
 	chaseHook  = regexp.MustCompile(`(?i)\bpodem?\s+(vir|sair)\b`)
 	pulledWord = regexp.MustCompile(`(?i)\b(tiramos|tirei|tirou|abrimos|abri|puxamos|puxei|puxou|saiu pra|saíram pra|nosso pull|pegamos)\b`)
@@ -44,17 +52,17 @@ type listaManchete struct {
 }
 
 type listaInput struct {
-	Tipo      string            `json:"tipo" jsonschema:"lancamentos (sets do mês, data do TCGplayer EUA), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (cartas mais vendidas na Liga em 7 dias), noticias (1 a 3 manchetes com link) ou podem_vir (cartas mais caras que podem vir no set, preço de mercado do TCGplayer EUA, e no fim o produto do site com o nosso preço; para anúncio)"`
-	Jogo      string            `json:"jogo" jsonschema:"pokemon, onepiece, riftbound, magic, yugioh ou lorcana. subiram e em_alta: só pokemon, onepiece e riftbound"`
+	Tipo      string            `json:"tipo" jsonschema:"lancamentos (sets do mês, data do TCGplayer EUA), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (cartas mais vendidas na Liga em 7 dias), mais_caras (top 3 a 5 cartas mais caras na Liga hoje), caiu (cartas que mais baixaram na Liga em 7 dias), chuta (quiz: 1 carta cara, contagem e o preço da Liga revelado), duelo (quiz: 2 cartas, qual vale mais, preços da Liga revelados), faltam (contagem de dias para o próximo lançamento do jogo, data do TCGplayer EUA), noticias (1 a 3 manchetes com link) ou podem_vir (cartas mais caras que podem vir no set, preço de mercado do TCGplayer EUA, e no fim o produto do site com o nosso preço; para anúncio)"`
+	Jogo      string            `json:"jogo" jsonschema:"pokemon, onepiece, riftbound, magic, yugioh ou lorcana. subiram, em_alta, mais_caras, caiu, chuta e duelo: só pokemon, onepiece e riftbound"`
 	Formato   string            `json:"formato" jsonschema:"video (Reels e TikTok, 1080x1920) ou arte (post do Instagram, 1080x1350)"`
 	Mes       string            `json:"mes,omitempty" jsonschema:"só em lancamentos: AAAA-MM (padrão: o mês de hoje)"`
-	Set       string            `json:"set,omitempty" jsonschema:"só em podem_vir: sigla ou nome do set no TCGplayer (ex.: DLR ou Delta Reign, OP18)"`
-	Itens     int               `json:"itens,omitempty" jsonschema:"só em subiram, em_alta e podem_vir: quantas cartas, de 3 a 5 (padrão 5; em podem_vir padrão 4)"`
+	Set       string            `json:"set,omitempty" jsonschema:"podem_vir (obrigatório) e faltam (opcional, padrão: o próximo lançamento do jogo): sigla ou nome do set no TCGplayer (ex.: DLR ou Delta Reign, OP18)"`
+	Itens     int               `json:"itens,omitempty" jsonschema:"só em subiram, em_alta, mais_caras, caiu e podem_vir: quantas cartas, de 3 a 5 (padrão 5; em podem_vir padrão 4)"`
 	Etiqueta  string            `json:"etiqueta" jsonschema:"linha pequena no topo, até 32 letras (ex.: One Piece · Liga)"`
 	Gancho    string            `json:"gancho" jsonschema:"frase grande dos primeiros segundos, de 4 a 40 letras, sem travessão (ex.: AS CARTAS QUE MAIS SUBIRAM)"`
 	Destaque  []string          `json:"destaque,omitempty" jsonschema:"palavras do gancho pintadas de verde, até 4"`
 	Manchetes []listaManchete   `json:"manchetes,omitempty" jsonschema:"só em noticias: de 1 a 3 manchetes"`
-	Produto   *pecaProdutoInput `json:"produto,omitempty" jsonschema:"lancamentos (opcional) e podem_vir (obrigatório): produto do site; entra no fim com o preço do site no Pix e no cartão"`
+	Produto   *pecaProdutoInput `json:"produto,omitempty" jsonschema:"lancamentos e faltam (opcional) e podem_vir (obrigatório): produto do site; entra no fim com o preço do site no Pix e no cartão"`
 	Final     pecaFinalInput    `json:"final"`
 }
 
@@ -69,6 +77,8 @@ type listaItem struct {
 	Alta      int          `json:"alta,omitempty"`
 	Unidades  int          `json:"unidades,omitempty"`
 	Dolar     float64      `json:"dolar,omitempty"`
+	Vencedor  bool         `json:"vencedor,omitempty"`
+	Dias      int          `json:"dias,omitempty"`
 	Produto   *pecaProduto `json:"produto,omitempty"`
 }
 
@@ -93,6 +103,8 @@ type listaSaida struct {
 	Alta     int     `json:"alta_pct,omitempty"`
 	Unidades int     `json:"unidades,omitempty"`
 	Dolar    float64 `json:"preco_mercado_usd,omitempty"`
+	ValeMais bool    `json:"vale_mais,omitempty"`
+	Dias     int     `json:"dias,omitempty"`
 	Link     string  `json:"link,omitempty"`
 }
 
@@ -116,7 +128,7 @@ type listaBuild struct {
 func (a *app) addListaTool(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "criar_lista",
-		Description: "Só para o Social Collecta. Gera vídeo ou arte de conteúdo com dados reais que a própria ferramenta busca: lancamentos (sets do mês no TCGplayer), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (mais vendidas na Liga em 7 dias) noticias (manchetes com link) ou podem_vir (anúncio: as cartas mais caras que podem vir no set, com preço de mercado do TCGplayer EUA, e o produto do site com o nosso preço). Você escreve só os textos; datas, preços e vendas vêm da fonte e voltam em itens. Olhe as prévias com Read antes de pedir aprovação. Conta no limite de 30 peças por dia junto com criar_peca.",
+		Description: "Só para o Social Collecta. Gera vídeo ou arte de conteúdo com dados reais que a própria ferramenta busca: lancamentos (sets do mês no TCGplayer), subiram (cartas que mais subiram na Liga em 7 dias), em_alta (mais vendidas na Liga em 7 dias), mais_caras (as mais caras na Liga hoje), caiu (as que mais baixaram na Liga em 7 dias), chuta (quiz Chuta o Preço: 1 carta), duelo (quiz Qual Vale Mais: 2 cartas), faltam (contagem para o próximo lançamento), noticias (manchetes com link) ou podem_vir (anúncio: as cartas mais caras que podem vir no set, com preço de mercado do TCGplayer EUA, e o produto do site com o nosso preço). Você escreve só os textos; datas, preços e vendas vêm da fonte e voltam em itens. Olhe as prévias com Read antes de pedir aprovação. Conta no limite de 30 peças por dia junto com criar_peca.",
 	}, a.toolLista)
 }
 
@@ -128,7 +140,7 @@ func (a *app) toolLista(ctx context.Context, _ *mcp.CallToolRequest, in listaInp
 		ext = ".png"
 	}
 	if !listaTipos[tipo] || !ok {
-		return nil, listaOutput{}, fmt.Errorf("tipo %q ou formato %q não existe: tipo lancamentos, subiram, em_alta, noticias ou podem_vir; formato video ou arte", in.Tipo, in.Formato)
+		return nil, listaOutput{}, fmt.Errorf("tipo %q ou formato %q não existe: tipo lancamentos, subiram, em_alta, mais_caras, caiu, chuta, duelo, faltam, noticias ou podem_vir; formato video ou arte", in.Tipo, in.Formato)
 	}
 	jogo := strings.ToLower(strings.TrimSpace(in.Jogo))
 	game, ok := listaGames[jogo]
@@ -163,6 +175,8 @@ func (a *app) toolLista(ctx context.Context, _ *mcp.CallToolRequest, in listaInp
 		b, err = a.buildNews(ctx, id, game, in.Manchetes)
 	case "podem_vir":
 		b, err = a.buildChase(ctx, id, game, in)
+	case "faltam":
+		b, err = a.buildCountdown(ctx, id, game, in)
 	default:
 		b, err = a.buildLiga(ctx, id, game, tipo, in.Itens)
 	}
@@ -209,20 +223,22 @@ func checkListaShape(tipo string, in listaInput) error {
 		return fmt.Errorf("noticias leva de 1 a %d manchetes", headlinesMax)
 	case tipo != "lancamentos" && strings.TrimSpace(in.Mes) != "":
 		return errors.New("mes só vale no tipo lancamentos")
-	case tipo != "lancamentos" && tipo != "podem_vir" && in.Produto != nil:
-		return errors.New("produto só vale em lancamentos e podem_vir")
-	case tipo != "podem_vir" && strings.TrimSpace(in.Set) != "":
-		return errors.New("set só vale em podem_vir")
+	case tipo != "lancamentos" && tipo != "podem_vir" && tipo != "faltam" && in.Produto != nil:
+		return errors.New("produto só vale em lancamentos, faltam e podem_vir")
+	case tipo != "podem_vir" && tipo != "faltam" && strings.TrimSpace(in.Set) != "":
+		return errors.New("set só vale em podem_vir e faltam")
+	case tipo == "faltam" && storeWord.MatchString(in.Gancho+" "+in.Etiqueta+" "+in.Final.Titulo+" "+in.Final.Oferta):
+		return errors.New("faltam conta os dias para o lançamento de uma coleção, nunca para a loja: tire loja e inauguração do texto")
 	case tipo == "podem_vir" && (in.Produto == nil || strings.TrimSpace(in.Set) == ""):
 		return errors.New("podem_vir precisa de set (sigla do TCGplayer, ex.: DLR) e produto (link do site)")
 	case tipo == "podem_vir" && !chaseHook.MatchString(in.Gancho):
 		return errors.New(`em podem_vir o gancho tem que dizer "pode vir" ou "podem vir" (ex.: AS MAIS CARAS QUE PODEM VIR): nunca dê a entender que a carta já saiu pra gente`)
 	case pulledWord.MatchString(in.Gancho + " " + in.Etiqueta + " " + in.Final.Titulo + " " + in.Final.Oferta):
 		return errors.New("o texto dá a entender que a gente abriu ou tirou a carta: diga que ela pode vir")
-	case (tipo == "subiram" || tipo == "em_alta" || tipo == "podem_vir") && in.Itens != 0 && (in.Itens < listaMin || in.Itens > listaDefault):
+	case listaItens[tipo] && in.Itens != 0 && (in.Itens < listaMin || in.Itens > listaDefault):
 		return fmt.Errorf("itens vai de %d a %d", listaMin, listaDefault)
-	case tipo != "subiram" && tipo != "em_alta" && tipo != "podem_vir" && in.Itens != 0:
-		return errors.New("itens só vale em subiram, em_alta e podem_vir")
+	case !listaItens[tipo] && in.Itens != 0:
+		return errors.New("itens só vale em subiram, em_alta, mais_caras, caiu e podem_vir")
 	}
 	for _, m := range in.Manchetes {
 		if err := (textLimit{"manchetes.texto", cleanLine(m.Texto), 10, 90}).check(); err != nil {
@@ -347,15 +363,29 @@ func (a *app) buildLiga(ctx context.Context, id string, game listaGame, tipo str
 	}
 	window := fmt.Sprintf("%s a %s", report.From.Format("02/01"), report.To.Format("02/01"))
 	b := listaBuild{props: listaProps{Selo: "LIGA · " + window, Fonte: "Menor preço na Liga, " + window}}
-	if tipo == "em_alta" {
+	switch tipo {
+	case "em_alta":
 		b.props.Fonte = "Vendas na Liga pela baixa de estoque, " + window
+	case "mais_caras", "chuta", "duelo":
+		stamp := report.To.Format("02/01")
+		b.props.Selo, b.props.Fonte = "LIGA · "+stamp, "Menor preço na Liga em "+stamp
 	}
+	cards := []ligaCard{}
 	for _, c := range report.Cards {
+		if c.Name != "" && utf8.RuneCountInString(c.Name) <= cardTitleMax {
+			cards = append(cards, c)
+		}
+	}
+	seed := a.now().In(saoPaulo).YearDay() + a.rendersToday()
+	switch tipo {
+	case "chuta":
+		return a.buildQuiz(ctx, id, b, rotate(cards, quizPool, seed), game)
+	case "duelo":
+		return a.buildDuel(ctx, id, b, duelPairs(cards, seed), seed, game)
+	}
+	for _, c := range cards {
 		if len(b.props.Itens) == want {
 			break
-		}
-		if utf8.RuneCountInString(c.Name) > cardTitleMax || c.Name == "" {
-			continue
 		}
 		rel, ratio, err := a.listaPhoto(ctx, id, &b, c.Image)
 		if err != nil {
@@ -363,10 +393,13 @@ func (a *app) buildLiga(ctx context.Context, id string, game listaGame, tipo str
 		}
 		item := listaItem{Titulo: c.Name, Imagem: rel, Proporcao: ratio, Rotulo: fmt.Sprintf("#%d", len(b.props.Itens)+1), Detalhe: cardDetail(c)}
 		saida := listaSaida{Titulo: c.Name, Rotulo: item.Rotulo, Detalhe: item.Detalhe}
-		if tipo == "subiram" {
+		switch tipo {
+		case "subiram", "caiu":
 			item.Antes, item.Agora, item.Alta = c.Before, c.Now, int(c.Change)
 			saida.Antes, saida.Agora, saida.Alta = c.Before, c.Now, int(c.Change)
-		} else {
+		case "mais_caras":
+			item.Agora, saida.Agora = c.Now, c.Now
+		default:
 			item.Agora, item.Unidades = c.Average, c.Units
 			saida.Agora, saida.Unidades = c.Average, c.Units
 		}
@@ -376,6 +409,135 @@ func (a *app) buildLiga(ctx context.Context, id string, game listaGame, tipo str
 	if len(b.props.Itens) < listaMin {
 		return listaBuild{}, fmt.Errorf("só %d cartas de %s passaram nos filtros da Liga (preço, lojas e foto): escolha outro jogo ou formato", len(b.props.Itens), game.name)
 	}
+	return b, nil
+}
+
+func rotate(cards []ligaCard, pool, seed int) []ligaCard {
+	if len(cards) > pool {
+		cards = cards[:pool]
+	}
+	if len(cards) == 0 {
+		return nil
+	}
+	start := seed % len(cards)
+	return append(append([]ligaCard{}, cards[start:]...), cards[:start]...)
+}
+
+func duelPairs(cards []ligaCard, seed int) [][2]ligaCard {
+	if len(cards) > duelPool {
+		cards = cards[:duelPool]
+	}
+	pairs := [][2]ligaCard{}
+	for i := range cards {
+		for j := i + 1; j < len(cards); j++ {
+			ratio := cards[i].Now / cards[j].Now
+			if ratio >= duelMinRatio && ratio <= duelMaxRatio {
+				pairs = append(pairs, [2]ligaCard{cards[i], cards[j]})
+			}
+		}
+	}
+	if len(pairs) == 0 {
+		return nil
+	}
+	start := seed % len(pairs)
+	return append(append([][2]ligaCard{}, pairs[start:]...), pairs[:start]...)
+}
+
+func (a *app) buildQuiz(ctx context.Context, id string, b listaBuild, cards []ligaCard, game listaGame) (listaBuild, error) {
+	for _, c := range cards {
+		rel, ratio, err := a.listaPhoto(ctx, id, &b, c.Image)
+		if err != nil {
+			continue
+		}
+		item := listaItem{Titulo: c.Name, Imagem: rel, Proporcao: ratio, Rotulo: "?", Detalhe: cardDetail(c), Agora: c.Now}
+		b.props.Itens = []listaItem{item}
+		b.out.Itens = []listaSaida{{Titulo: c.Name, Rotulo: item.Rotulo, Detalhe: item.Detalhe, Agora: c.Now}}
+		b.out.Avisos = append(b.out.Avisos, "não escreva o preço na legenda nem no gancho: a graça é o chute. Peça o palpite nos comentários e cite a fonte com a data")
+		return b, nil
+	}
+	return listaBuild{}, fmt.Errorf("nenhuma carta cara de %s com foto na Liga para o quiz", game.name)
+}
+
+func (a *app) buildDuel(ctx context.Context, id string, b listaBuild, pairs [][2]ligaCard, seed int, game listaGame) (listaBuild, error) {
+	for _, pair := range pairs {
+		high, low := pair[0], pair[1]
+		rh, ph, err := a.listaPhoto(ctx, id, &b, high.Image)
+		if err != nil {
+			continue
+		}
+		rl, pl, err := a.listaPhoto(ctx, id, &b, low.Image)
+		if err != nil {
+			continue
+		}
+		hi := listaItem{Titulo: high.Name, Imagem: rh, Proporcao: ph, Detalhe: cardDetail(high), Agora: high.Now, Vencedor: true}
+		lo := listaItem{Titulo: low.Name, Imagem: rl, Proporcao: pl, Detalhe: cardDetail(low), Agora: low.Now}
+		left, right := hi, lo
+		if seed%2 == 1 {
+			left, right = lo, hi
+		}
+		left.Rotulo, right.Rotulo = "ESQUERDA", "DIREITA"
+		b.props.Itens = []listaItem{left, right}
+		for _, it := range b.props.Itens {
+			b.out.Itens = append(b.out.Itens, listaSaida{Titulo: it.Titulo, Rotulo: it.Rotulo, Detalhe: it.Detalhe, Agora: it.Agora, ValeMais: it.Vencedor})
+		}
+		b.out.Avisos = append(b.out.Avisos, "não diga na legenda nem no gancho qual vale mais: peça o palpite (esquerda ou direita) nos comentários e cite a fonte com a data")
+		return b, nil
+	}
+	return listaBuild{}, fmt.Errorf("a Liga de %s não tem duas cartas com foto e preços parecidos para o duelo", game.name)
+}
+
+func (a *app) buildCountdown(ctx context.Context, id string, game listaGame, in listaInput) (listaBuild, error) {
+	today := a.now().In(saoPaulo)
+	day := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, saoPaulo)
+	all, err := a.releases(ctx, game)
+	if err != nil {
+		return listaBuild{}, err
+	}
+	set := strings.ToLower(cleanLine(in.Set))
+	var next *tcgRelease
+	for i := range all {
+		r := all[i]
+		if !r.Date.After(day) || r.Date.Sub(day) > releaseAhead {
+			continue
+		}
+		if set != "" && !strings.EqualFold(r.Group.Abbreviation, set) && !strings.Contains(strings.ToLower(r.Group.Name), set) {
+			continue
+		}
+		next = &all[i]
+		break
+	}
+	if next == nil && set != "" {
+		return listaBuild{}, fmt.Errorf("o TCGplayer não tem lançamento de %s com %q nos próximos 90 dias", game.name, in.Set)
+	}
+	if next == nil {
+		return listaBuild{}, fmt.Errorf("o TCGplayer não tem lançamento de %s nos próximos 90 dias", game.name)
+	}
+	days := int(math.Round(next.Date.Sub(day).Hours() / 24))
+	b := listaBuild{props: listaProps{Selo: fmt.Sprintf("FALTAM %d DIAS", days), Fonte: "Data de lançamento nos EUA: TCGplayer"}}
+	if days == 1 {
+		b.props.Selo = "FALTA 1 DIA"
+	}
+	img, err := a.boxImage(ctx, game, next.Group)
+	if err != nil {
+		return listaBuild{}, fmt.Errorf("foto de %s: %v", next.Group.Name, err)
+	}
+	rel, ratio, err := a.listaPhoto(ctx, id, &b, img)
+	if err != nil {
+		return listaBuild{}, err
+	}
+	item := listaItem{Titulo: cleanLine(next.Group.Name), Imagem: rel, Proporcao: ratio, Rotulo: strconv.Itoa(days), Detalhe: "Lançamento EUA " + releaseLabel(next.Date, today), Dias: days}
+	b.props.Itens = append(b.props.Itens, item)
+	b.out.Itens = append(b.out.Itens, listaSaida{Titulo: item.Titulo, Rotulo: item.Rotulo, Detalhe: item.Detalhe, Dias: days})
+	if in.Produto != nil {
+		prod, price, err := a.resolveProduct(ctx, id, len(b.photos), *in.Produto)
+		if err != nil {
+			return listaBuild{}, err
+		}
+		b.props.Itens = append(b.props.Itens, listaItem{Titulo: prod.Nome, Imagem: prod.Imagem, Proporcao: prod.Proporcao, Rotulo: "Na Collecta", Detalhe: "Pix ou cartão", Produto: &prod})
+		b.out.Itens = append(b.out.Itens, listaSaida{Titulo: prod.Nome, Rotulo: "Na Collecta", Agora: prod.Preco, Link: price.Link})
+		b.out.Precos = append(b.out.Precos, price)
+	}
+	b.out.Avisos = append(b.out.Avisos, "a data é do lançamento nos EUA (TCGplayer): no Brasil pode ser outra. A legenda diz isso")
 	return b, nil
 }
 

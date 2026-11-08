@@ -309,6 +309,112 @@ func TestListaBestSellers(t *testing.T) {
 	}
 }
 
+func priceCards() []ligaFixtureCard {
+	return []ligaFixtureCard{
+		{number: "001", name: "Charizard ex (#001/080)", before: 120, now: 100, stores: 3, image: true},
+		{number: "002", name: "Umbreon ex (#002/080)", before: 50, now: 60, stores: 4, image: true},
+		{number: "003", name: "Pikachu ex (#003/080)", before: 50, now: 40, stores: 3, image: true},
+		{number: "004", name: "Eevee (#004/080)", before: 12, now: 12, stores: 3, image: true},
+		{number: "005", name: "Poucas Lojas (#005/080)", before: 900, now: 500, stores: 2, image: true},
+		{number: "006", name: "Barata (#006/080)", before: 9, now: 8, stores: 5, image: true},
+	}
+}
+
+func listaTitles(props listaProps) string {
+	titles := []string{}
+	for _, it := range props.Itens {
+		titles = append(titles, it.Titulo)
+	}
+	return strings.Join(titles, ",")
+}
+
+func TestListaMostExpensive(t *testing.T) {
+	f, _, ls := newListaFixture(t)
+	writeLiga(t, f, ls, "tracking-pkm", "M2", priceCards())
+	args := listaArgs("mais_caras", "pokemon")
+	args["itens"] = 3
+	out, errText := callTool[listaOutput](t, f, "criar_lista", args)
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	props := lastLista(t, f)
+	if listaTitles(props) != "Charizard ex,Umbreon ex,Pikachu ex" || props.Itens[0].Agora != 100 || props.Itens[0].Rotulo != "#1" {
+		t.Fatalf("itens = %+v", props.Itens)
+	}
+	if props.Fonte != "Menor preço na Liga em 06/11" || props.Selo != "LIGA · 06/11" || out.Itens[2].Agora != 40 {
+		t.Fatalf("fonte = %q %q %+v", props.Fonte, props.Selo, out.Itens)
+	}
+}
+
+func TestListaPriceDrops(t *testing.T) {
+	f, _, ls := newListaFixture(t)
+	writeLiga(t, f, ls, "tracking-pkm", "M2", append(priceCards(), ligaFixtureCard{number: "007", name: "Mew ex (#007/080)", before: 30, now: 27, stores: 3, image: true}))
+	out, errText := callTool[listaOutput](t, f, "criar_lista", listaArgs("caiu", "pokemon"))
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	props := lastLista(t, f)
+	if listaTitles(props) != "Pikachu ex,Charizard ex,Mew ex" {
+		t.Fatalf("ordem = %s", listaTitles(props))
+	}
+	if first := props.Itens[0]; first.Antes != 50 || first.Agora != 40 || first.Alta != -20 || out.Itens[1].Alta != -17 {
+		t.Fatalf("primeiro = %+v saída = %+v", first, out.Itens)
+	}
+}
+
+func TestListaQuiz(t *testing.T) {
+	f, _, ls := newListaFixture(t)
+	writeLiga(t, f, ls, "tracking-pkm", "M2", priceCards())
+	out, errText := callTool[listaOutput](t, f, "criar_lista", listaArgs("chuta", "pokemon"))
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	props := lastLista(t, f)
+	if len(props.Itens) != 1 || props.Itens[0].Titulo != "Pikachu ex" || props.Itens[0].Agora != 40 || props.Itens[0].Rotulo != "?" {
+		t.Fatalf("itens = %+v", props.Itens)
+	}
+	if len(out.Avisos) != 1 || !strings.Contains(out.Avisos[0], "não escreva o preço") || !strings.Contains(out.Arquivo, "-lista-chuta-pokemon-") {
+		t.Fatalf("saída = %+v", out)
+	}
+}
+
+func TestListaDuel(t *testing.T) {
+	f, _, ls := newListaFixture(t)
+	writeLiga(t, f, ls, "tracking-pkm", "M2", priceCards())
+	out, errText := callTool[listaOutput](t, f, "criar_lista", listaArgs("duelo", "pokemon"))
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	props := lastLista(t, f)
+	if len(props.Itens) != 2 {
+		t.Fatalf("itens = %+v", props.Itens)
+	}
+	left, right := props.Itens[0], props.Itens[1]
+	if left.Titulo != "Charizard ex" || !left.Vencedor || left.Rotulo != "ESQUERDA" || right.Titulo != "Pikachu ex" || right.Vencedor || right.Rotulo != "DIREITA" {
+		t.Fatalf("duelo = %+v x %+v", left, right)
+	}
+	if !out.Itens[0].ValeMais || out.Itens[1].ValeMais || out.Itens[1].Agora != 40 || !strings.Contains(out.Avisos[0], "não diga") {
+		t.Fatalf("saída = %+v", out)
+	}
+}
+
+func TestListaCountdown(t *testing.T) {
+	f, _, _ := newListaFixture(t)
+	args := listaArgs("faltam", "onepiece")
+	args["gancho"] = "Faltam poucos dias pra OP-18"
+	out, errText := callTool[listaOutput](t, f, "criar_lista", args)
+	if errText != "" {
+		t.Fatal(errText)
+	}
+	props := lastLista(t, f)
+	if props.Selo != "FALTAM 14 DIAS" || len(props.Itens) != 1 || props.Itens[0].Titulo != "The Dominance of God" || props.Itens[0].Dias != 14 || props.Itens[0].Detalhe != "Lançamento EUA 20/11" {
+		t.Fatalf("props = %+v", props)
+	}
+	if out.Itens[0].Dias != 14 || !strings.Contains(out.Avisos[0], "nos EUA") {
+		t.Fatalf("saída = %+v", out)
+	}
+}
+
 func TestListaRefusesStaleLiga(t *testing.T) {
 	f, site, ls := newListaFixture(t)
 	writeLiga(t, f, ls, "tracking-rft", "UNL", []ligaFixtureCard{{number: "1", name: "Ahri (1)", before: 20, now: 40, stores: 3, image: true}})
@@ -442,7 +548,7 @@ func TestListaRefuses(t *testing.T) {
 			a := listaArgs("em_alta", "pokemon")
 			a["produto"] = map[string]any{"link": "https://www.collectatcg.com.br/selado/reinado-box"}
 			return a
-		}, "produto só vale em lancamentos e podem_vir"},
+		}, "produto só vale em lancamentos"},
 		{"podem_vir sem produto", func(*listaSite) map[string]any {
 			a := chaseArgs()
 			delete(a, "produto")
@@ -473,6 +579,21 @@ func TestListaRefuses(t *testing.T) {
 			a["jogo"], a["set"] = "onepiece", "OP18"
 			return a
 		}, "ainda está em pré-venda no TCGplayer (lançamento 20/11)"},
+		{"itens no chuta", func(*listaSite) map[string]any {
+			a := listaArgs("chuta", "pokemon")
+			a["itens"] = 3
+			return a
+		}, "itens só vale"},
+		{"faltam fala da loja", func(*listaSite) map[string]any {
+			a := listaArgs("faltam", "onepiece")
+			a["gancho"] = "Faltam poucos dias pra inauguração"
+			return a
+		}, "nunca para a loja"},
+		{"faltam sem lançamento", func(*listaSite) map[string]any {
+			a := listaArgs("faltam", "pokemon")
+			a["set"] = "OP18"
+			return a
+		}, "não tem lançamento de Pokémon"},
 		{"gancho longo", func(*listaSite) map[string]any {
 			a := listaArgs("lancamentos", "pokemon")
 			a["gancho"] = strings.Repeat("a", 41)
