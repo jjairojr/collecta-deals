@@ -326,26 +326,24 @@ export default function StockPage() {
     [holdings, rows],
   );
 
-  const dirty = useMemo(() => {
-    if (!data) {
-      return false;
-    }
-    if (ligaChanged.length > 0) {
-      return true;
-    }
-    return holdings.some((t) => {
-      const r = rows[t.id];
-      return (
-        r &&
-        (round2(r.askBRL) !== round2(t.askBRL ?? 0) ||
-          r.listed !== Boolean(t.listed) ||
-          (r.imageURL ?? "") !== (t.imageURL ?? "") ||
-          r.featured !== Boolean(t.featured) ||
-          round2(r.cardBRL) !== round2(t.cardBRL ?? 0) ||
-          r.shipsFrom !== (t.shipsFrom ?? ""))
-      );
-    });
-  }, [holdings, rows, data, ligaChanged]);
+  const listingChanged = useMemo(
+    () =>
+      holdings.filter((t) => {
+        const r = rows[t.id];
+        return (
+          r &&
+          (round2(r.askBRL) !== round2(t.askBRL ?? 0) ||
+            r.listed !== Boolean(t.listed) ||
+            (r.imageURL ?? "") !== (t.imageURL ?? "") ||
+            r.featured !== Boolean(t.featured) ||
+            round2(r.cardBRL) !== round2(t.cardBRL ?? 0) ||
+            r.shipsFrom !== (t.shipsFrom ?? ""))
+        );
+      }),
+    [holdings, rows],
+  );
+
+  const dirty = Boolean(data) && (ligaChanged.length > 0 || listingChanged.length > 0);
 
   const stats = useMemo(() => {
     let onSale = 0;
@@ -463,7 +461,7 @@ export default function StockPage() {
   const save = async () => {
     setSaving(true);
     try {
-      const items: ListingInput[] = holdings.map((t) => ({
+      const items: ListingInput[] = listingChanged.map((t) => ({
         id: t.id,
         askBRL: rows[t.id]?.askBRL ?? 0,
         listed: Boolean(rows[t.id]?.listed),
@@ -472,7 +470,9 @@ export default function StockPage() {
         cardBRL: rows[t.id]?.cardBRL ?? 0,
         shipsFrom: rows[t.id]?.shipsFrom ?? "",
       }));
-      await setListings(items);
+      if (items.length > 0) {
+        await setListings(items);
+      }
       if (ligaChanged.length > 0) {
         const ligaItems: LigaInput[] = ligaChanged.map((t) => ({
           id: t.id,
