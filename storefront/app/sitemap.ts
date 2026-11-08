@@ -7,6 +7,10 @@ import { absoluteURL } from "@/lib/site";
 
 export const revalidate = 3600;
 
+function xmlSafe(url: string): string {
+  return url.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { singles, sealed, accessories, soldOut, games, live } =
     await loadCatalog();
@@ -98,7 +102,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: p.addedAt,
       changeFrequency: "weekly",
       priority,
-      images: p.imageURL ? [absoluteURL(p.imageURL)] : undefined,
+      images: p.imageURL ? [xmlSafe(absoluteURL(p.imageURL))] : undefined,
     });
   };
   for (const s of singles) {
@@ -119,5 +123,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const a of soldOut.accessories) {
     product(`/acessorio/${a.slug}`, a, 0.4);
   }
-  return urls;
+  return urls.map((u) => ({ ...u, url: xmlSafe(u.url) }));
 }

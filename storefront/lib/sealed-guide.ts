@@ -23,6 +23,7 @@ const POKEMON_MAIN_SET: BoxContents[] = [
     match: /\betb\b|treinador avan[cç]ado|elite trainer/i,
     text: "9 pacotes de booster, 1 carta promocional, sleeves, cartas de energia, dados e marcadores, numa caixa que serve de organizador.",
   },
+  { match: /combo de pacotes/i, text: "18 pacotes de booster da coleção numa só embalagem, sem acessórios." },
   { match: /blister triplo/i, text: "3 pacotes de booster e 1 carta promocional." },
   { match: /blister qu[aá]druplo/i, text: "4 pacotes de booster e 1 carta promocional." },
 ];
