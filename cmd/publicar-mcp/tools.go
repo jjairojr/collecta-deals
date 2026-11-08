@@ -130,8 +130,8 @@ func (a *app) toolRequest(ctx context.Context, _ *mcp.CallToolRequest, in reques
 	if !publishq.ValidFormat(canal, formato) {
 		return nil, requestOutput{}, fmt.Errorf("canal %q com formato %q não existe: instagram (reels, post, carrossel, teste) ou tiktok (video)", in.Canal, in.Formato)
 	}
-	if publishq.ViaAPI(canal, formato) && !a.metaReady() {
-		return nil, requestOutput{}, errors.New("Reels de teste ainda não está ligado: falta o token do Meta em anuncios.env. Mande a peça só para o TikTok e anote em Pendências do Jairo")
+	if publishq.ViaAPI(canal, formato) && !a.trialsReady() {
+		return nil, requestOutput{}, errors.New("Reels de teste está desligado (precisa de META_REELS_TESTE=on e do token do Meta em anuncios.env). Mande a peça só para o TikTok e anote em Pendências do Jairo")
 	}
 	caption, err := checkCaption(in.Legenda)
 	if err != nil {
@@ -171,9 +171,9 @@ func (a *app) toolRequest(ctx context.Context, _ *mcp.CallToolRequest, in reques
 	return nil, out, nil
 }
 
-func (a *app) metaReady() bool {
+func (a *app) trialsReady() bool {
 	env, err := readEnvFile(a.cfg.AdsEnv)
-	return err == nil && env["META_TOKEN"] != "" && env["META_INSTAGRAM_ID"] != ""
+	return err == nil && env["META_TOKEN"] != "" && env["META_INSTAGRAM_ID"] != "" && env["META_REELS_TESTE"] == "on"
 }
 
 func (a *app) selfApprove(ctx context.Context, it publishq.Item) error {

@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"opdeals/internal/publishq"
@@ -17,6 +15,9 @@ import (
 const trialGraduation = "SS_PERFORMANCE"
 
 func (e *executor) publishTrials(ctx context.Context) []error {
+	if !e.g.cfg.Trials {
+		return nil
+	}
 	var list struct {
 		Items []publishq.Item `json:"items"`
 	}
@@ -69,20 +70,22 @@ func (e *executor) trialReel(ctx context.Context, it publishq.Item) (string, err
 	if got.SHA256 != file.SHA256 {
 		return "", fmt.Errorf("%s mudou depois do pedido", filepath.Base(file.Path))
 	}
+	link, stop, err := e.host.share(ctx, file.Path)
+	if err != nil {
+		return "", fmt.Errorf("link do vídeo: %w", err)
+	}
+	defer stop()
 	var container struct {
 		ID string `json:"id"`
 	}
 	if err := e.g.post(ctx, e.g.cfg.IGUserID+"/media", url.Values{
-		"media_type": {"REELS"}, "upload_type": {"resumable"}, "caption": {it.Caption},
+		"media_type": {"REELS"}, "video_url": {link}, "caption": {it.Caption},
 		"trial_params": {jsonParam(map[string]string{"graduation_strategy": trialGraduation})},
 	}, &container); err != nil {
 		return "", err
 	}
 	if container.ID == "" {
 		return "", errors.New("Meta não devolveu o container do vídeo")
-	}
-	if err := e.rupload(ctx, container.ID, file.Path); err != nil {
-		return "", err
 	}
 	if err := e.waitContainer(ctx, container.ID); err != nil {
 		return "", err
@@ -95,41 +98,15 @@ func (e *executor) trialReel(ctx context.Context, it publishq.Item) (string, err
 	}
 	var info struct {
 		Permalink string `json:"permalink"`
+		InFeed    bool   `json:"is_shared_to_feed"`
 	}
-	if err := e.g.get(ctx, media.ID, url.Values{"fields": {"permalink"}}, &info); err != nil || info.Permalink == "" {
+	if err := e.g.get(ctx, media.ID, url.Values{"fields": {"permalink,is_shared_to_feed"}}, &info); err != nil || info.Permalink == "" {
 		return "https://www.instagram.com/" + e.g.cfg.IGUsername + "/", nil
 	}
+	if info.InFeed {
+		e.notify(ctx, "Reels de teste caiu na grade", "high", "warning", fmt.Sprintf("O Instagram publicou como reels normal. Tire da grade pelo app (Gerenciar post, Remover da grade do perfil).\n%s", info.Permalink))
+	}
 	return info.Permalink, nil
-}
-
-func (e *executor) rupload(ctx context.Context, containerID, path string) error {
-	fh, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	info, err := fh.Stat()
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.g.cfg.RuploadURL+"/"+url.PathEscape(containerID), fh)
-	if err != nil {
-		return err
-	}
-	req.ContentLength = info.Size()
-	req.Header.Set("Authorization", "OAuth "+e.g.cfg.Token)
-	req.Header.Set("offset", "0")
-	req.Header.Set("file_size", strconv.FormatInt(info.Size(), 10))
-	var out struct {
-		Success bool `json:"success"`
-	}
-	if err := e.g.do(req, &out); err != nil {
-		return fmt.Errorf("envio do vídeo: %w", err)
-	}
-	if !out.Success {
-		return errors.New("envio do vídeo não confirmado pela Meta")
-	}
-	return nil
 }
 
 func (e *executor) waitContainer(ctx context.Context, id string) error {

@@ -41,27 +41,29 @@ const (
 var brazilInterests = []string{"Pokémon", "One Piece", "Trading card game"}
 
 type metaConfig struct {
-	Token      string
-	Account    string
-	PageID     string
-	IGUserID   string
-	IGUsername string
-	PixelID    string
-	BaseURL    string
-	RuploadURL string
+	Token       string
+	Account     string
+	PageID      string
+	IGUserID    string
+	IGUsername  string
+	PixelID     string
+	BaseURL     string
+	Cloudflared string
+	Trials      bool
 }
 
 func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
 	version := cmp.Or(getenv("META_VERSAO"), "v27.0")
 	cfg := metaConfig{
-		Token:      getenv("META_TOKEN"),
-		Account:    getenv("META_CONTA"),
-		PageID:     getenv("META_PAGINA"),
-		IGUserID:   getenv("META_INSTAGRAM_ID"),
-		IGUsername: cmp.Or(getenv("META_INSTAGRAM_USUARIO"), "tcgcollecta"),
-		PixelID:    getenv("META_PIXEL"),
-		BaseURL:    strings.TrimRight(cmp.Or(getenv("META_URL"), "https://graph.facebook.com"), "/") + "/" + version,
-		RuploadURL: strings.TrimRight(cmp.Or(getenv("META_RUPLOAD"), "https://rupload.facebook.com/ig-api-upload"), "/") + "/" + version,
+		Token:       getenv("META_TOKEN"),
+		Account:     getenv("META_CONTA"),
+		PageID:      getenv("META_PAGINA"),
+		IGUserID:    getenv("META_INSTAGRAM_ID"),
+		IGUsername:  cmp.Or(getenv("META_INSTAGRAM_USUARIO"), "tcgcollecta"),
+		PixelID:     getenv("META_PIXEL"),
+		BaseURL:     strings.TrimRight(cmp.Or(getenv("META_URL"), "https://graph.facebook.com"), "/") + "/" + version,
+		Cloudflared: cmp.Or(getenv("META_CLOUDFLARED"), "/opt/homebrew/bin/cloudflared"),
+		Trials:      getenv("META_REELS_TESTE") == "on",
 	}
 	for name, v := range map[string]string{"META_TOKEN": cfg.Token, "META_CONTA": cfg.Account, "META_PAGINA": cfg.PageID, "META_INSTAGRAM_ID": cfg.IGUserID} {
 		if v == "" {
@@ -202,10 +204,11 @@ type executor struct {
 	g         *graph
 	pollEvery time.Duration
 	pollMax   time.Duration
+	host      videoHost
 }
 
 func newExecutor(a *app, mc metaConfig, client *http.Client) *executor {
-	return &executor{app: a, g: &graph{cfg: mc, client: client}, pollEvery: videoPollEvery, pollMax: videoPollMax}
+	return &executor{app: a, g: &graph{cfg: mc, client: client}, pollEvery: videoPollEvery, pollMax: videoPollMax, host: tunnelHost{binary: mc.Cloudflared}}
 }
 
 func (e *executor) list(ctx context.Context, status string) ([]adtestq.Test, error) {

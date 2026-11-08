@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -99,21 +97,10 @@ type fakeMeta struct {
 	next     int
 	failOn   string
 	insights []insightRow
+	inFeed   bool
 }
 
 func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/rupload/v27.0/") {
-		body, _ := io.ReadAll(r.Body)
-		m.mu.Lock()
-		m.calls = append(m.calls, metaCall{method: r.Method, path: strings.TrimPrefix(r.URL.Path, "/"), form: map[string]string{"body": string(body), "file_size": r.Header.Get("file_size"), "offset": r.Header.Get("offset")}})
-		m.mu.Unlock()
-		if r.Header.Get("Authorization") != "OAuth token-meta" || r.Header.Get("file_size") != strconv.Itoa(len(body)) {
-			http.Error(w, `{"error":{"message":"upload"}}`, http.StatusUnauthorized)
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": "Upload successful."})
-		return
-	}
 	path := strings.TrimPrefix(r.URL.Path, "/v27.0/")
 	form := map[string]string{}
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
@@ -148,8 +135,8 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": []map[string]string{{"id": "6003", "name": r.URL.Query().Get("q")}}})
 	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "status_code,status":
 		_ = json.NewEncoder(w).Encode(map[string]string{"status_code": "FINISHED", "status": "Finished: Media has been uploaded"})
-	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "permalink":
-		_ = json.NewEncoder(w).Encode(map[string]string{"permalink": "https://www.instagram.com/reel/teste123/"})
+	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "permalink,is_shared_to_feed":
+		_ = json.NewEncoder(w).Encode(map[string]any{"permalink": "https://www.instagram.com/reel/teste123/", "is_shared_to_feed": m.inFeed})
 	case r.Method == http.MethodGet && r.URL.Query().Get("fields") == "status":
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": map[string]string{"video_status": "ready"}})
 	case r.Method == http.MethodPost && !strings.Contains(path, "/"):
@@ -183,15 +170,50 @@ func (m *fakeMeta) statusPosts(status string) int {
 	return n
 }
 
+type fakeHost struct {
+	shared []string
+	open   int
+}
+
+func (h *fakeHost) share(_ context.Context, path string) (string, func(), error) {
+	h.shared = append(h.shared, path)
+	h.open++
+	return "https://tunel.test/v.mp4", func() { h.open-- }, nil
+}
+
+func TestExecutorWarnsWhenTrialLandsInFeed(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	f.metaEnv(t)
+	meta.inFeed = true
+	video := f.file(t, "lista.mp4", "v")
+	if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video)); errText != "" {
+		t.Fatal(errText)
+	}
+	f.now = f.now.Add(6 * time.Hour)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, p := range f.pushed() {
+		if p.title == "Reels de teste caiu na grade" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("devia avisar que caiu na grade: %+v", f.pushed())
+	}
+}
+
 func newAdFixture(t *testing.T) (*fixture, *fakeMeta, *executor) {
 	t.Helper()
 	f := newFixture(t)
 	meta := &fakeMeta{}
 	srv := httptest.NewServer(http.HandlerFunc(meta.serve))
 	t.Cleanup(srv.Close)
-	mc := metaConfig{Token: "token-meta", Account: "act_1", PageID: "page", IGUserID: "ig", IGUsername: "tcgcollecta", PixelID: "px", BaseURL: srv.URL + "/v27.0", RuploadURL: srv.URL + "/rupload/v27.0"}
+	mc := metaConfig{Token: "token-meta", Account: "act_1", PageID: "page", IGUserID: "ig", IGUsername: "tcgcollecta", PixelID: "px", BaseURL: srv.URL + "/v27.0", Trials: true}
 	ex := newExecutor(f.app, mc, http.DefaultClient)
 	ex.pollEvery = time.Millisecond
+	ex.host = &fakeHost{}
 	return f, meta, ex
 }
 
@@ -453,21 +475,44 @@ func TestReadEnvFile(t *testing.T) {
 func (f *fixture) metaEnv(t *testing.T) {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "anuncios.env")
-	if err := os.WriteFile(p, []byte("META_TOKEN=x\nMETA_INSTAGRAM_ID=ig\n"), 0o600); err != nil {
+	if err := os.WriteFile(p, []byte("META_TOKEN=x\nMETA_INSTAGRAM_ID=ig\nMETA_REELS_TESTE=on\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	f.app.cfg.AdsEnv = p
 }
 
-func TestRequestTrialReelNeedsMetaToken(t *testing.T) {
+func TestRequestTrialReelNeedsSwitch(t *testing.T) {
 	f := newFixture(t)
-	f.app.cfg.AdsEnv = filepath.Join(t.TempDir(), "nao-existe.env")
 	video := f.file(t, "lista.mp4", "v")
-	if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video)); !strings.Contains(errText, "token do Meta") {
-		t.Fatalf("devia recusar sem token: %s", errText)
+	off := filepath.Join(t.TempDir(), "anuncios.env")
+	if err := os.WriteFile(off, []byte("META_TOKEN=x\nMETA_INSTAGRAM_ID=ig\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, env := range []string{filepath.Join(t.TempDir(), "nao-existe.env"), off} {
+		f.app.cfg.AdsEnv = env
+		if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video)); !strings.Contains(errText, "desligado") {
+			t.Fatalf("devia recusar com %s: %s", env, errText)
+		}
 	}
 	if all, _ := f.store.List(""); len(all) != 0 {
 		t.Fatalf("não devia criar pedido: %+v", all)
+	}
+}
+
+func TestExecutorSkipsTrialsWhenOff(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	f.metaEnv(t)
+	video := f.file(t, "lista.mp4", "v")
+	if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", trialArgs(video)); errText != "" {
+		t.Fatal(errText)
+	}
+	ex.g.cfg.Trials = false
+	f.now = f.now.Add(6 * time.Hour)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.find("ig/media")) != 0 {
+		t.Fatal("publicou reels de teste com a chave desligada")
 	}
 }
 
@@ -519,12 +564,12 @@ func TestExecutorPublishesTrialReel(t *testing.T) {
 		t.Fatal(err)
 	}
 	created := meta.find("ig/media")
-	if len(created) != 1 || created[0].form["media_type"] != "REELS" || created[0].form["upload_type"] != "resumable" || created[0].form["trial_params"] != `{"graduation_strategy":"SS_PERFORMANCE"}` || !strings.Contains(created[0].form["caption"], "Faltam 10 dias") {
+	host := ex.host.(*fakeHost)
+	if len(created) != 1 || created[0].form["media_type"] != "REELS" || created[0].form["video_url"] != "https://tunel.test/v.mp4" || created[0].form["trial_params"] != `{"graduation_strategy":"SS_PERFORMANCE"}` || !strings.Contains(created[0].form["caption"], "Faltam 10 dias") {
 		t.Fatalf("container errado: %+v", created)
 	}
-	up := meta.find("rupload/v27.0/" + "id1")
-	if len(up) != 1 || up[0].form["body"] != "video da lista" || up[0].form["offset"] != "0" {
-		t.Fatalf("envio errado: %+v", meta.calls)
+	if len(host.shared) != 1 || filepath.Base(host.shared[0]) != filepath.Base(video) || host.open != 0 {
+		t.Fatalf("link do vídeo: compartilhou %v, abertos %d", host.shared, host.open)
 	}
 	if pub := meta.find("ig/media_publish"); len(pub) != 1 || pub[0].form["creation_id"] != "id1" {
 		t.Fatalf("publish errado: %+v", pub)

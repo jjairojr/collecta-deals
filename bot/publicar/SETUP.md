@@ -92,17 +92,18 @@ O `com.collecta.anuncios` (launchd, a cada 30 min) roda `publicar-mcp anuncios`:
 
 O Instagram pelo navegador não tem a opção de Reels de teste (conferido em 07/11/2026), então eles saem pela API:
 
+**Como sai (desde 08/11/2026):** o `trial_params` só funciona no envio por link (`video_url`). No envio resumível, os 3 primeiros saíram como reels normais, no perfil. Por isso o job abre um túnel temporário do `cloudflared` (`/opt/homebrew/bin/cloudflared`, ou `META_CLOUDFLARED`) que serve só aquele vídeo, num caminho aleatório, entrega o link ao Instagram e fecha o túnel depois de publicar. Se mesmo assim o reel cair na grade (`is_shared_to_feed` verdadeiro), avisa "Reels de teste caiu na grade" para tirar pelo app (Gerenciar post, Remover da grade do perfil). Liga e desliga com `META_REELS_TESTE=on` no `anuncios.env`.
+
 - O Social pede com `pedir_aprovacao` no canal `instagram`, formato `teste`. O pedido já entra aprovado, como o
   TikTok, e o Jairo recebe só o aviso "Reels de teste agendado pela Collecta" com a prévia.
 - O Publicador não vê esses itens em `aprovados`. Quem publica é o mesmo `com.collecta.anuncios` (a cada 30 min):
-  cria o container `REELS` com `upload_type=resumable` e `trial_params` `{"graduation_strategy":"SS_PERFORMANCE"}`,
-  envia o vídeo para `rupload.facebook.com/ig-api-upload/<versão>/<container>`, espera o `status_code` `FINISHED` e
-  chama `media_publish`. Registra o link como publicado e avisa "Reels de teste no ar".
+  abre o túnel, cria o container `REELS` com `video_url` e `trial_params` `{"graduation_strategy":"SS_PERFORMANCE"}`,
+  espera o `status_code` `FINISHED` e chama `media_publish`. Registra o link como publicado e avisa "Reels de teste no ar".
 - O reel aparece só para quem não segue a conta; se for bem, o Instagram coloca no perfil sozinho.
 - Falha passageira volta na rodada seguinte, até 3 tentativas; na última avisa "Reels de teste não saiu".
 - Limite da Meta: 100 posts por API em 24 horas.
-- Precisa do mesmo `anuncios.env` dos testes de anúncio, com `instagram_content_publish` no token. A Meta só aceita
-  o envio resumível para apps com Login do Facebook para Empresas.
+- Precisa do mesmo `anuncios.env` dos testes de anúncio, com `instagram_content_publish` no token, e do `cloudflared`
+  instalado (`brew install cloudflared`).
 
 ### Uma vez só
 
