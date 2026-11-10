@@ -24,8 +24,12 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   refunded: "ESTORNADO",
 };
 
-async function loadOrders(userID: string): Promise<PublicOrder[] | null> {
-  const res = await checkoutFetch(`/api/orders?collectaUserId=${encodeURIComponent(userID)}`);
+async function loadOrders(userID: string, email: string | null): Promise<PublicOrder[] | null> {
+  const qs = new URLSearchParams({ collectaUserId: userID });
+  if (email) {
+    qs.set("email", email);
+  }
+  const res = await checkoutFetch(`/api/orders?${qs.toString()}`);
   if (!res.ok) {
     return null;
   }
@@ -37,7 +41,7 @@ export default async function PedidosPage() {
   if (!session) {
     redirect("/conta/entrar?next=/conta/pedidos");
   }
-  const orders = await loadOrders(session.user.id);
+  const orders = await loadOrders(session.user.id, session.user.email);
   return (
     <Container narrow className="py-9">
       <TrackPageEvent event="view_orders" count={orders?.length ?? 0} />

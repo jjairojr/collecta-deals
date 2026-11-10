@@ -419,4 +419,15 @@ func TestUserOrdersList(t *testing.T) {
 	if strings.TrimSpace(rec.Body.String()) != "[]" {
 		t.Fatalf("unknown user = %s", rec.Body.String())
 	}
+	rec = f.do(t, http.MethodGet, "/api/orders?collectaUserId=u2&email=Bruno%40Example.com", nil, storefrontHeaders())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("guest by email: %d %s", rec.Code, rec.Body.String())
+	}
+	list = nil
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].FirstName != "Bruno" {
+		t.Fatalf("guest order by email = %+v", list)
+	}
 }

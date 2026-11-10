@@ -1080,7 +1080,7 @@ func bySKU(all []trades.Trade, game, sku string) []trades.Trade {
 
 func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 	if uid := strings.TrimSpace(r.URL.Query().Get("collectaUserId")); uid != "" {
-		s.handleUserOrders(w, r, uid)
+		s.handleUserOrders(w, r, uid, strings.TrimSpace(r.URL.Query().Get("email")))
 		return
 	}
 	if !s.requireAdmin(w, r) {
@@ -1102,7 +1102,7 @@ func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, all)
 }
 
-func (s *Server) handleUserOrders(w http.ResponseWriter, r *http.Request, uid string) {
+func (s *Server) handleUserOrders(w http.ResponseWriter, r *http.Request, uid, email string) {
 	if !s.requireStorefront(w, r) {
 		return
 	}
@@ -1115,7 +1115,7 @@ func (s *Server) handleUserOrders(w http.ResponseWriter, r *http.Request, uid st
 	art := s.listingArt()
 	out := make([]publicOrder, 0)
 	for _, o := range all {
-		if o.CollectaUserID == uid {
+		if o.CollectaUserID == uid || (email != "" && strings.EqualFold(strings.TrimSpace(o.Buyer.Email), email)) {
 			out = append(out, withPhotoBase(publicView(o, now, art), publicBase(r)))
 		}
 	}
