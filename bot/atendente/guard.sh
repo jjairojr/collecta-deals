@@ -16,16 +16,21 @@ block() {
 }
 
 tool="$(field tool_name)"
+args="tool_input.arguments"
+target=""
+case "$tool" in
+  mcp__openbot__tool_call) target="$(field tool_input.name)" ;;
+  mcp__openbot_browser__*) target="openbot_browser.${tool#mcp__openbot_browser__}"; args="tool_input" ;;
+esac
 
-if [ "$tool" = "mcp__openbot__tool_call" ]; then
-  target="$(field tool_input.name)"
+if [ "$tool" = "mcp__openbot__tool_call" ] || [ -n "$target" ]; then
   case "$target" in
     openbot_browser.upload_files | openbot_browser.run_script | openbot_browser.evaluate | openbot_browser.fill_fields) block "$target" ;;
     openbot_browser.*login* | openbot_browser.*secret* | openbot_browser.*download* | openbot_browser.*vault*) block "$target" ;;
     openbot_browser.*) ;;
     *) block "tool_call ${target:-sem nome}" ;;
   esac
-  url="$(field tool_input.arguments.url)"
+  url="$(field "$args.url")"
   if [ -n "$url" ]; then
     case "$url" in
       https://web.whatsapp.com | https://web.whatsapp.com/*) ;;
