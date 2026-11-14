@@ -32,7 +32,7 @@ const (
 )
 
 const (
-	WeeklyCapCents = 50000
+	WeeklyCapCents = 62000
 	MaxBudgetCents = 30000
 	BudgetWindow   = 7 * 24 * time.Hour
 	MinBudgetCents = 3000

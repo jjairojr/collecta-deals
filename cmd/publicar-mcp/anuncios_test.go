@@ -260,7 +260,7 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if errText != "" {
 		t.Fatal(errText)
 	}
-	if out.ID == "" || out.SobraSemana != "R$ 200,00" {
+	if out.ID == "" || out.SobraSemana != "R$ 320,00" {
 		t.Fatalf("saída = %+v", out)
 	}
 	pushes := f.pushed()
@@ -277,7 +277,10 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if _, err := os.Stat(list[0].Creatives[0].Thumb); err != nil {
 		t.Fatal(err)
 	}
-	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 250)); !strings.Contains(errText, "cabem só R$ 200,00") {
+	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 300)); errText != "" {
+		t.Fatal(errText)
+	}
+	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 30)); !strings.Contains(errText, "cabem só R$ 20,00") {
 		t.Fatalf("teto: %q", errText)
 	}
 }

@@ -24,7 +24,10 @@ func TestWeeklyCap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add(sample(25000)); !errors.Is(err, ErrOverBudget) {
+	if _, err := s.Add(sample(20000)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Add(sample(12100)); !errors.Is(err, ErrOverBudget) {
 		t.Fatalf("passou do teto: %v", err)
 	}
 	if _, err := s.Decide(first.ID, first.Token, false); err != nil {
@@ -33,7 +36,7 @@ func TestWeeklyCap(t *testing.T) {
 	if _, err := s.Add(sample(MaxBudgetCents + 100)); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("acima do teto por teste devia ser recusado: %v", err)
 	}
-	if _, err := s.Add(sample(20000)); err != nil {
+	if _, err := s.Add(sample(12000)); err != nil {
 		t.Fatal(err)
 	}
 	second, err := s.Add(sample(30000))

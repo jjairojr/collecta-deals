@@ -35,7 +35,7 @@ var adStatusLabel = map[string]string{
 func (a *app) addAdTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "propor_teste",
-		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 500 por semana somando todos os testes.",
+		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 620 por semana somando todos os testes.",
 	}, a.toolProposeAdTest)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "testes_anuncio",
