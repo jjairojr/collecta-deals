@@ -1,6 +1,6 @@
 import { brl } from "@/lib/format";
 import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
-import { contentsOf, releaseLabel, type SealedCollection } from "@/lib/sealed-guide";
+import { contentsOf, releaseLabel, type SealedCollection, type SealedShelf } from "@/lib/sealed-guide";
 import type { FaqItem } from "@/lib/seo";
 import { SHIPPING } from "@/lib/store";
 import type { Sealed } from "@/lib/types";
@@ -53,6 +53,13 @@ export function collectionFaq(collection: SealedCollection, items: Sealed[]): Fa
     });
   }
   return [...out, ...contentsFaq(items), SEALED_ORIGINAL, SEALED_SHIPPING];
+}
+
+export function shelfPriceFaq(shelf: SealedShelf, items: Sealed[]): FaqItem {
+  return {
+    q: `Quanto custa ${shelf.name} na Collecta?`,
+    a: `${items.map(priceLine).join("; ")}. Preços atualizados com o estoque do site.`,
+  };
 }
 
 export function productFaq(item: Sealed, collection: SealedCollection | undefined): FaqItem[] {

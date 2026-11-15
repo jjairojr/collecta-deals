@@ -2,7 +2,10 @@ import { loadCatalog } from "@/lib/catalog";
 import { brl } from "@/lib/format";
 import { GAME_NAMES, isGameId } from "@/lib/games";
 import { shipsFromLabel } from "@/lib/payment";
-import { collectionPath, liveCollections } from "@/lib/sealed-guide";
+import { categoryPath, liveCategories } from "@/lib/accessory-guide";
+import { GAME_HUBS } from "@/lib/game-hubs";
+import { GUIDES, guidePath } from "@/lib/guides";
+import { collectionPath, liveCollections, liveShelves, shelfPath } from "@/lib/sealed-guide";
 import { absoluteURL } from "@/lib/site";
 import { SHIPPING, STORE, STORE_ADDRESS_LINE, STORE_PROFILES } from "@/lib/store";
 import type { Accessory, Sealed } from "@/lib/types";
@@ -41,6 +44,7 @@ export async function GET(): Promise<Response> {
     `- Perfis: ${STORE_PROFILES.join(", ")}`,
     "",
     "## Páginas principais",
+    ...GAME_HUBS.map((h) => link(h.name, h.path, h.lead)),
     link("Produtos selados", "/selado", "todos os selados em estoque, por jogo e coleção"),
     ...sealedGames.map((g) => link(`Selados ${GAME_NAMES[g]}`, `/selado/${g}`)),
     link("Cartinhas Pokémon", "/cartinhas-pokemon", "guia de onde comprar cartinhas Pokémon originais"),
@@ -56,11 +60,28 @@ export async function GET(): Promise<Response> {
       link(collection.name, collectionPath(collection), `${items.length} produtos. ${collection.summary}`),
     ),
     "",
+    "## Selados por formato e idioma",
+    ...liveShelves(sealed).map(({ shelf, items }) =>
+      link(shelf.name, shelfPath(shelf), `${items.length} produtos. ${shelf.summary}`),
+    ),
+    "",
+    "## Guias",
+    ...GUIDES.map((g) => link(g.title, guidePath(g), g.answer)),
+    "",
     "## Selados em estoque",
     ...sealed.map((s) => productLine(s, "selado")),
   ];
   if (accessories.length > 0) {
-    lines.push("", "## Acessórios em estoque", ...accessories.map((a) => productLine(a, "acessorio")));
+    lines.push(
+      "",
+      "## Acessórios por categoria",
+      ...liveCategories(accessories).map(({ category, items }) =>
+        link(category.name, categoryPath(category), `${items.length} produtos. ${category.summary}`),
+      ),
+      "",
+      "## Acessórios em estoque",
+      ...accessories.map((a) => productLine(a, "acessorio")),
+    );
   }
   lines.push("", `Atualizado em ${new Date().toISOString().slice(0, 10)}.`, "");
   return new Response(lines.join("\n"), {

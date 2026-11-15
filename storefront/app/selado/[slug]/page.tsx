@@ -7,10 +7,17 @@ import KindToggle from "@/components/ui/KindToggle";
 import FaqSection from "@/components/ui/FaqSection";
 import { CategoryIntro } from "@/components/singles/CategoryExtras";
 import SealedDetailView from "@/components/product/SealedDetailView";
-import { SealedCollectionAbout, SealedCollectionLinks, SealedFormatGuide } from "@/components/sealed/SealedExtras";
+import {
+  SealedCollectionAbout,
+  SealedCollectionLinks,
+  SealedFormatGuide,
+  SealedShelfLinks,
+} from "@/components/sealed/SealedExtras";
+import GuideLinks from "@/components/guide/GuideLinks";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadCatalog, loadSealedDetail } from "@/lib/catalog";
 import { GAME_NAMES } from "@/lib/games";
+import { guidesFor } from "@/lib/guides";
 import { breadcrumbJsonLd, itemListJsonLd, productOpenGraph, sealedProductJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
 import {
@@ -18,6 +25,7 @@ import {
   collectionOf,
   collectionPath,
   liveCollections,
+  liveShelves,
   MIN_COLLECTION_ITEMS,
 } from "@/lib/sealed-guide";
 import { productFaq, SEALED_GENERAL } from "@/lib/sealed-faq";
@@ -105,8 +113,10 @@ export default async function SeladoSlugPage({
             listId={`selado_${slug}`}
             listName={`${gameName} · Selado`}
           />
+          <SealedShelfLinks title={`Selados de ${gameName} por formato e idioma`} shelves={liveShelves(sealed, slug)} />
           <SealedCollectionLinks title={`Coleções de ${gameName}`} collections={liveCollections(sealed, slug)} />
           <SealedFormatGuide title={`Qual selado de ${gameName} comprar?`} list={list} />
+          <GuideLinks guides={guidesFor(slug)} title={`Guias de ${gameName}`} />
           <FaqSection items={SEALED_GENERAL} />
         </Container>
       </>

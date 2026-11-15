@@ -57,6 +57,30 @@ export default function Footer() {
             Cartinhas Pokémon
           </Link>
           <Link
+            href="/pokemon-tcg"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Pokémon TCG
+          </Link>
+          <Link
+            href="/one-piece-card-game"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            One Piece Card Game
+          </Link>
+          <Link
+            href="/riftbound"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Riftbound
+          </Link>
+          <Link
+            href="/guia"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Guias
+          </Link>
+          <Link
             href="/acessorios"
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
           >

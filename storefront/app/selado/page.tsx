@@ -7,12 +7,14 @@ import SectionHead from "@/components/ui/SectionHead";
 import SealedGrid from "@/components/SealedGrid";
 import KindToggle from "@/components/ui/KindToggle";
 import { CategoryIntro } from "@/components/singles/CategoryExtras";
-import { SealedCollectionLinks, SealedFormatGuide } from "@/components/sealed/SealedExtras";
+import { SealedCollectionLinks, SealedFormatGuide, SealedShelfLinks } from "@/components/sealed/SealedExtras";
+import GuideLinks from "@/components/guide/GuideLinks";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadCatalog } from "@/lib/catalog";
 import { pixelText } from "@/lib/format";
 import { GAME_NAMES, isGameId } from "@/lib/games";
-import { liveCollections } from "@/lib/sealed-guide";
+import { GUIDES } from "@/lib/guides";
+import { liveCollections, liveShelves } from "@/lib/sealed-guide";
 import { SEALED_GENERAL } from "@/lib/sealed-faq";
 import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
 
@@ -78,8 +80,10 @@ export default async function SeladoPage({
           </div>
         )}
         <SealedGrid list={sealed} />
+        <SealedShelfLinks title="Selados por formato e idioma" shelves={liveShelves(sealed)} />
         <SealedCollectionLinks title="Coleções seladas" collections={liveCollections(sealed)} />
         <SealedFormatGuide title="Qual selado comprar?" list={sealed} />
+        <GuideLinks guides={GUIDES.filter((g) => g.eyebrow === "GUIA DE SELADOS")} title="Guias de selados" />
         <FaqSection items={SEALED_GENERAL} />
       </Container>
     </>

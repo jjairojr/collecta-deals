@@ -250,6 +250,20 @@ export function itemListJsonLd(name: string, paths: string[]) {
   };
 }
 
+export function articleJsonLd(a: { title: string; description: string; path: string; updated: string }) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: a.title,
+    description: a.description,
+    inLanguage: "pt-BR",
+    dateModified: a.updated,
+    mainEntityOfPage: absoluteURL(a.path),
+    author: { "@id": ORGANIZATION_ID },
+    publisher: { "@id": ORGANIZATION_ID },
+  };
+}
+
 export interface FaqItem {
   q: string;
   a: string;

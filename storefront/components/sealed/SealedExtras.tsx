@@ -6,7 +6,9 @@ import {
   formatsIn,
   MIN_COLLECTION_ITEMS,
   releaseLabel,
+  shelfPath,
   type SealedCollection,
+  type SealedShelf,
 } from "@/lib/sealed-guide";
 import type { Sealed } from "@/lib/types";
 
@@ -82,6 +84,35 @@ export function SealedCollectionLinks({
             className="arcade-press sticker rounded-[10px] bg-royal px-4 py-2.5 font-pixel text-[9px] text-white [--sh:4px]"
           >
             {pixelText(collection.short)} · {items.length} · {brl(Math.min(...items.map((s) => s.price)))}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function SealedShelfLinks({
+  title,
+  shelves,
+}: {
+  title: string;
+  shelves: { shelf: SealedShelf; items: Sealed[] }[];
+}) {
+  if (shelves.length === 0) {
+    return null;
+  }
+  return (
+    <section className={panel}>
+      <h2 className="font-display text-3xl font-bold leading-none text-white">{title}</h2>
+      <p className="mt-3 text-sm text-muted">Quantidade em estoque e menor preço de cada tipo de produto:</p>
+      <div className="mt-5 flex flex-wrap gap-3">
+        {shelves.map(({ shelf, items }) => (
+          <Link
+            key={shelf.slug}
+            href={shelfPath(shelf)}
+            className="arcade-press sticker rounded-[10px] bg-royal px-4 py-2.5 font-pixel text-[9px] text-white [--sh:4px]"
+          >
+            {pixelText(shelf.short)} · {items.length} · {brl(Math.min(...items.map((s) => s.price)))}
           </Link>
         ))}
       </div>

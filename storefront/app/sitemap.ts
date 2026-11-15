@@ -1,7 +1,10 @@
 import type { MetadataRoute } from "next";
 import { loadCatalog } from "@/lib/catalog";
 import { pageCount } from "@/lib/paging";
-import { collectionPath, liveCollections } from "@/lib/sealed-guide";
+import { categoryPath, liveCategories } from "@/lib/accessory-guide";
+import { GAME_HUBS } from "@/lib/game-hubs";
+import { GUIDES, guidePath } from "@/lib/guides";
+import { collectionPath, liveCollections, liveShelves, shelfPath } from "@/lib/sealed-guide";
 import { setsOf } from "@/lib/sets";
 import { absoluteURL } from "@/lib/site";
 
@@ -29,6 +32,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteURL("/termos"), changeFrequency: "yearly", priority: 0.3 },
     { url: absoluteURL("/privacidade"), changeFrequency: "yearly", priority: 0.3 },
     { url: absoluteURL("/sobre"), changeFrequency: "yearly", priority: 0.3 },
+    { url: absoluteURL("/guia"), changeFrequency: "weekly", priority: 0.7 },
+    ...GUIDES.map((g) => ({
+      url: absoluteURL(guidePath(g)),
+      lastModified: g.updated,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
   ];
   if (live && accessories.length > 0) {
     urls.push({
@@ -84,6 +94,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.8,
     });
+  }
+  for (const hub of GAME_HUBS) {
+    if (singles.some((s) => s.game === hub.game) || sealed.some((s) => s.game === hub.game)) {
+      urls.push({ url: absoluteURL(hub.path), changeFrequency: "daily", priority: 0.9 });
+    }
+  }
+  for (const { shelf } of liveShelves(sealed)) {
+    urls.push({ url: absoluteURL(shelfPath(shelf)), changeFrequency: "daily", priority: 0.8 });
+  }
+  for (const { category } of liveCategories(accessories)) {
+    urls.push({ url: absoluteURL(categoryPath(category)), changeFrequency: "daily", priority: 0.7 });
   }
   for (const { collection } of liveCollections(sealed)) {
     urls.push({
