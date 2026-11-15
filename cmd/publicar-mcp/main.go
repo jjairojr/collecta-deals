@@ -53,7 +53,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 	default:
 		return cfg, errors.New("NTFY_TOPIC não definido: sem ele o pedido de aprovação não chega ao dono")
 	}
-	roots := cmp.Or(getenv("PUBLICAR_MIDIA"), "/Users/jjairo/Documents/www/collecta-app/store")
+	roots := cmp.Or(getenv("PUBLICAR_MIDIA"), "/Users/jjairo/Documents/www/collecta-app/store:/Users/jjairo/Documents/www/ai-vids/entities/collecta-trafego")
 	for _, r := range strings.Split(roots, ":") {
 		if r = strings.TrimSpace(r); r != "" {
 			cfg.MediaRoots = append(cfg.MediaRoots, filepath.Clean(r))

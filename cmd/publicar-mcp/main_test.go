@@ -253,6 +253,13 @@ func TestLoadConfig(t *testing.T) {
 	if cfg.NtfyURL != "https://ntfy.sh/abc" || strings.Join(cfg.MediaRoots, ",") != "/a/store,/b/out" || cfg.DataDir != "/Users/Shared/collecta-bot/publicar" {
 		t.Fatalf("config errada: %+v", cfg)
 	}
+	cfg, err = loadConfig(env(map[string]string{"OPDEALS_ADMIN_TOKEN": "t", "NTFY_TOPIC": "abc"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(cfg.MediaRoots, ",") != "/Users/jjairo/Documents/www/collecta-app/store,/Users/jjairo/Documents/www/ai-vids/entities/collecta-trafego" {
+		t.Fatalf("pastas padrão erradas: %+v", cfg.MediaRoots)
+	}
 }
 
 func TestRequestSendsPreviewWithApproveButtons(t *testing.T) {
