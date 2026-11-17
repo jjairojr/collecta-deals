@@ -39,6 +39,12 @@ export default function Footer() {
             Loja física
           </Link>
           <Link
+            href="/torneios"
+            className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
+          >
+            Torneios
+          </Link>
+          <Link
             href="/singles"
             className="inline-block py-1.5 text-sm font-bold text-white underline-offset-4 hover:underline"
           >

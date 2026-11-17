@@ -48,6 +48,8 @@ export function storeJsonLd() {
     "@type": ["Store", "HobbyShop"],
     "@id": STORE_ID,
     name: STORE.name,
+    description:
+      "Loja de card games em Goiânia com produto selado, cartas avulsas e acessórios, mesas para jogar e torneios semanais: com premiação, gratuitos e 4fun.",
     url: absoluteURL("/loja"),
     image: STORE_PHOTOS.map((p) => absoluteURL(p.src)),
     telephone: STORE.phone,

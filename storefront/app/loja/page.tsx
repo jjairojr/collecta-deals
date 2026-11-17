@@ -13,7 +13,7 @@ import { STORE, STORE_ADDRESS_LINE, STORE_MAPS_EMBED_URL, STORE_MAPS_URL, STORE_
 export const metadata: Metadata = {
   title: "Loja de card games e cartinhas Pokémon em Goiânia",
   description:
-    "Loja de card games (TCG) na Galeria Badra, Setor Oeste, Goiânia: produto selado, cartas avulsas e acessórios de Pokémon, One Piece, Riftbound, Lorcana e Gundam, mesas para jogar e compra de coleções. Aberta todos os dias das 12h às 22h.",
+    "Loja de card games (TCG) na Galeria Badra, Setor Oeste, Goiânia: produto selado, cartas avulsas e acessórios de Pokémon, One Piece, Riftbound, Lorcana e Gundam, torneios semanais, mesas para jogar e compra de coleções. Aberta todos os dias das 12h às 22h.",
   alternates: { canonical: "/loja" },
   openGraph: {
     title: "Collecta TCG — loja de cartas em Goiânia",
@@ -100,6 +100,18 @@ export default function LojaPage() {
               </tbody>
             </table>
             <p>Aberta todos os dias. Telefone e WhatsApp: {STORE.phone}.</p>
+          </Panel>
+
+          <Panel title="Torneios toda semana">
+            <p>
+              A loja recebe torneios de card games toda semana: torneios com premiação, torneios gratuitos e encontros
+              4fun, para jogar por diversão. Fora dos dias de torneio, as mesas ficam livres para jogar.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <Link href="/torneios" className="arcade-press sticker rounded-[10px] bg-royal px-4 py-2.5 font-pixel text-[9px] text-white [--sh:4px]">
+                VER TORNEIOS
+              </Link>
+            </div>
           </Panel>
 
           <Panel title="O que você encontra">

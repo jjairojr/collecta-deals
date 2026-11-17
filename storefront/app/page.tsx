@@ -19,6 +19,10 @@ const HOME_FAQ: FaqItem[] = [
     a: `Sim. Fica na ${STORE_ADDRESS_LINE}, aberta todos os dias das ${STORE.opens} às ${STORE.closes}. Dá para comprar na hora, retirar pedidos do site e jogar nas mesas da loja.`,
   },
   {
+    q: "A Collecta tem torneios?",
+    a: "Sim. Toda semana tem torneio de card games na loja em Goiânia: torneios com premiação, torneios gratuitos e encontros 4fun para jogar por diversão. A agenda sai no Instagram e pelo WhatsApp.",
+  },
+  {
     q: "Quais card games a Collecta vende?",
     a: "Pokémon, One Piece Card Game, Riftbound, Disney Lorcana e Gundam Card Game: produto selado, cartas avulsas e acessórios.",
   },
