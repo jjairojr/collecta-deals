@@ -45,7 +45,7 @@ func (s *Server) moveBlocker(from string, t trades.Trade) (string, error) {
 				if slices.Contains(l.TradeIDs, t.ID) {
 					return "o item saiu num pedido do site: o pedido guarda o jogo dele, então não dá para trocar o jogo", nil
 				}
-				if open && l.Game == from && l.SKU == sku {
+				if open && l.Game == from && l.StockKey() == sku {
 					return "o item está num pedido do site em aberto: conclua ou cancele o pedido em Pedidos antes de trocar o jogo", nil
 				}
 			}

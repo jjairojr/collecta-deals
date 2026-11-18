@@ -8,7 +8,7 @@ import {
   curatedSingle,
   sealedBySlug,
 } from "@/lib/mock";
-import { sealedToCartLine, singleToCartLine } from "@/lib/cart-lines";
+import { kitStock, kitToCartLine, sealedToCartLine, singleToCartLine } from "@/lib/cart-lines";
 import { gameSurface } from "@/lib/games";
 import { ownPhotoURL } from "@/lib/photo";
 import { setsOf } from "@/lib/sets";
@@ -19,6 +19,7 @@ import type {
   AccessoryDetail,
   CartLine,
   Game,
+  KitOffer,
   Sealed,
   SealedDetail,
   Single,
@@ -59,6 +60,34 @@ interface RawResponse {
   artVersion?: string;
   items: RawItem[];
   soldOut?: RawItem[];
+  kits?: RawKit[];
+}
+
+interface RawKit {
+  sku: string;
+  baseSKU: string;
+  units: number;
+  askBRL: number;
+  cardBRL?: number;
+}
+
+function withKits<T extends Sealed | Accessory>(products: T[], raw: RawKit[]): T[] {
+  const byBase = new Map<string, KitOffer[]>();
+  for (const k of raw) {
+    const offer: KitOffer = {
+      sku: k.sku,
+      units: k.units,
+      price: Math.round(k.askBRL * 100),
+      cardPrice: k.cardBRL ? Math.round(k.cardBRL * 100) : undefined,
+    };
+    byBase.set(k.baseSKU, [...(byBase.get(k.baseSKU) ?? []), offer]);
+  }
+  return products.map((p) => {
+    const kits = (byBase.get(p.sku) ?? [])
+      .filter((k) => k.units > 1 && kitStock(p.qty, k.units) > 0)
+      .sort((a, b) => a.units - b.units);
+    return kits.length > 0 ? { ...p, kits } : p;
+  });
 }
 
 export interface SoldOut {
@@ -464,7 +493,10 @@ export async function loadCatalog(): Promise<Catalog> {
       aliases,
     ),
   });
-  const { singles, sealed, accessories } = shelf(data.items ?? []);
+  const inStock = shelf(data.items ?? []);
+  const singles = inStock.singles;
+  const sealed = withKits(inStock.sealed, data.kits ?? []);
+  const accessories = withKits(inStock.accessories, data.kits ?? []);
   const gone = shelf([...(data.soldOut ?? []), ...legacySold]);
   const taken = new Set([...singles, ...sealed, ...accessories].map((p) => p.slug));
   const known = new Set([
@@ -512,6 +544,19 @@ export function findBySku(
   );
 }
 
+function findKit(
+  catalog: Catalog,
+  sku: string,
+): { product: Sealed | Accessory; kit: KitOffer } | null {
+  for (const product of [...catalog.sealed, ...catalog.accessories]) {
+    const kit = product.kits?.find((k) => k.sku === sku);
+    if (kit) {
+      return { product, kit };
+    }
+  }
+  return null;
+}
+
 export async function resolveCartLines(
   lines: { sku: string; qty: number }[],
 ): Promise<{ lines: CartLine[]; missing: number }> {
@@ -519,6 +564,15 @@ export async function resolveCartLines(
   const resolved: CartLine[] = [];
   let missing = 0;
   for (const line of lines) {
+    const bundle = findKit(catalog, line.sku);
+    if (bundle) {
+      const stock = kitStock(bundle.product.qty, bundle.kit.units);
+      resolved.push({
+        ...kitToCartLine(bundle.product, bundle.kit, bundle.product.qty),
+        qty: Math.min(line.qty, stock),
+      });
+      continue;
+    }
     const product = findBySku(catalog, line.sku);
     if (!product || product.qty <= 0) {
       missing += 1;

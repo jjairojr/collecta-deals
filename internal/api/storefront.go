@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"opdeals/internal/kits"
 	"opdeals/internal/trades"
 )
 
@@ -47,6 +48,34 @@ type storefrontResponse struct {
 	ArtVersion string           `json:"artVersion"`
 	Items      []storefrontItem `json:"items"`
 	SoldOut    []storefrontItem `json:"soldOut"`
+	Kits       []storefrontKit  `json:"kits"`
+}
+
+type storefrontKit struct {
+	SKU     string  `json:"sku"`
+	BaseSKU string  `json:"baseSKU"`
+	Units   int     `json:"units"`
+	AskBRL  float64 `json:"askBRL"`
+	CardBRL float64 `json:"cardBRL,omitempty"`
+}
+
+func storefrontKits(listed []kits.Kit, inStock []storefrontItem) []storefrontKit {
+	out := make([]storefrontKit, 0, len(listed))
+	stock := make(map[string]int, len(inStock))
+	for _, it := range inStock {
+		stock[it.SKU] += it.Qty
+	}
+	for _, k := range listed {
+		if stock[k.BaseSKU] < k.Units {
+			continue
+		}
+		item := storefrontKit{SKU: k.SKU(), BaseSKU: k.BaseSKU, Units: k.Units, AskBRL: round2(k.AskBRL)}
+		if k.CardBRL > 0 {
+			item.CardBRL = round2(k.CardBRL)
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 // Accessories are stocked for no game in particular, so the catalog publishes
@@ -114,6 +143,12 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 		sold = append(drained, sold...)
 	}
 	resp.SoldOut = soldOutOnly(resp.Items, sold)
+	listed, err := s.listedKits()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp.Kits = storefrontKits(listed, resp.Items)
 	base := publicBase(r)
 	for _, list := range [][]storefrontItem{resp.Items, resp.SoldOut} {
 		for i := range list {

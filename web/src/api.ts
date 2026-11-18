@@ -1053,6 +1053,47 @@ export interface ListingInput {
   shipsFrom?: string;
 }
 
+export interface Kit {
+  id: string;
+  sku: string;
+  baseSKU: string;
+  units: number;
+  askBRL: number;
+  cardBRL?: number;
+  listed: boolean;
+  tradeIDs: string[];
+}
+
+export interface KitInput {
+  tradeID: string;
+  units: number;
+  askBRL: number;
+  cardBRL: number;
+  listed: boolean;
+}
+
+export type KitPatch = Partial<Pick<Kit, "askBRL" | "cardBRL" | "listed">>;
+
+export async function getKits(): Promise<Kit[]> {
+  const res = await getJSON<{ kits: Kit[] }>(`${base}/kits?${gp(new URLSearchParams()).toString()}`);
+  return res.kits;
+}
+
+export function createKit(input: KitInput): Promise<Kit> {
+  return sendJSON<Kit>(`${base}/kits?${gp(new URLSearchParams()).toString()}`, "POST", input);
+}
+
+export function updateKit(id: string, patch: KitPatch): Promise<Kit> {
+  return sendJSON<Kit>(`${base}/kits/${encodeURIComponent(id)}`, "PUT", patch);
+}
+
+export async function deleteKit(id: string): Promise<void> {
+  const res = await fetch(`${base}/kits/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw await requestError(res);
+  }
+}
+
 // setListings persists storefront state (asking price + listed flag) for one or
 // more holdings of the active game in a single batch write.
 export function setListings(items: ListingInput[]): Promise<{ updated: number }> {

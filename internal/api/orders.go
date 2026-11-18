@@ -16,6 +16,7 @@ import (
 
 	"opdeals/internal/collecta"
 	"opdeals/internal/game"
+	"opdeals/internal/kits"
 	"opdeals/internal/logx"
 	"opdeals/internal/mercadopago"
 	"opdeals/internal/orders"
@@ -87,6 +88,34 @@ type skuEntry struct {
 	game   string
 	trades []trades.Trade
 	lookup trades.PriceLookup
+	kit    *kits.Kit
+}
+
+func (e skuEntry) units() int {
+	if e.kit != nil {
+		return e.kit.Units
+	}
+	return 1
+}
+
+func (e skuEntry) prices() (float64, float64) {
+	if e.kit != nil {
+		return e.kit.AskBRL, e.kit.CardPrice()
+	}
+	pix, _ := orders.UnitPrice(e.trades)
+	card, _ := orders.CardUnitPrice(e.trades)
+	return pix, card
+}
+
+func (e skuEntry) cardPriced() bool {
+	if e.kit != nil {
+		return e.kit.CardBRL > 0
+	}
+	return orders.HasCardPrice(e.trades)
+}
+
+func kitName(name string, units int) string {
+	return fmt.Sprintf("%s · Kit %d un", name, units)
 }
 
 type skuIndex map[string]skuEntry
@@ -125,7 +154,37 @@ func (s *Server) buildSKUIndex() (skuIndex, error) {
 		}
 		add(accessoryGameID, all, nil)
 	}
+	listed, err := s.listedKits()
+	if err != nil {
+		return nil, err
+	}
+	for i := range listed {
+		k := listed[i]
+		base, ok := idx[k.BaseSKU]
+		if !ok {
+			continue
+		}
+		base.kit = &k
+		idx[k.SKU()] = base
+	}
 	return idx, nil
+}
+
+func (s *Server) listedKits() ([]kits.Kit, error) {
+	if s.Kits == nil {
+		return nil, nil
+	}
+	all, err := s.Kits.List()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]kits.Kit, 0, len(all))
+	for _, k := range all {
+		if k.Listed && k.AskBRL > 0 {
+			out = append(out, k)
+		}
+	}
+	return out, nil
 }
 
 const cardImagePath = "/api/card-image?"
@@ -263,6 +322,7 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int, me
 		return res, errors.New("carrinho vazio")
 	}
 	seen := make(map[string]bool, len(in))
+	used := make(map[string]int, len(in))
 	for _, l := range in {
 		if l.SKU == "" || seen[l.SKU] {
 			return res, errors.New("item repetido ou sem sku")
@@ -276,8 +336,7 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int, me
 			res.shortages = append(res.shortages, lineProblem{SKU: l.SKU})
 			continue
 		}
-		pix, _ := orders.UnitPrice(e.trades)
-		card, _ := orders.CardUnitPrice(e.trades)
+		pix, card := e.prices()
 		pixCents := cents(pix)
 		cardCents := cents(card)
 		checkCard := method == orders.PaymentCard || l.CardCents != 0
@@ -288,20 +347,23 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int, me
 		if method == orders.PaymentCard {
 			unit = card
 		}
-		available := orders.Available(e.trades) - reserved[l.SKU]
+		eligible := orders.Eligible(e.trades)
+		first := eligible[0]
+		stockSKU := trades.SKU(e.game, first)
+		units := e.units()
+		available := (orders.Available(e.trades) - reserved[stockSKU] - used[stockSKU]) / units
 		if available < l.Qty {
 			if available < 0 {
 				available = 0
 			}
 			res.shortages = append(res.shortages, lineProblem{SKU: l.SKU, Available: available})
 		}
-		eligible := orders.Eligible(e.trades)
-		first := eligible[0]
+		used[stockSKU] += l.Qty * units
 		kind := first.Kind
 		if kind == "" {
 			kind = "single"
 		}
-		res.lines = append(res.lines, orders.Line{
+		line := orders.Line{
 			SKU:        l.SKU,
 			Game:       e.game,
 			Kind:       kind,
@@ -310,9 +372,15 @@ func resolveLines(in []orderLineInput, idx skuIndex, reserved map[string]int, me
 			Qty:        l.Qty,
 			UnitBRL:    round2(unit),
 			ImageURL:   lineImage(eligible, e.game, e.lookup),
-			CardPriced: orders.HasCardPrice(e.trades),
+			CardPriced: e.cardPriced(),
 			ShipsFrom:  orders.ShipsFrom(e.trades),
-		})
+		}
+		if e.kit != nil {
+			line.Name = kitName(first.Name, units)
+			line.Units = units
+			line.StockSKU = stockSKU
+		}
+		res.lines = append(res.lines, line)
 	}
 	return res, nil
 }
@@ -330,7 +398,7 @@ func (s *Server) quoteShipping(ctx context.Context, cep string, lines []orders.L
 	if cep != "" && s.Checkout.Quoter != nil && s.Checkout.FromCEP != "" {
 		items := make([]shipping.Item, 0, len(lines))
 		for _, l := range lines {
-			items = append(items, shipping.Item{Kind: l.Kind, Name: l.Name, Qty: l.Qty, UnitBRL: l.UnitBRL})
+			items = append(items, shipping.Item{Kind: l.Kind, Name: l.Name, Qty: l.StockUnits(), UnitBRL: l.UnitBRL / float64(l.UnitsPerItem())})
 		}
 		quoted, err := s.Checkout.Quoter.Quote(ctx, s.Checkout.FromCEP, cep, shipping.Pack(items))
 		if err != nil {

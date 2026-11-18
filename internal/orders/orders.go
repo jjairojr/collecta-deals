@@ -62,6 +62,27 @@ type Line struct {
 	ShipsFrom  string   `json:"shipsFrom,omitempty"`
 
 	ReturnedTradeIDs []string `json:"returnedTradeIDs,omitempty"`
+
+	Units    int    `json:"units,omitempty"`
+	StockSKU string `json:"stockSKU,omitempty"`
+}
+
+func (l Line) UnitsPerItem() int {
+	if l.Units > 1 {
+		return l.Units
+	}
+	return 1
+}
+
+func (l Line) StockUnits() int {
+	return l.Qty * l.UnitsPerItem()
+}
+
+func (l Line) StockKey() string {
+	if l.StockSKU != "" {
+		return l.StockSKU
+	}
+	return l.SKU
 }
 
 type Buyer struct {
@@ -318,7 +339,7 @@ func reserved(all []Order, now time.Time) map[string]int {
 			continue
 		}
 		for _, l := range o.Lines {
-			out[l.SKU] += l.Qty
+			out[l.StockKey()] += l.StockUnits()
 		}
 	}
 	return out

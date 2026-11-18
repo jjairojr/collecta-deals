@@ -65,6 +65,13 @@ export interface PricePoint {
   value: number;
 }
 
+export interface KitOffer {
+  sku: string;
+  units: number;
+  price: number;
+  cardPrice?: number;
+}
+
 // A sealed product (booster box, ETB, etc.).
 export interface Sealed {
   kind: "sealed";
@@ -92,6 +99,7 @@ export interface Sealed {
   soldOut?: boolean;
   addedAt?: string;
   gtin?: string;
+  kits?: KitOffer[];
 }
 
 export interface SealedDetail extends Sealed {

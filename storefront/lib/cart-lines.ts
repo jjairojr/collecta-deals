@@ -1,4 +1,4 @@
-import type { Accessory, CartLine, Sealed, Single } from "@/lib/types";
+import type { Accessory, CartLine, KitOffer, Sealed, Single } from "@/lib/types";
 
 export const STORE_SELLER = "Collecta Oficial";
 
@@ -29,5 +29,29 @@ export function sealedToCartLine(item: Sealed | Accessory, stock: number): Omit<
     shipsFrom: item.shipsFrom,
     stock,
     imageURL: item.imageURL,
+  };
+}
+
+export function kitLabel(units: number): string {
+  return `Kit ${units} un`;
+}
+
+export function kitStock(stock: number, units: number): number {
+  return Math.floor(stock / units);
+}
+
+export function kitToCartLine(
+  item: Sealed | Accessory,
+  kit: KitOffer,
+  stock: number,
+): Omit<CartLine, "qty"> {
+  const base = sealedToCartLine(item, kitStock(stock, kit.units));
+  return {
+    ...base,
+    sku: kit.sku,
+    name: `${item.name} · ${kitLabel(kit.units)}`,
+    meta: [base.meta, kitLabel(kit.units)].filter(Boolean).join(" · "),
+    price: kit.price,
+    cardPrice: kit.cardPrice,
   };
 }

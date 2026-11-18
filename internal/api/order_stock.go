@@ -34,6 +34,7 @@ func (s *Server) refundStock(o *orders.Order, from orders.Status, now time.Time)
 
 func (s *Server) planStock(o orders.Order) ([][]orders.Pick, string, error) {
 	plan := make([][]orders.Pick, len(o.Lines))
+	taken := make(map[string]int)
 	for i, l := range o.Lines {
 		st := s.ledgerForGame(l.Game)
 		if st == nil {
@@ -47,17 +48,37 @@ func (s *Server) planStock(o orders.Order) ([][]orders.Pick, string, error) {
 		if lost != "" {
 			return nil, fmt.Sprintf("venda %s de %s sumiu do estoque: confira antes de mudar o status", lost, l.Name), nil
 		}
-		missing := l.Qty - covered
+		missing := l.StockUnits() - covered
 		if missing <= 0 {
 			continue
 		}
-		picks, ok := orders.Allocate(bySKU(all, l.Game, l.SKU), missing)
+		picks, ok := orders.Allocate(withoutTaken(bySKU(all, l.Game, l.StockKey()), taken), missing)
 		if !ok {
 			return nil, fmt.Sprintf("sem estoque para %s x%d", l.Name, missing), nil
+		}
+		for _, p := range picks {
+			taken[p.TradeID] += p.Qty
 		}
 		plan[i] = picks
 	}
 	return plan, "", nil
+}
+
+func withoutTaken(ts []trades.Trade, taken map[string]int) []trades.Trade {
+	out := make([]trades.Trade, 0, len(ts))
+	for _, t := range ts {
+		used := taken[t.ID]
+		if used == 0 {
+			out = append(out, t)
+			continue
+		}
+		if t.Status != "holding" || t.Qty <= used {
+			continue
+		}
+		t.Qty -= used
+		out = append(out, t)
+	}
+	return out
 }
 
 func soldFor(all []trades.Trade, ids []string) (int, string) {
@@ -85,7 +106,7 @@ func (s *Server) sellStock(o *orders.Order, plan [][]orders.Pick, now time.Time)
 		for _, p := range picks {
 			sold, err := st.Sell(p.TradeID, trades.Sale{
 				Qty:          p.Qty,
-				SellPrice:    round2(float64(p.Qty) * l.UnitBRL),
+				SellPrice:    round2(float64(p.Qty) * l.UnitBRL / float64(l.UnitsPerItem())),
 				SellCurrency: "BRL",
 				SellDate:     date,
 				Buyer:        buyer,

@@ -10,6 +10,7 @@ import {
   Combine,
   Copy,
   ImagePlus,
+  Layers,
   Save,
   Search,
   Share2,
@@ -22,11 +23,13 @@ import {
 import {
   gameHasDeals,
   getGame,
+  getKits,
   getPortfolio,
   mergeTrades,
   productIDFromTcgURL,
   setLigaState,
   setListings,
+  type Kit,
   type LigaInput,
   type ListingInput,
   type PortfolioResponse,
@@ -34,6 +37,7 @@ import {
 } from "../api";
 import { brl, brl0, shipsFromLabel, usd } from "../format";
 import CardArt from "./CardArt";
+import KitsEditor from "./KitsEditor";
 import ShareList from "./ShareList";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -236,6 +240,25 @@ export default function StockPage() {
   const [sort, setSort] = useState<SortState>({ key: "total", dir: "desc" });
   const [onlyMissingOnLiga, setOnlyMissingOnLiga] = useState(false);
   const [sharing, setSharing] = useState<"none" | "stock" | "us">("none");
+  const [kits, setKits] = useState<Kit[]>([]);
+
+  const loadKits = useCallback(async () => {
+    try {
+      setKits(await getKits());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "failed to load kits");
+    }
+  }, []);
+
+  const kitsByTrade = useMemo(() => {
+    const out: Record<string, Kit[]> = {};
+    for (const k of kits) {
+      for (const id of k.tradeIDs) {
+        out[id] = [...(out[id] ?? []), k];
+      }
+    }
+    return out;
+  }, [kits]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -269,7 +292,8 @@ export default function StockPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadKits();
+  }, [load, loadKits]);
 
   const fx = data?.fxRate ?? 0;
   const holdings = useMemo(() => (data?.trades ?? []).filter((t) => !t.realized), [data]);
@@ -661,6 +685,7 @@ export default function StockPage() {
                   selected={selected.has(t.id)}
                   onToggle={toggleSelect}
                   onEditImage={setImgEditId}
+                  kits={kitsByTrade[t.id]}
                 />
               ))}
             </tbody>
@@ -763,7 +788,7 @@ export default function StockPage() {
           onClick={() => setImgEditId(null)}
         >
           <div
-            className="win sticker-5 w-full max-w-md"
+            className="win sticker-5 max-h-[92vh] w-full max-w-lg overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="win-bar">
@@ -837,6 +862,13 @@ export default function StockPage() {
               branco quando o produto já estiver em estoque.
             </p>
 
+            <KitsEditor
+              trade={imgEditTrade}
+              unitBRL={rows[imgEditId]?.askBRL ?? 0}
+              kits={kitsByTrade[imgEditId] ?? []}
+              onChanged={loadKits}
+            />
+
             <div className="mt-5 flex items-center justify-between gap-2">
               <Button
                 variant="ghost"
@@ -877,6 +909,7 @@ function StockRow({
   selected,
   onToggle,
   onEditImage,
+  kits,
 }: {
   t: TradeView;
   fx: number;
@@ -885,6 +918,7 @@ function StockRow({
   selected: boolean;
   onToggle: (id: string) => void;
   onEditImage: (id: string) => void;
+  kits: Kit[] | undefined;
 }) {
   const ask = row?.askBRL ?? 0;
   const listed = Boolean(row?.listed);
@@ -925,7 +959,7 @@ function StockRow({
             onMouseLeave={() => setPreview(null)}
             onFocus={openPreview}
             onBlur={() => setPreview(null)}
-            title="Imagem, preço no cartão e pré-venda"
+            title="Imagem, preço no cartão, pré-venda e kits"
             className="group relative h-12 w-[34px] shrink-0 overflow-hidden rounded"
           >
             <CardArt
@@ -952,6 +986,17 @@ function StockRow({
               <div className="mt-0.5 inline-block rounded bg-brand/20 px-1.5 text-[10px] font-bold text-brand-label">
                 Pré-venda · envio {shipsFromLabel(row.shipsFrom)}
               </div>
+            )}
+            {kits && kits.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onEditImage(t.id)}
+                title="Kits deste produto na vitrine — clique para editar"
+                className="mt-0.5 flex items-center gap-1 rounded bg-brand/20 px-1.5 text-[10px] font-bold text-brand-label hover:bg-brand/30"
+              >
+                <Layers className="h-3 w-3" />
+                Kits: {kits.map((k) => `${k.units} un ${brl(k.askBRL)}${k.listed ? "" : " (oculto)"}`).join(" · ")}
+              </button>
             )}
           </div>
         </div>

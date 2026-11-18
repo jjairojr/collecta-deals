@@ -1288,3 +1288,34 @@ Decidido no grilling de 30/10. Usuários: dono + sócio, desktop, uso pesado em 
 
 ### Review
 go test ./internal/... ok, web build ok, storefront tsc + next build ok. E2E local (backend fake + next start): vitrine, detalhe, checkout cartão R$ 410, pedido pago, baixa de 1 un, Pedidos no dashboard com selo e "Cartão · master".
+
+# Kits: vender 1, 2 ou 3 unidades do mesmo produto (2026-11-18)
+
+## Contexto levantado
+- Hoje 1 produto da vitrine = 1 SKU = 1 unidade do ledger em tudo: reserva (`orders.reserved`), disponibilidade (`orders.Available`), alocação FIFO (`orders.Allocate`), baixa (`sellStock` → `Store.Sell`), fila da Liga (`queueStockExit`) e teto do carrinho.
+- Não existe nenhum conceito de kit, multiplicador ou tamanho de pacote.
+- Um SKU pode ter vários lotes (linhas do ledger), então o kit não pode morar na linha do lote.
+
+## Desenho proposto
+- Kit = oferta em cima de um SKU base, guardada em ledger próprio `data/kits.json` (flag `-kits`): `{id, game, baseSKU, units, askBRL, cardBRL, listed}`. Nenhum campo novo em `Trade`.
+- SKU do kit: `<baseSKU>#x<units>`. Estoque do kit = `floor((disponível do base − reservado) / units)`. Kit e produto avulso bebem do mesmo estoque.
+- `orders.Line` ganha `Units` (vazio = 1) e `StockSKU`. Reserva soma `Qty × Units` por `StockSKU`; alocação e baixa usam `Qty × Units`; preço por unidade na baixa = preço do kit ÷ units. Pedidos antigos continuam valendo (Units 0 = 1).
+- Fila da Liga e MyP não mudam: a baixa sai em unidades, como hoje.
+- Vitrine: seletor "1 un · 2 un · 3 un" na página do produto base (preço Pix e cartão de cada opção, economia por unidade); cada opção vira linha própria no carrinho. Sem página nova por kit.
+- Dashboard (Estoque): no modal do produto, seção "Kits" para criar, editar preço, listar e apagar.
+
+## Plano
+- [x] `internal/kits`: store + testes
+- [x] `orders`: `Units`/`StockSKU` na linha, reserva em unidades + testes
+- [x] `api`: CRUD `/api/kits` (admin), kits no `/api/storefront`, `resolveLines`/`planStock`/`sellStock` com unidades, embalagem do frete com `Qty × Units` + testes (reserva, baixa FIFO, oversold, estoque compartilhado)
+- [x] `web`: seção Kits no modal do Estoque
+- [x] `storefront`: tipos, catálogo, seletor na página, carrinho e checkout
+- [x] Verificação: `go test ./...`, builds, ponta a ponta local com `CHECKOUT_FAKE=1` em ledgers copiados
+
+## Review
+- Aprovado pelo dono em 2026-11-18 ("pode mandar bala").
+- Backend: `internal/kits` (ledger `data/kits.json`, flag `-kits`), `orders.Line.Units`/`StockSKU`, reserva e baixa em unidades, `planStock` não pega o mesmo lote duas vezes quando avulso e kit estão no mesmo pedido, frete embala `Qty × Units`, CRUD `/api/kits` (atrás do token de admin), `kits` na resposta de `/api/storefront`. Pós-venda ignora kits na lista de ofertas.
+- Dashboard: `KitsEditor` no modal do produto em Anúncios + selo "Kits" na linha.
+- Vitrine: seletor na página de selado e acessório, linha de kit no carrinho, `resolveCartLines` entende sku de kit. Página de single não tem seletor.
+- Verificado: `go test ./...` e `go vet` verdes (6 testes novos de API, 3 do ledger), `tsc` limpo em `web` e `storefront`, ponta a ponta local com `CHECKOUT_FAKE=1` em ledgers copiados: 500 boosters, kits de 2 e 3 criados pela tela, pedido de 2 kits de 3 reservou 6 (vitrine 494), pago baixou 6 un. por R$ 180 no canal Site.
+- Não feito: `next build` da vitrine, teste da tela de checkout com kit pelo navegador (pedido foi criado direto na API), deploy. Nada commitado.

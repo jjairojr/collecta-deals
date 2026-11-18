@@ -21,6 +21,7 @@ import (
 	"opdeals/internal/game"
 	"opdeals/internal/httpx"
 	"opdeals/internal/jpimport"
+	"opdeals/internal/kits"
 	"opdeals/internal/liga"
 	"opdeals/internal/logx"
 	"opdeals/internal/model"
@@ -54,6 +55,7 @@ func run() error {
 	expensesPath := flag.String("expenses", "data/expenses.json", "path to the business expense ledger (despesas — not tied to a game)")
 	purchasesPath := flag.String("purchases", "data/purchases.json", "path to the buy-order ledger (compras — one order mixes games)")
 	promosPath := flag.String("promos", "data/promos.json", "path to the storefront promo-code ledger (cupons da vitrine)")
+	kitsPath := flag.String("kits", "data/kits.json", "path to the storefront kit ledger (kits de N unidades de um produto)")
 	syncQueuePath := flag.String("syncqueue", "data/syncqueue.json", "path to the Liga/MyP propagation queue (saídas de estoque fora da Liga)")
 	publishPath := flag.String("publishq", "data/publishq.json", "path to the social posting approval queue (fila do Publicador)")
 	adTestsPath := flag.String("adtests", "data/adtests.json", "path to the Meta ad test approval queue (testes de anúncio do Social)")
@@ -496,6 +498,7 @@ func run() error {
 	}
 	srv.Checkout = checkout
 	srv.Checkout.Promos = promos.NewStore(*promosPath)
+	srv.Kits = kits.NewStore(*kitsPath)
 	if checkout.Coupons != nil {
 		sweepCtx, stopSweep := context.WithCancel(context.Background())
 		defer stopSweep()

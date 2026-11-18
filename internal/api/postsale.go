@@ -299,7 +299,7 @@ func (s *Server) stockItems() ([]postsale.Item, error) {
 	items := make([]postsale.Item, 0, len(idx))
 	for sku, e := range idx {
 		eligible := orders.Eligible(e.trades)
-		if len(eligible) == 0 {
+		if e.kit != nil || len(eligible) == 0 {
 			continue
 		}
 		unit, _ := orders.UnitPrice(e.trades)

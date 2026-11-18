@@ -8,7 +8,7 @@ import Stepper from "@/components/ui/Stepper";
 import SoldOutBox from "@/components/product/SoldOutBox";
 import { sealedItem, trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
-import { sealedToCartLine } from "@/lib/cart-lines";
+import { kitLabel, kitStock, kitToCartLine, sealedToCartLine } from "@/lib/cart-lines";
 import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
 import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
@@ -21,11 +21,17 @@ export default function SealedDetailView({
 }) {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
+  const [kitSKU, setKitSKU] = useState<string | null>(null);
 
   const sealed = item.kind === "sealed";
   const stockNoun = sealed ? "CAIXAS" : "UNIDADES";
   const preorder = item.badge === "PRE-VENDA";
-  const installments = item.cardPrice !== undefined ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS;
+  const kits = item.soldOut ? [] : (item.kits ?? []);
+  const kit = kits.find((k) => k.sku === kitSKU);
+  const price = kit ? kit.price : item.price;
+  const cardPrice = kit ? kit.cardPrice : item.cardPrice;
+  const maxQty = kit ? kitStock(item.stockLeft, kit.units) : item.stockLeft;
+  const installments = cardPrice !== undefined ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS;
   const soldPct =
     item.stockTotal > 0
       ? Math.round(((item.stockTotal - item.stockLeft) / item.stockTotal) * 100)
@@ -39,7 +45,21 @@ export default function SealedDetailView({
     trackViewItem(sealedItem(item));
   }, [item]);
 
+  const pick = (sku: string | null) => {
+    setKitSKU(sku);
+    setQty(1);
+  };
+
   const addToCart = () => {
+    if (kit) {
+      add(kitToCartLine(item, kit, item.stockLeft), qty);
+      trackAddToCart({
+        ...sealedItem(item, qty),
+        item_name: `${item.name} · ${kitLabel(kit.units)}`,
+        price: kit.price / 100,
+      });
+      return;
+    }
     add(sealedToCartLine(item, item.stockLeft), qty);
     trackAddToCart(sealedItem(item, qty));
   };
@@ -113,17 +133,46 @@ export default function SealedDetailView({
               className="sticker mt-6 rounded-[14px] bg-surface p-6"
               style={{ ["--sh" as string]: "6px" }}
             >
+              {kits.length > 0 && (
+                <div className="mb-5">
+                  <div className="font-pixel text-[9px] text-brand-soft">QUANTAS UNIDADES?</div>
+                  <div className="mt-2 flex flex-wrap gap-2.5">
+                    <KitOption
+                      label="1 UN"
+                      price={item.price}
+                      active={!kit}
+                      onPick={() => pick(null)}
+                    />
+                    {kits.map((k) => (
+                      <KitOption
+                        key={k.sku}
+                        label={`KIT ${k.units} UN`}
+                        price={k.price}
+                        saving={savingPct(item.price, k.units, k.price)}
+                        active={kit?.sku === k.sku}
+                        onPick={() => pick(k.sku)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
               <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
-                {brl(item.price)}
+                {brl(price)}
               </span>
-              {item.cardPrice !== undefined && (
+              {cardPrice !== undefined && (
                 <>
                   <span className="ml-2 font-pixel text-[9px] text-brand-soft">NO PIX</span>
                   <p className="mt-2 text-sm text-muted">
-                    ou <strong className="text-white">{brl(item.cardPrice)}</strong> em até {installments}x no
+                    ou <strong className="text-white">{brl(cardPrice)}</strong> em até {installments}x no
                     cartão
                   </p>
                 </>
+              )}
+              {kit && (
+                <p className="mt-2 text-sm text-muted">
+                  Kit com {kit.units} unidades: sai a{" "}
+                  <strong className="text-white">{brl(Math.round(kit.price / kit.units))}</strong> cada.
+                </p>
               )}
               {item.shipsFrom && (
                 <p className="mt-4 rounded-[8px] border-[3px] border-brand bg-outline px-3 py-2 text-sm text-white">
@@ -151,7 +200,7 @@ export default function SealedDetailView({
               )}
 
               <div className="mt-5 flex flex-wrap items-stretch gap-3">
-                <Stepper value={qty} onChange={setQty} max={item.stockLeft} />
+                <Stepper value={qty} onChange={setQty} max={maxQty} />
                 <button
                   type="button"
                   onClick={addToCart}
@@ -202,5 +251,46 @@ export default function SealedDetailView({
         </div>
       </div>
     </Container>
+  );
+}
+
+function savingPct(unitPrice: number, units: number, kitPrice: number): number {
+  const full = unitPrice * units;
+  if (full <= 0) {
+    return 0;
+  }
+  return Math.round(((full - kitPrice) / full) * 100);
+}
+
+function KitOption({
+  label,
+  price,
+  saving = 0,
+  active,
+  onPick,
+}: {
+  label: string;
+  price: number;
+  saving?: number;
+  active: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      aria-pressed={active}
+      className={`relative min-w-[104px] rounded-[10px] border-[3px] border-outline px-3 py-2.5 text-left transition-colors ${
+        active ? "bg-brand text-white" : "bg-outline text-white hover:bg-royal"
+      }`}
+    >
+      <span className="block font-pixel text-[9px]">{label}</span>
+      <span className="mt-1.5 block text-sm font-bold tabular-nums">{brl(price)}</span>
+      {saving > 0 && (
+        <span className="absolute -right-2 -top-2.5 rounded-[6px] border-2 border-outline bg-brand-soft px-1.5 py-0.5 font-pixel text-[7px] text-outline">
+          -{saving}%
+        </span>
+      )}
+    </button>
   );
 }
