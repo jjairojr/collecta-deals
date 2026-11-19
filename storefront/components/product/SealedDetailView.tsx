@@ -12,7 +12,7 @@ import { kitLabel, kitStock, kitToCartLine, sealedToCartLine } from "@/lib/cart-
 import { brl, pixelText } from "@/lib/format";
 import { gamePixel } from "@/lib/games";
 import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
-import type { AccessoryDetail, SealedDetail } from "@/lib/types";
+import type { AccessoryDetail, KitOffer, SealedDetail } from "@/lib/types";
 
 export default function SealedDetailView({
   item,
@@ -30,6 +30,12 @@ export default function SealedDetailView({
   const kit = kits.find((k) => k.sku === kitSKU);
   const price = kit ? kit.price : item.price;
   const cardPrice = kit ? kit.cardPrice : item.cardPrice;
+  const bestKit = kits.reduce<KitOffer | undefined>(
+    (best, k) => (!best || k.price / k.units < best.price / best.units ? k : best),
+    undefined,
+  );
+  const bestSaving = bestKit ? savingPct(item.price, bestKit.units, bestKit.price) : 0;
+  const bestSKU = bestSaving > 0 ? bestKit?.sku : undefined;
   const maxQty = kit ? kitStock(item.stockLeft, kit.units) : item.stockLeft;
   const installments = cardPrice !== undefined ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS;
   const soldPct =
@@ -135,43 +141,68 @@ export default function SealedDetailView({
             >
               {kits.length > 0 && (
                 <div className="mb-5">
-                  <div className="font-pixel text-[9px] text-brand-soft">QUANTAS UNIDADES?</div>
-                  <div className="mt-2 flex flex-wrap gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-pixel text-[10px] text-white sm:text-[11px]">
+                      LEVE MAIS, PAGUE MENOS
+                    </span>
+                    {bestSaving > 0 && (
+                      <span className="bg-brand px-2 py-1 font-pixel text-[8px] text-white">
+                        ATE -{bestSaving}%
+                      </span>
+                    )}
+                  </div>
+                  <div role="radiogroup" aria-label="Quantas unidades" className="mt-3 flex flex-col gap-2.5">
                     <KitOption
-                      label="1 UN"
+                      label="1 UNIDADE"
+                      units={1}
                       price={item.price}
+                      fullPrice={item.price}
                       active={!kit}
+                      best={false}
                       onPick={() => pick(null)}
                     />
                     {kits.map((k) => (
                       <KitOption
                         key={k.sku}
-                        label={`KIT ${k.units} UN`}
+                        label={`KIT ${k.units} UNIDADES`}
+                        units={k.units}
                         price={k.price}
-                        saving={savingPct(item.price, k.units, k.price)}
+                        fullPrice={item.price * k.units}
                         active={kit?.sku === k.sku}
+                        best={k.sku === bestSKU}
                         onPick={() => pick(k.sku)}
                       />
                     ))}
                   </div>
                 </div>
               )}
-              <span className="font-pixel text-[22px] text-brand sm:text-[32px]">
-                {brl(price)}
-              </span>
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-pixel text-[22px] text-brand sm:text-[32px]">{brl(price)}</span>
+                {cardPrice !== undefined && (
+                  <span className="font-pixel text-[9px] text-brand-soft">NO PIX</span>
+                )}
+                {kit && kit.price < item.price * kit.units && (
+                  <span className="text-base text-faint line-through">{brl(item.price * kit.units)}</span>
+                )}
+              </div>
               {cardPrice !== undefined && (
-                <>
-                  <span className="ml-2 font-pixel text-[9px] text-brand-soft">NO PIX</span>
-                  <p className="mt-2 text-sm text-muted">
-                    ou <strong className="text-white">{brl(cardPrice)}</strong> em até {installments}x no
-                    cartão
-                  </p>
-                </>
+                <p className="mt-2 text-sm text-muted">
+                  ou <strong className="text-white">{brl(cardPrice)}</strong> em até {installments}x no
+                  cartão
+                </p>
               )}
               {kit && (
                 <p className="mt-2 text-sm text-muted">
                   Kit com {kit.units} unidades: sai a{" "}
-                  <strong className="text-white">{brl(Math.round(kit.price / kit.units))}</strong> cada.
+                  <strong className="text-white">{brl(Math.round(kit.price / kit.units))}</strong> cada
+                  {kit.price < item.price * kit.units && (
+                    <>
+                      {" "}
+                      e você economiza{" "}
+                      <strong className="text-brand-soft">{brl(item.price * kit.units - kit.price)}</strong>
+                    </>
+                  )}
+                  .
                 </p>
               )}
               {item.shipsFrom && (
@@ -264,33 +295,72 @@ function savingPct(unitPrice: number, units: number, kitPrice: number): number {
 
 function KitOption({
   label,
+  units,
   price,
-  saving = 0,
+  fullPrice,
   active,
+  best,
   onPick,
 }: {
   label: string;
+  units: number;
   price: number;
-  saving?: number;
+  fullPrice: number;
   active: boolean;
+  best: boolean;
   onPick: () => void;
 }) {
+  const saving = savingPct(fullPrice, 1, price);
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={active}
       onClick={onPick}
-      aria-pressed={active}
-      className={`relative min-w-[104px] rounded-[10px] border-[3px] border-outline px-3 py-2.5 text-left transition-colors ${
-        active ? "bg-brand text-white" : "bg-outline text-white hover:bg-royal"
+      className={`flex w-full items-center gap-3 rounded-[10px] border-[3px] px-3 py-3 text-left transition-colors sm:px-4 ${
+        active
+          ? "border-brand bg-brand/15"
+          : "border-outline bg-outline hover:border-royal-light"
       }`}
     >
-      <span className="block font-pixel text-[9px]">{label}</span>
-      <span className="mt-1.5 block text-sm font-bold tabular-nums">{brl(price)}</span>
-      {saving > 0 && (
-        <span className="absolute -right-2 -top-2.5 rounded-[6px] border-2 border-outline bg-brand-soft px-1.5 py-0.5 font-pixel text-[7px] text-outline">
-          -{saving}%
+      <span
+        aria-hidden
+        className={`flex h-5 w-5 shrink-0 items-center justify-center border-[3px] ${
+          active ? "border-brand" : "border-faint"
+        }`}
+      >
+        {active && <span className="h-2 w-2 bg-brand" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-pixel text-[9px] text-white sm:text-[10px]">{label}</span>
+          {saving > 0 && (
+            <span className="bg-brand-soft px-1.5 py-0.5 font-pixel text-[8px] text-outline">
+              -{saving}%
+            </span>
+          )}
+          {best && (
+            <span className="bg-brand px-1.5 py-0.5 font-pixel text-[8px] text-white">
+              MELHOR PRECO
+            </span>
+          )}
         </span>
-      )}
+        <span className="mt-1.5 block text-sm text-muted">
+          {units > 1 ? (
+            <>
+              <strong className="text-white">{brl(Math.round(price / units))}</strong> cada
+            </>
+          ) : (
+            "preço avulso"
+          )}
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-lg font-bold tabular-nums text-white">{brl(price)}</span>
+        {saving > 0 && (
+          <span className="block text-xs tabular-nums text-faint line-through">{brl(fullPrice)}</span>
+        )}
+      </span>
     </button>
   );
 }

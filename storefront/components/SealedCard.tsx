@@ -11,6 +11,9 @@ import type { Accessory, Sealed } from "@/lib/types";
 // blue box-art block. Links to the product page for its kind.
 export default function SealedCard({ item }: { item: Sealed | Accessory }) {
   const sealed = item.kind === "sealed";
+  const kits = item.kits ?? [];
+  const bestUnit = kits.reduce((min, k) => Math.min(min, Math.round(k.price / k.units)), item.price);
+  const bestSaving = item.price > 0 ? Math.round(((item.price - bestUnit) / item.price) * 100) : 0;
   return (
     <Link
       href={`${sealed ? "/selado" : "/acessorio"}/${item.slug}`}
@@ -52,6 +55,14 @@ export default function SealedCard({ item }: { item: Sealed | Accessory }) {
         {item.cardPrice !== undefined && (
           <span className="text-xs text-on-soft">
             ou {brl(item.cardPrice)} em até {CARD_PRICED_INSTALLMENTS}x no cartão
+          </span>
+        )}
+        {bestSaving > 0 && (
+          <span className="mt-2 flex items-center gap-2 rounded-[8px] border-[3px] border-outline bg-brand px-2 py-1.5 text-white">
+            <span className="shrink-0 font-pixel text-[8px] sm:text-[9px]">KIT -{bestSaving}%</span>
+            <span className="text-xs font-bold leading-tight">
+              a partir de {brl(bestUnit)} cada
+            </span>
           </span>
         )}
       </div>
