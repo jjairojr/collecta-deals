@@ -106,7 +106,7 @@ func (s *Store) persist(all []Item) error {
 
 var formats = map[string]map[string]bool{
 	"instagram": {"reels": true, "post": true, "carrossel": true, "teste": true},
-	"tiktok":    {"video": true},
+	"tiktok":    {"video": true, "foto": true},
 }
 
 func ValidFormat(channel, format string) bool {

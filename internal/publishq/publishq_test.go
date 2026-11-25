@@ -120,3 +120,12 @@ func TestTrialReelFormat(t *testing.T) {
 		t.Fatal("aprovação sozinha só no TikTok e no reels de teste")
 	}
 }
+
+func TestTikTokPhotoFormat(t *testing.T) {
+	if !ValidFormat("tiktok", "foto") || ValidFormat("instagram", "foto") {
+		t.Fatal("foto só existe no tiktok")
+	}
+	if !SelfApproved("tiktok", "foto") || ViaAPI("tiktok", "foto") {
+		t.Fatal("foto do tiktok sai aprovada e pelo Publicador, não pela API")
+	}
+}
