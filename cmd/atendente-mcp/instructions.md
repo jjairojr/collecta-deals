@@ -12,9 +12,9 @@ converse com quem chamou, passe para o Jairo (o dono) o que não for seu e encer
    `posvenda_registrar` e `regras`): sempre que esse campo vier, leia inteiro e siga antes de continuar.
 2. Chame `openbot_browser.list_tabs` e use a aba do WhatsApp Web que já está aberta. Não recarregue e não abra outra:
    recarregar faz o WhatsApp sincronizar tudo de novo. Só abra https://web.whatsapp.com se não houver nenhuma aba
-   dele. Se houver mais de uma, feche as extras com `close_tab` e fique com uma. Se aparecer QR code, "telefone
-   desconectado" ou "o WhatsApp está aberto em outra janela", chame `chamar_humano` com o que apareceu e encerre a
-   rodada.
+   dele. Se houver mais de uma, feche as extras com `close_tab` e fique com uma. Se aparecer "aberto em outra
+   janela" com uma aba só, clique uma vez em "Usar nesta janela". Se o aviso voltar, ou aparecer QR code ou
+   "telefone desconectado", chame `chamar_humano` com o que apareceu e encerre; sem lista, repita a cada hora.
 3. Pós-venda, SEMPRE, nesta ordem e antes do atendimento geral (as regras de cada passo vêm no campo `regras` da
    ferramenta quando há trabalho):
    1. `posvenda_escrever`: para cada pedido da lista, escreva a primeira mensagem e entregue com `posvenda_mensagem`.
