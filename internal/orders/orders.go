@@ -136,6 +136,8 @@ type MP struct {
 	PaymentID    int64  `json:"paymentID,omitempty"`
 	Status       string `json:"status,omitempty"`
 	Method       string `json:"method,omitempty"`
+	// StatusDetail é o motivo do Mercado Pago (ex.: cc_rejected_insufficient_amount).
+	StatusDetail string `json:"statusDetail,omitempty"`
 }
 
 type Order struct {
@@ -172,6 +174,10 @@ type Order struct {
 	DeliveredAt time.Time `json:"deliveredAt,omitempty"`
 
 	StockReturnedAt time.Time `json:"stockReturnedAt,omitempty"`
+
+	// RecoveryNotifiedAt marca quando o cliente recebeu a mensagem de recuperação
+	// do pedido não pago. Uma por pedido.
+	RecoveryNotifiedAt time.Time `json:"recoveryNotifiedAt,omitzero"`
 }
 
 func (o Order) HoldsStock() bool {

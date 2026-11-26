@@ -1029,7 +1029,7 @@ func (s *Server) handleMPWebhook(w http.ResponseWriter, r *http.Request) {
 	if err := s.applyPayment(r.Context(), pay); err != nil {
 		s.logCheckout("apply payment %d: %v", id, err)
 	} else {
-		s.logCheckout("webhook payment %d %s → order %s", pay.ID, pay.Status, pay.ExternalReference)
+		s.logCheckout("webhook payment %d %s (%s) → order %s", pay.ID, pay.Status, pay.StatusDetail, pay.ExternalReference)
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }
@@ -1067,6 +1067,7 @@ func (s *Server) applyPayment(ctx context.Context, pay mercadopago.Payment) erro
 		o.MP.PaymentID = pay.ID
 		o.MP.Status = pay.Status
 		o.MP.Method = pay.Method
+		o.MP.StatusDetail = pay.StatusDetail
 		switch pay.Status {
 		case "approved":
 			return s.settle(o, pay, now)

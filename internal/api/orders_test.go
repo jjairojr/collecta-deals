@@ -421,10 +421,10 @@ func TestWebhookStockGoneOversold(t *testing.T) {
 func TestWebhookRejectedThenApproved(t *testing.T) {
 	f := checkoutServer(t)
 	o := f.createOrder(t)
-	f.gw.payments[2] = mercadopago.Payment{ID: 2, Status: "rejected", ExternalReference: o.ID, AmountBRL: 512, Method: "master"}
+	f.gw.payments[2] = mercadopago.Payment{ID: 2, Status: "rejected", StatusDetail: "cc_rejected_insufficient_amount", ExternalReference: o.ID, AmountBRL: 512, Method: "master"}
 	f.webhook(t, "2", testWebhookSecret)
 	got, _ := f.s.Checkout.Orders.Get(o.ID)
-	if got.Status != orders.StatusFailed {
+	if got.Status != orders.StatusFailed || got.MP.StatusDetail != "cc_rejected_insufficient_amount" {
 		t.Fatalf("order = %+v", got)
 	}
 	rec := f.do(t, http.MethodGet, "/api/orders/"+o.ID, nil, nil)
