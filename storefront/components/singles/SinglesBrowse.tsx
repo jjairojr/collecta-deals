@@ -68,6 +68,7 @@ export default function SinglesBrowse({
   setLabels = {},
   intro,
   footer,
+  kindLabel = "Singles",
 }: {
   catalog: Single[];
   games: { id: string; label: string }[];
@@ -81,6 +82,8 @@ export default function SinglesBrowse({
   setLabels?: Record<string, string>;
   intro?: React.ReactNode;
   footer?: React.ReactNode;
+  /** What this list is, in the heading and the TIPO filter ("Singles", "Graduadas"). */
+  kindLabel?: string;
 }) {
   const router = useRouter();
   const q = query.trim().toLowerCase();
@@ -307,7 +310,7 @@ export default function SinglesBrowse({
       : undefined;
   const setLabel =
     colecaoSel.length === 1 ? (setLabels[colecaoSel[0]] ?? colecaoSel[0]) : undefined;
-  const title = [selectedLabel ?? "Todos", setLabel, "Singles"].filter(Boolean).join(" · ");
+  const title = [selectedLabel ?? "Todos", setLabel, kindLabel].filter(Boolean).join(" · ");
   const heading = current > 1 ? `${title} · página ${current}` : title;
 
   useEffect(() => {
@@ -392,7 +395,7 @@ export default function SinglesBrowse({
 
       <FilterGroup heading="TIPO">
         <FilterChip active onClick={() => {}}>
-          Singles
+          {kindLabel}
         </FilterChip>
         <FilterChip
           active={false}

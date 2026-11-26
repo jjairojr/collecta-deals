@@ -39,7 +39,8 @@ func value(t Trade, pct, fxRate float64, lookup PriceLookup) TradeView {
 	v.CostBRL = float64(v.Qty)*t.BuyBRL + t.ShippingBRL + t.OrderShippingBRL
 
 	market, ok := 0.0, false
-	if t.Kind == "" {
+	graded := t.Kind == "" && IsGraded(t.Condition)
+	if t.Kind == "" && !graded {
 		if lookup != nil {
 			market, v.TCGURL, ok = lookup(t.Number, t.Name, t.Set)
 		}
@@ -55,7 +56,7 @@ func value(t Trade, pct, fxRate float64, lookup PriceLookup) TradeView {
 		v.Channel = ChannelOf(t)
 		v.WriteOff = WriteOffOf(t)
 		v.ValueBRL = proceedsBRL(t, fxRate)
-	} else if t.Kind != "" {
+	} else if t.Kind != "" || graded {
 		v.ValueBRL = t.ManualBRL * float64(v.Qty)
 	} else if ok && fxRate > 0 {
 		v.ValueBRL = pct / 100 * market * float64(v.Qty) / fxRate

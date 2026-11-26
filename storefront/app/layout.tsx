@@ -4,7 +4,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { AccountProvider } from "@/lib/account";
 import { CartProvider } from "@/lib/cart";
-import { loadCatalog } from "@/lib/catalog";
+import { gradedGames, loadCatalog } from "@/lib/catalog";
 import { organizationJsonLd, storeJsonLd, webSiteJsonLd } from "@/lib/seo";
 import { siteURL } from "@/lib/site";
 import AnnouncementBar from "@/components/chrome/AnnouncementBar";
@@ -64,8 +64,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { navGames, accessories } = await loadCatalog();
-  const games = navGames.map((g) => ({ id: g.id, name: g.name }));
+  const catalog = await loadCatalog();
+  const { navGames, accessories } = catalog;
+  const graded = gradedGames(catalog);
+  const games = navGames.map((g) => ({ id: g.id, name: g.name, graded: graded.has(g.id) }));
   const showAccessories = accessories.length > 0;
   return (
     <html

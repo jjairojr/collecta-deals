@@ -158,7 +158,14 @@ func (s *Server) addTrade(gs *GameStack, t trades.Trade) (trades.Trade, error) {
 	if t.Number == "" && t.Name == "" {
 		return trades.Trade{}, errNoIdentity
 	}
-	if t.RefUSD == 0 && t.Kind == "" {
+	// "single" is how callers name a loose card, but the ledger stores it as an
+	// empty kind (the PUT already converts it). Stored as "single", the card never
+	// reaches the storefront, which only lists empty-kind singles.
+	if t.Kind == trades.KindSingle {
+		t.Kind = ""
+	}
+	// A graded slab is not priced by the raw card's market.
+	if t.RefUSD == 0 && t.Kind == "" && !trades.IsGraded(t.Condition) {
 		if gs.Deals != nil {
 			if lookup, _ := s.priceLookup(gs); lookup != nil {
 				if usd, _, ok := lookup(t.Number, t.Name, t.Set); ok {

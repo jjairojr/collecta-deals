@@ -25,6 +25,7 @@ import type {
   Single,
   SingleDetail,
 } from "@/lib/types";
+import { isGradedCondition } from "@/lib/grade";
 
 // Shape of one item from the Go backend's GET /api/storefront (see
 // internal/api/storefront.go). Prices are in reais; there is no slug/language.
@@ -184,7 +185,7 @@ function mapItem(it: RawItem, version: string): Single {
     language: "", // backend has no language field yet
     price: Math.round(it.askBRL * 100),
     qty: Math.max(it.qty, 0),
-    grade: /^PSA/i.test(condition) ? condition : undefined,
+    grade: isGradedCondition(condition) ? condition : undefined,
     imageURL: resolveImage(it, version),
     addedAt: it.addedAt,
   };
@@ -673,4 +674,22 @@ export function scopeToGame(catalog: Catalog, game: string) {
     sets,
     setLabels: Object.fromEntries(sets.map((s) => [s.code, s.label])),
   };
+}
+
+/** Only the graded slabs of one game, for the /graduadas/[jogo] tab. */
+export function scopeToGraded(catalog: Catalog, game: string) {
+  const scope = scopeToGame(catalog, game);
+  const singles = scope.singles.filter((s) => s.grade);
+  const sets = setsOf(singles, game);
+  return {
+    ...scope,
+    singles,
+    sets,
+    setLabels: Object.fromEntries(sets.map((s) => [s.code, s.label])),
+  };
+}
+
+/** Games that have at least one graded slab in stock: they get the tab. */
+export function gradedGames(catalog: Catalog): Set<string> {
+  return new Set(catalog.singles.filter((s) => s.grade).map((s) => s.game));
 }

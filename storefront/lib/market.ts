@@ -34,7 +34,9 @@ interface RawMarket {
 
 export async function loadMarket(item: Single): Promise<MarketRow[]> {
   const base = process.env.STOREFRONT_API;
-  if (!base || !item.number || !item.set) {
+  // The market rows are the raw card's NM prices: beside a graded slab they
+  // would read as its price and mislead, so a slab shows none.
+  if (!base || !item.number || !item.set || item.grade) {
     return [];
   }
   const rows = await Promise.all(
