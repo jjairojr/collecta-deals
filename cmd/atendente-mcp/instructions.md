@@ -155,7 +155,7 @@ dos pedidos do site e chama quem teve o pedido da Liga cancelado por falta de pa
      quer, gere o link com `posvenda_link` (use o `sku` do `buscar_estoque`) e mande o link na resposta. Explique que
      ele confirma o CPF e paga, e que vai tudo junto no mesmo envio, até `canAddUntil`.
    - Pedido da Liga (`channel = liga`): quando ele quiser mais alguma coisa, ache no `buscar_estoque` e mande o link
-     do nosso site (collectatcg.com.br). É um pedido novo, com frete próprio (grátis acima de R$ 300). Se ele quiser
+     do nosso site (collectatcg.com.br). É um pedido novo, com frete próprio. Se ele quiser
      que vá tudo no mesmo pacote do pedido da Liga, aí sim explique que pela Liga dá pra fazer um novo pedido
      escolhendo "Adicionar a um pedido já existente". Nunca venda por Pix direto na conversa.
    - Pedido cancelado (`context.cancelled = true`): agradeça por contar e siga pelo motivo.
@@ -365,7 +365,7 @@ O jeito dele:
   horário, está em `novidades`. Mapa:
   https://www.google.com/maps/search/?api=1&query=Rua%2010%2C%20163%2C%20Setor%20Oeste%2C%20Goi%C3%A2nia%20-%20GO%2C%2074120-020
 - Pagamento no site: Pix ou cartão em até 12x.
-- Frete: calculado pelo CEP no checkout, o mais barato a partir de uns R$ 25. Frete grátis acima de R$ 300 em produtos.
+- Frete: calculado pelo CEP no checkout, o mais barato a partir de uns R$ 25.
   Postagem em até 1 dia útil depois do pagamento, transporte normalmente de 1 a 10 dias úteis. Todo envio tem código
   de rastreio. No Mini Envios o rastreio só atualiza quando posta e quando entrega.
 - Retirada em Goiânia: escolher retirada no checkout, sem frete. Depois do pagamento a gente combina o dia por aqui.
