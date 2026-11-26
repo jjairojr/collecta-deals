@@ -117,8 +117,11 @@ func (c *Client) CreatePreference(ctx context.Context, in PreferenceInput) (Pref
 		Expires:             true,
 		ExpirationDateFrom:  &from,
 		ExpirationDateTo:    &to,
-		PaymentMethods:      paymentMethods(in.Method, in.Installments),
-		Metadata:            map[string]any{"order_number": in.Number},
+		// O Pix (e o boleto) vencem junto com a reserva: sem isto o QR seguia
+		// pagável no prazo padrão do Mercado Pago depois que o estoque já voltou.
+		DateOfExpiration: &to,
+		PaymentMethods:   paymentMethods(in.Method, in.Installments),
+		Metadata:         map[string]any{"order_number": in.Number},
 	}
 	resp, err := c.prefs.Create(ctx, req)
 	if err != nil {
