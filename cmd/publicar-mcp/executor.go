@@ -34,11 +34,19 @@ const (
 	storeLongitude  = -49.2659
 	storeRadiusKm   = 30
 	audienceMinAge  = 18
-	audienceMaxAge  = 45
+	audienceMaxAge  = 65
 	metaErrorMaxLen = 300
 )
 
 var brazilInterests = []string{"Pokémon", "One Piece", "Trading card game"}
+
+// Posicionamentos fixos: só Facebook e Instagram, em feed, stories e reels. Sem
+// Audience Network e sem Messenger, que gastam com clique de baixa qualidade.
+var placements = map[string]any{
+	"publisher_platforms": []string{"facebook", "instagram"},
+	"facebook_positions":  []string{"feed", "story", "facebook_reels"},
+	"instagram_positions": []string{"stream", "story", "reels"},
+}
 
 type metaConfig struct {
 	Token       string
@@ -353,6 +361,9 @@ func (e *executor) create(ctx context.Context, t adtestq.Test, meta *adtestq.Met
 
 func (e *executor) targeting(ctx context.Context, audience string) (map[string]any, error) {
 	base := map[string]any{"age_min": audienceMinAge, "age_max": audienceMaxAge}
+	for k, v := range placements {
+		base[k] = v
+	}
 	if audience == "goiania" {
 		base["geo_locations"] = map[string]any{"custom_locations": []map[string]any{{
 			"latitude": storeLatitude, "longitude": storeLongitude, "radius": storeRadiusKm, "distance_unit": "kilometer",
