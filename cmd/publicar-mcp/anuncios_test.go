@@ -455,9 +455,45 @@ func TestBrazilAudienceUsesInterests(t *testing.T) {
 	}
 }
 
+func TestRemarketingAudience(t *testing.T) {
+	_, _, ex := newAdFixture(t)
+	if _, err := ex.targeting(context.Background(), "remarketing"); err == nil || !strings.Contains(err.Error(), "META_PUBLICO_REMARKETING") {
+		t.Fatalf("sem públicos devia falhar: %v", err)
+	}
+	ex.g.cfg.Remarketing = []string{"111", "222"}
+	ex.g.cfg.Buyers = []string{"999"}
+	tg, err := ex.targeting(context.Background(), "remarketing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(tg)
+	s := string(data)
+	for _, want := range []string{
+		`"custom_audiences":[{"id":"111"},{"id":"222"}]`, `"excluded_custom_audiences":[{"id":"999"}]`,
+		`"countries":["BR"]`, `"age_min":18`, `"age_max":65`, `"advantage_audience":0`,
+		`"publisher_platforms":["facebook","instagram"]`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("falta %s em %s", want, s)
+		}
+	}
+	if strings.Contains(s, "flexible_spec") {
+		t.Errorf("remarketing não leva interesse: %s", s)
+	}
+}
+
+func TestIDList(t *testing.T) {
+	if got := idList(" 1, ,2 ,"); len(got) != 2 || got[0] != "1" || got[1] != "2" {
+		t.Fatalf("idList = %v", got)
+	}
+	if got := idList(""); len(got) != 0 {
+		t.Fatalf("idList vazio = %v", got)
+	}
+}
+
 func TestAudiencesAgeAndPlacements(t *testing.T) {
 	_, _, ex := newAdFixture(t)
-	for _, audience := range []string{"brasil", "goiania"} {
+	for _, audience := range []string{"brasil", "goiania"} { // remarketing tem teste próprio
 		tg, err := ex.targeting(context.Background(), audience)
 		if err != nil {
 			t.Fatal(err)

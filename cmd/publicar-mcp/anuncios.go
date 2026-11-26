@@ -52,7 +52,7 @@ type adCreativeInput struct {
 
 type proposeInput struct {
 	Objetivo   string            `json:"objetivo" jsonschema:"seguidores (leva para o perfil do Instagram) ou vendas (otimiza compra no site)"`
-	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse) ou brasil (Brasil, interesse em Pokémon, One Piece ou card game). Nos dois: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
+	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse), brasil (Brasil, interesse em Pokémon, One Piece ou card game) ou remarketing (Brasil, só quem visitou o site, pôs no carrinho ou interagiu com o @tcgcollecta, sem quem já comprou; exige os públicos no anuncios.env). Nos três: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
 	Link       string            `json:"link,omitempty" jsonschema:"só em vendas: página do site para onde o anúncio leva (https://www.collectatcg.com.br/...)"`
 	Criativos  []adCreativeInput `json:"criativos" jsonschema:"de 2 a 5 criativos, cada um com um gancho diferente"`
 	VerbaReais int               `json:"verba_reais" jsonschema:"verba total do teste em reais, de 30 a 300, dentro do que cabe na semana"`
@@ -82,8 +82,8 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 	switch {
 	case t.Objective != "seguidores" && t.Objective != "vendas":
 		return nil, proposeOutput{}, fmt.Errorf("objetivo %q não existe: seguidores ou vendas", in.Objetivo)
-	case t.Audience != "goiania" && t.Audience != "brasil":
-		return nil, proposeOutput{}, fmt.Errorf("publico %q não existe: goiania ou brasil", in.Publico)
+	case t.Audience != "goiania" && t.Audience != "brasil" && t.Audience != "remarketing":
+		return nil, proposeOutput{}, fmt.Errorf("publico %q não existe: goiania, brasil ou remarketing", in.Publico)
 	case t.BudgetCents < adtestq.MinBudgetCents || t.BudgetCents > adtestq.MaxBudgetCents:
 		return nil, proposeOutput{}, fmt.Errorf("verba_reais vai de %d a %d", adtestq.MinBudgetCents/100, adtestq.MaxBudgetCents/100)
 	case t.Days < adtestq.MinDays || t.Days > adtestq.MaxDays:
@@ -212,7 +212,7 @@ func (a *app) stageCreatives(stage string, in []adCreativeInput) ([]adtestq.Crea
 }
 
 var objectiveLabel = map[string]string{"seguidores": "seguidores (perfil do Instagram)", "vendas": "vendas no site"}
-var audienceLabel = map[string]string{"goiania": "Goiânia, 30 km", "brasil": "Brasil, interesse em TCG"}
+var audienceLabel = map[string]string{"goiania": "Goiânia, 30 km", "brasil": "Brasil, interesse em TCG", "remarketing": "Remarketing (site e Instagram, sem compradores)"}
 
 func (a *app) adDecideURL(t adtestq.Test, action string) string {
 	q := url.Values{"acao": {action}, "t": {t.Token}}
