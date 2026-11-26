@@ -52,7 +52,7 @@ type adCreativeInput struct {
 
 type proposeInput struct {
 	Objetivo   string            `json:"objetivo" jsonschema:"seguidores (leva para o perfil do Instagram) ou vendas (otimiza compra no site)"`
-	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, 18 a 45 anos) ou brasil (Brasil, interesse em Pokémon, One Piece e card game)"`
+	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse) ou brasil (Brasil, interesse em Pokémon, One Piece ou card game). Nos dois: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
 	Link       string            `json:"link,omitempty" jsonschema:"só em vendas: página do site para onde o anúncio leva (https://www.collectatcg.com.br/...)"`
 	Criativos  []adCreativeInput `json:"criativos" jsonschema:"de 2 a 5 criativos, cada um com um gancho diferente"`
 	VerbaReais int               `json:"verba_reais" jsonschema:"verba total do teste em reais, de 30 a 300, dentro do que cabe na semana"`

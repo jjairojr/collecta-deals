@@ -455,6 +455,31 @@ func TestBrazilAudienceUsesInterests(t *testing.T) {
 	}
 }
 
+func TestAudiencesAgeAndPlacements(t *testing.T) {
+	_, _, ex := newAdFixture(t)
+	for _, audience := range []string{"brasil", "goiania"} {
+		tg, err := ex.targeting(context.Background(), audience)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := json.Marshal(tg)
+		s := string(data)
+		for _, want := range []string{
+			`"age_min":18`, `"age_max":65`,
+			`"publisher_platforms":["facebook","instagram"]`,
+			`"facebook_positions":["feed","story","facebook_reels"]`,
+			`"instagram_positions":["stream","story","reels"]`,
+		} {
+			if !strings.Contains(s, want) {
+				t.Errorf("%s: falta %s em %s", audience, want, s)
+			}
+		}
+		if strings.Contains(s, "audience_network") || strings.Contains(s, "messenger") {
+			t.Errorf("%s: posicionamento a mais em %s", audience, s)
+		}
+	}
+}
+
 func TestReadEnvFile(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "anuncios.env")
 	if err := os.WriteFile(p, []byte("# comentário\nMETA_TOKEN=\"abc\"\nMETA_CONTA=123\n\n"), 0o600); err != nil {
