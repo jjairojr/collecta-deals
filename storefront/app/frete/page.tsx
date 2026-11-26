@@ -10,7 +10,7 @@ const handling = `${SHIPPING.handlingDays[1]} ${SHIPPING.handlingDays[1] === 1 ?
 
 export const metadata: Metadata = {
   title: "Frete e prazo de entrega",
-  description: `Como a Collecta envia cartas e produtos selados: frete calculado pelo CEP, postagem em até ${handling}, frete grátis acima de ${brl(SHIPPING.freeAboveBRL * 100)} e retirada na loja em Goiânia.`,
+  description: `Como a Collecta envia cartas e produtos selados: frete calculado pelo CEP, postagem em até ${handling} e retirada na loja em Goiânia.`,
   alternates: { canonical: "/frete" },
 };
 
@@ -23,10 +23,6 @@ export default function FretePage() {
           <p>
             O frete é calculado pelo CEP no checkout, com as opções de entrega disponíveis para o seu endereço e o preço
             de cada uma. O envio mais barato começa em cerca de {brl(SHIPPING.minBRL * 100)}.
-          </p>
-          <p>
-            <strong>Frete grátis acima de {brl(SHIPPING.freeAboveBRL * 100)}</strong> em produtos: a opção de envio mais
-            barata sai de graça.
           </p>
         </Section>
         <Section title="Prazo">

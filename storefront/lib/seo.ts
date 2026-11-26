@@ -98,12 +98,12 @@ function days(range: readonly [number, number]) {
   return { "@type": "QuantitativeValue", minValue: range[0], maxValue: range[1], unitCode: "DAY" };
 }
 
-function shippingDetails(priceCents: number) {
+function shippingDetails() {
   return {
     "@type": "OfferShippingDetails",
     shippingRate: {
       "@type": "MonetaryAmount",
-      value: priceCents >= SHIPPING.freeAboveBRL * 100 ? 0 : SHIPPING.minBRL,
+      value: SHIPPING.minBRL,
       currency: "BRL",
     },
     shippingDestination: { "@type": "DefinedRegion", addressCountry: "BR" },
@@ -132,7 +132,7 @@ function offerJsonLd(path: string, priceCents: number, itemCondition: string, so
     availabilityStarts: shipsFrom,
     itemCondition,
     seller: { "@id": ORGANIZATION_ID },
-    shippingDetails: shippingDetails(priceCents),
+    shippingDetails: shippingDetails(),
     hasMerchantReturnPolicy: returnPolicy(),
   };
 }

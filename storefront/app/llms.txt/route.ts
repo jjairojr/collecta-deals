@@ -7,7 +7,7 @@ import { GAME_HUBS } from "@/lib/game-hubs";
 import { GUIDES, guidePath } from "@/lib/guides";
 import { collectionPath, liveCollections, liveShelves, shelfPath } from "@/lib/sealed-guide";
 import { absoluteURL } from "@/lib/site";
-import { SHIPPING, STORE, STORE_ADDRESS_LINE, STORE_PROFILES } from "@/lib/store";
+import { STORE, STORE_ADDRESS_LINE, STORE_PROFILES } from "@/lib/store";
 import type { Accessory, Sealed } from "@/lib/types";
 
 export const revalidate = 3600;
@@ -40,7 +40,7 @@ export async function GET(): Promise<Response> {
     `- WhatsApp: ${STORE.phone}`,
     `- Empresa: ${STORE.legalName}, CNPJ ${STORE.cnpj}`,
     `- Pagamento: Pix ou cartão pelo Mercado Pago, no checkout do site`,
-    `- Entrega: Correios para todo o Brasil com rastreio, frete grátis acima de R$ ${SHIPPING.freeAboveBRL}; retirada grátis na loja`,
+    `- Entrega: Correios para todo o Brasil com rastreio, frete calculado pelo CEP no checkout; retirada grátis na loja`,
     "- Torneios: toda semana na loja, com torneios com premiação, torneios gratuitos e encontros 4fun; mesas para jogar todos os dias",
     `- Perfis: ${STORE_PROFILES.join(", ")}`,
     "",
