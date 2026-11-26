@@ -216,7 +216,7 @@ export default function OrderStatusView({
       return (
         <Shell title="Pedido expirado" eyebrow={pixelText(`PEDIDO ${number} · TIME OUT`)}>
           <p className="text-sm text-[#c9c9d1]">
-            A reserva de 30 minutos acabou e os itens voltaram para a loja. Monte
+            A reserva de 2 horas acabou e os itens voltaram para a loja. Monte
             o carrinho de novo para fazer um novo pedido.
           </p>
           <Actions primary={{ href: "/carrinho", label: "VOLTAR AO CARRINHO" }} />
