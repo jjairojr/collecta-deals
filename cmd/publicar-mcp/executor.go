@@ -49,15 +49,30 @@ var placements = map[string]any{
 }
 
 type metaConfig struct {
-	Token       string
-	Account     string
-	PageID      string
-	IGUserID    string
-	IGUsername  string
-	PixelID     string
+	Token      string
+	Account    string
+	PageID     string
+	IGUserID   string
+	IGUsername string
+	PixelID    string
+	// Públicos personalizados criados no Meta para o público remarketing: quem entra
+	// e quem sai (compradores). IDs separados por vírgula no anuncios.env.
+	Remarketing []string
+	Buyers      []string
 	BaseURL     string
 	Cloudflared string
 	Trials      bool
+}
+
+// idList lê "id1, id2" do anuncios.env e devolve só os ids não vazios.
+func idList(raw string) []string {
+	var ids []string
+	for _, id := range strings.Split(raw, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
@@ -72,6 +87,8 @@ func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
 		BaseURL:     strings.TrimRight(cmp.Or(getenv("META_URL"), "https://graph.facebook.com"), "/") + "/" + version,
 		Cloudflared: cmp.Or(getenv("META_CLOUDFLARED"), "/opt/homebrew/bin/cloudflared"),
 		Trials:      getenv("META_REELS_TESTE") == "on",
+		Remarketing: idList(getenv("META_PUBLICO_REMARKETING")),
+		Buyers:      idList(getenv("META_PUBLICO_COMPRADORES")),
 	}
 	for name, v := range map[string]string{"META_TOKEN": cfg.Token, "META_CONTA": cfg.Account, "META_PAGINA": cfg.PageID, "META_INSTAGRAM_ID": cfg.IGUserID} {
 		if v == "" {
@@ -364,6 +381,19 @@ func (e *executor) targeting(ctx context.Context, audience string) (map[string]a
 	for k, v := range placements {
 		base[k] = v
 	}
+	if audience == "remarketing" {
+		// Nunca cai para um público aberto: sem os públicos, o teste não sobe.
+		if len(e.g.cfg.Remarketing) == 0 {
+			return nil, errors.New("público remarketing sem META_PUBLICO_REMARKETING em anuncios.env: crie os públicos no Meta e ponha os ids lá")
+		}
+		base["geo_locations"] = map[string]any{"countries": []string{"BR"}}
+		base["custom_audiences"] = audienceRefs(e.g.cfg.Remarketing)
+		if len(e.g.cfg.Buyers) > 0 {
+			base["excluded_custom_audiences"] = audienceRefs(e.g.cfg.Buyers)
+		}
+		base["targeting_automation"] = map[string]int{"advantage_audience": 0}
+		return base, nil
+	}
 	if audience == "goiania" {
 		base["geo_locations"] = map[string]any{"custom_locations": []map[string]any{{
 			"latitude": storeLatitude, "longitude": storeLongitude, "radius": storeRadiusKm, "distance_unit": "kilometer",
@@ -394,6 +424,14 @@ func (e *executor) targeting(ctx context.Context, audience string) (map[string]a
 	base["flexible_spec"] = []map[string]any{{"interests": interests}}
 	base["targeting_automation"] = map[string]int{"advantage_audience": 0}
 	return base, nil
+}
+
+func audienceRefs(ids []string) []map[string]string {
+	refs := make([]map[string]string, len(ids))
+	for i, id := range ids {
+		refs[i] = map[string]string{"id": id}
+	}
+	return refs
 }
 
 func (e *executor) imageHash(ctx context.Context, file string) (string, error) {
