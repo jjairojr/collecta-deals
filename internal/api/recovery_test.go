@@ -172,3 +172,44 @@ func itoaTest(n int) string {
 	b, _ := json.Marshal(n)
 	return string(b)
 }
+
+func TestRecoveryAgentRoutes(t *testing.T) {
+	f := checkoutServer(t)
+	now := recoveryClock
+	f.s.postSale.now = func() time.Time { return now }
+	o := f.seedExpired(t, now)
+	list := "/api/postsale/agent/recovery/orders"
+	sent := list + "/" + o.ID + "/sent"
+	t.Setenv(recoveryEnvFlag, "1")
+	t.Setenv(recoveryEnvText, "Oi, {nome}! Pedido #{numero}: {link}")
+
+	if rec := f.do(t, http.MethodGet, list, nil, agentAuth()); rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("sem token de agente configurado = %d", rec.Code)
+	}
+	f.s.PostSale.AgentToken = testAgentToken
+	if rec := f.do(t, http.MethodGet, list, nil, map[string]string{"X-Admin-Token": "admin"}); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("token de admin na rota de agente = %d", rec.Code)
+	}
+
+	rec := f.do(t, http.MethodGet, list, nil, agentAuth())
+	var out recoveryList
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || rec.Code != http.StatusOK || !out.On || len(out.Orders) != 1 || out.Orders[0].ID != o.ID || out.Orders[0].Message == "" {
+		t.Fatalf("lista do agente: %d %s", rec.Code, rec.Body)
+	}
+	rec = f.do(t, http.MethodPost, sent, nil, agentAuth())
+	var ok struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &ok); err != nil || rec.Code != http.StatusOK || !ok.OK {
+		t.Fatalf("marcar pelo agente = %d %s", rec.Code, rec.Body)
+	}
+	if rec := f.do(t, http.MethodPost, sent, nil, agentAuth()); rec.Code != http.StatusConflict {
+		t.Fatalf("marcar de novo pelo agente = %d", rec.Code)
+	}
+
+	t.Setenv(recoveryEnvFlag, "")
+	rec = f.do(t, http.MethodGet, list, nil, agentAuth())
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || rec.Code != http.StatusOK || out.On || len(out.Orders) != 0 {
+		t.Fatalf("desligado pelo agente: %d %s", rec.Code, rec.Body)
+	}
+}
