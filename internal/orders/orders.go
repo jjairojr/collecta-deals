@@ -30,7 +30,7 @@ const (
 	StatusRefunded  Status = "refunded"
 )
 
-const ReservationTTL = 30 * time.Minute
+const ReservationTTL = 2 * time.Hour
 
 type PaymentMethod string
 

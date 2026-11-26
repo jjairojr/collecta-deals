@@ -28,7 +28,7 @@ export default function TermosPage() {
             do estoque é peça única, então o item só fica garantido depois do pagamento.
           </p>
           <p>
-            Ao iniciar o pagamento, os itens ficam reservados por 30 minutos. Se o pagamento não for concluído nesse
+            Ao iniciar o pagamento, os itens ficam reservados por 2 horas. Se o pagamento não for concluído nesse
             prazo, eles voltam para a loja.
           </p>
         </Section>

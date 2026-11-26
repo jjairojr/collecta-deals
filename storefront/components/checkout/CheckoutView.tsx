@@ -936,7 +936,7 @@ export default function CheckoutView({ joinOrder: initialJoin }: { joinOrder?: s
           <p className="mt-3 text-center font-pixel text-[8px] leading-relaxed text-faint">
             VOCE SERA REDIRECIONADO AO MERCADO PAGO
             <br />
-            ESTOQUE RESERVADO POR 30 MINUTOS
+            ESTOQUE RESERVADO POR 2 HORAS
           </p>
         </div>
       </form>
