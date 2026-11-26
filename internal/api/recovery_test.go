@@ -11,13 +11,17 @@ import (
 
 var recoveryClock = time.Date(2026, 11, 26, 14, 0, 0, 0, saoPaulo)
 
-func recoveryOrderAt(id string, created time.Time, status orders.Status, phone string) orders.Order {
+// recoveryOrderAt monta um pedido cuja reserva venceu (ou vence) em expires. O
+// pedido nasce ReservationTTL antes, então os casos não dependem do prazo da
+// reserva.
+func recoveryOrderAt(id string, expires time.Time, status orders.Status, phone string) orders.Order {
+	created := expires.Add(-orders.ReservationTTL)
 	return orders.Order{
 		ID: id, Number: len(id), Status: status,
 		Lines:         []orders.Line{{SKU: "x", Name: "Booster", Qty: 1, UnitBRL: 30}},
 		Buyer:         orders.Buyer{Name: "Cliente Teste", Phone: phone, Email: id + "@exemplo.test"},
 		PaymentMethod: orders.PaymentPix,
-		CreatedAt:     created, UpdatedAt: created, ExpiresAt: created.Add(orders.ReservationTTL),
+		CreatedAt:     created, UpdatedAt: created, ExpiresAt: expires,
 	}
 }
 
@@ -31,22 +35,22 @@ func candidateIDs(list []orders.Order) []string {
 
 func TestRecoveryCandidatesRules(t *testing.T) {
 	now := recoveryClock
-	expired := recoveryOrderAt("expirado", now.Add(-2*time.Hour), orders.StatusPending, "62 99999-0001")
-	tooSoon := recoveryOrderAt("cedo", now.Add(-40*time.Minute), orders.StatusPending, "62 99999-0002") // expirou há 10 min
-	tooOld := recoveryOrderAt("velho", now.Add(-20*time.Hour), orders.StatusPending, "62 99999-0003")
-	stillPending := recoveryOrderAt("pendente", now.Add(-10*time.Minute), orders.StatusPending, "62 99999-0004")
-	failed := recoveryOrderAt("recusado", now.Add(-3*time.Hour), orders.StatusFailed, "62 99999-0005")
+	expired := recoveryOrderAt("expirado", now.Add(-90*time.Minute), orders.StatusPending, "62 99999-0001")
+	tooSoon := recoveryOrderAt("cedo", now.Add(-10*time.Minute), orders.StatusPending, "62 99999-0002") // expirou há 10 min
+	tooOld := recoveryOrderAt("velho", now.Add(-(19*time.Hour + 30*time.Minute)), orders.StatusPending, "62 99999-0003")
+	stillPending := recoveryOrderAt("pendente", now.Add(20*time.Minute), orders.StatusPending, "62 99999-0004")
+	failed := recoveryOrderAt("recusado", now.Add(-150*time.Minute), orders.StatusFailed, "62 99999-0005")
 	failed.PaymentMethod = orders.PaymentCard
 	failed.UpdatedAt = now.Add(-2 * time.Hour)
-	amountMismatch := recoveryOrderAt("divergente", now.Add(-3*time.Hour), orders.StatusFailed, "62 99999-0006")
+	amountMismatch := recoveryOrderAt("divergente", now.Add(-150*time.Minute), orders.StatusFailed, "62 99999-0006")
 	amountMismatch.MP.Status = "approved"
 	amountMismatch.UpdatedAt = now.Add(-2 * time.Hour)
-	retried := recoveryOrderAt("tentou", now.Add(-3*time.Hour), orders.StatusPending, "62 99999-0007")
-	retriedPaid := recoveryOrderAt("pagou", now.Add(-2*time.Hour), orders.StatusPaid, "(62) 99999-0007")
-	notifiedBefore := recoveryOrderAt("avisado", now.Add(-5*24*time.Hour), orders.StatusPending, "62 99999-0008")
+	retried := recoveryOrderAt("tentou", now.Add(-150*time.Minute), orders.StatusPending, "62 99999-0007")
+	retriedPaid := recoveryOrderAt("pagou", now.Add(-90*time.Minute), orders.StatusPaid, "(62) 99999-0007")
+	notifiedBefore := recoveryOrderAt("avisado", now.Add(-(5*24*time.Hour - 30*time.Minute)), orders.StatusPending, "62 99999-0008")
 	notifiedBefore.RecoveryNotifiedAt = now.Add(-5 * 24 * time.Hour)
-	again := recoveryOrderAt("denovo", now.Add(-2*time.Hour), orders.StatusPending, "62 99999-0008")
-	noPhone := recoveryOrderAt("semtelefone", now.Add(-2*time.Hour), orders.StatusPending, "")
+	again := recoveryOrderAt("denovo", now.Add(-90*time.Minute), orders.StatusPending, "62 99999-0008")
+	noPhone := recoveryOrderAt("semtelefone", now.Add(-90*time.Minute), orders.StatusPending, "")
 
 	got := candidateIDs(recoveryCandidates([]orders.Order{
 		expired, tooSoon, tooOld, stillPending, failed, amountMismatch, retried, retriedPaid, notifiedBefore, again, noPhone,
@@ -64,8 +68,8 @@ func TestRecoveryCandidatesRules(t *testing.T) {
 
 func TestRecoveryCandidatesOnePerBuyer(t *testing.T) {
 	now := recoveryClock
-	older := recoveryOrderAt("a", now.Add(-4*time.Hour), orders.StatusPending, "62 99999-0001")
-	newer := recoveryOrderAt("b", now.Add(-2*time.Hour), orders.StatusPending, "62 99999-0001")
+	older := recoveryOrderAt("a", now.Add(-210*time.Minute), orders.StatusPending, "62 99999-0001")
+	newer := recoveryOrderAt("b", now.Add(-90*time.Minute), orders.StatusPending, "62 99999-0001")
 	if got := candidateIDs(recoveryCandidates([]orders.Order{older, newer}, now)); len(got) != 1 || got[0] != "b" {
 		t.Fatalf("candidatos = %v, quero só o mais novo", got)
 	}
@@ -73,15 +77,15 @@ func TestRecoveryCandidatesOnePerBuyer(t *testing.T) {
 
 func TestRecoveryReasons(t *testing.T) {
 	now := recoveryClock
-	pix := recoveryOrderAt("p", now.Add(-2*time.Hour), orders.StatusPending, "62 99999-0001")
+	pix := recoveryOrderAt("p", now.Add(-90*time.Minute), orders.StatusPending, "62 99999-0001")
 	if _, reason, ok := failedAt(pix, now); !ok || reason != recoveryReasonPix {
 		t.Fatalf("pix = %q %v", reason, ok)
 	}
-	card := recoveryOrderAt("c", now.Add(-2*time.Hour), orders.StatusFailed, "62 99999-0001")
+	card := recoveryOrderAt("c", now.Add(-90*time.Minute), orders.StatusFailed, "62 99999-0001")
 	if _, reason, ok := failedAt(card, now); !ok || reason != recoveryReasonFail {
 		t.Fatalf("cartão = %q %v", reason, ok)
 	}
-	paid := recoveryOrderAt("pg", now.Add(-2*time.Hour), orders.StatusPaid, "62 99999-0001")
+	paid := recoveryOrderAt("pg", now.Add(-90*time.Minute), orders.StatusPaid, "62 99999-0001")
 	if _, _, ok := failedAt(paid, now); ok {
 		t.Fatal("pedido pago não é candidato")
 	}
@@ -90,8 +94,7 @@ func TestRecoveryReasons(t *testing.T) {
 func (f *checkoutFixture) seedExpired(t *testing.T, now time.Time) orders.Order {
 	t.Helper()
 	o, err := f.s.Checkout.Orders.Create(func(map[string]int, []orders.Order) (orders.Order, error) {
-		o := recoveryOrderAt("", now.Add(-2*time.Hour), orders.StatusPending, "62 99999-0001")
-		o.ExpiresAt = now.Add(-90 * time.Minute)
+		o := recoveryOrderAt("", now.Add(-90*time.Minute), orders.StatusPending, "62 99999-0001")
 		return o, nil
 	})
 	if err != nil {
