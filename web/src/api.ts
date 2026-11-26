@@ -1094,6 +1094,56 @@ export async function deleteKit(id: string): Promise<void> {
   }
 }
 
+export interface PackLink {
+  id: string;
+  game: string;
+  parentSKU: string;
+  childSKU: string;
+  units: number;
+  parentName: string;
+  childName: string;
+  parentIDs: string[];
+  childIDs: string[];
+  parentQty: number;
+  childQty: number;
+}
+
+export interface PackLinkInput {
+  parentTradeID: string;
+  childTradeID: string;
+  units: number;
+}
+
+export interface PackOpenInput {
+  qty: number;
+  units?: number;
+  childName?: string;
+}
+
+export async function getPacks(): Promise<PackLink[]> {
+  const res = await getJSON<{ packs: PackLink[] }>(`${base}/packs?${gp(new URLSearchParams()).toString()}`);
+  return res.packs;
+}
+
+export function createPack(input: PackLinkInput): Promise<PackLink> {
+  return sendJSON<PackLink>(`${base}/packs?${gp(new URLSearchParams()).toString()}`, "POST", input);
+}
+
+export async function deletePack(id: string): Promise<void> {
+  const res = await fetch(`${base}/packs/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw await requestError(res);
+  }
+}
+
+export function openPack(tradeID: string, input: PackOpenInput): Promise<{ child: TradeView }> {
+  return sendJSON<{ child: TradeView }>(
+    `${base}/trades/${encodeURIComponent(tradeID)}/open?${gp(new URLSearchParams()).toString()}`,
+    "POST",
+    input,
+  );
+}
+
 // setListings persists storefront state (asking price + listed flag) for one or
 // more holdings of the active game in a single batch write.
 export function setListings(items: ListingInput[]): Promise<{ updated: number }> {

@@ -144,6 +144,10 @@ func (s *Server) buildSKUIndex() (skuIndex, error) {
 		if err != nil {
 			return nil, err
 		}
+		all, _, err = s.expandStock(gs.Game.ID, all)
+		if err != nil {
+			return nil, err
+		}
 		lookup, _ := s.priceLookup(gs)
 		add(gs.Game.ID, all, lookup)
 	}
@@ -647,7 +651,11 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return orders.Order{}, err
 		}
-		res, err := resolveLines(in.Lines, idx, reserved, method)
+		claims, err := s.packClaims(reserved)
+		if err != nil {
+			return orders.Order{}, err
+		}
+		res, err := resolveLines(in.Lines, idx, claims, method)
 		if err != nil {
 			return orders.Order{}, err
 		}

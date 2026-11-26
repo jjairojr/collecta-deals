@@ -234,8 +234,10 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	var patchErr error
 	prevPurchase := ""
+	prevQty := 0
 	mutate := func(t *trades.Trade) {
 		prevPurchase = t.PurchaseID
+		prevQty = t.Qty
 		next, err := patchTrade(*t, patch)
 		if err == nil && next.Status != t.Status {
 			err = errStatusChange
@@ -271,6 +273,9 @@ func (s *Server) handleTradesUpdate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if updated.Status == "holding" && updated.Kind != trades.KindAccessory {
+		s.queueLinkedLiga(gs.Game.ID, gs.Trades, updated, updated.Qty-prevQty, "quantidade ajustada: "+updated.Name)
 	}
 	writeJSON(w, updated)
 }
@@ -401,6 +406,7 @@ func (s *Server) handleTradesSell(w http.ResponseWriter, r *http.Request) {
 		game = accessoryGameID
 	}
 	s.queueStockExit(game, sold)
+	s.queueLinkedExit(game, sold)
 	writeJSON(w, sold)
 }
 
@@ -430,6 +436,7 @@ func (s *Server) handleTradesUnsell(w http.ResponseWriter, r *http.Request) {
 		game = accessoryGameID
 	}
 	s.queueStockReturn(game, res.Sale)
+	s.queueLinkedReturn(game, res.Sale)
 	if err := s.reallocateOrderShipping(res.Restored.PurchaseID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

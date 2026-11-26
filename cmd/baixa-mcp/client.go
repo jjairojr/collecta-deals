@@ -90,6 +90,16 @@ func (a *app) sell(ctx context.Context, game, id string, in sale) (trades.Trade,
 	return sold, err
 }
 
+type openResult struct {
+	Child trades.Trade `json:"child"`
+}
+
+func (a *app) openPack(ctx context.Context, game, id string, qty int) (trades.Trade, error) {
+	var out openResult
+	err := a.call(ctx, http.MethodPost, "/api/trades/"+url.PathEscape(id)+"/open", gameQuery(game), map[string]int{"qty": qty}, &out)
+	return out.Child, err
+}
+
 func (a *app) createTrade(ctx context.Context, game string, t trades.Trade) (trades.Trade, error) {
 	var created trades.Trade
 	err := a.call(ctx, http.MethodPost, "/api/trades", gameQuery(game), t, &created)

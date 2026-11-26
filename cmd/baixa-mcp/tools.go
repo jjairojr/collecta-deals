@@ -94,6 +94,10 @@ func (a *app) server() *mcp.Server {
 		Description: "Dá baixa de um item vendido na Liga num registro em estoque. Recusa pedido que já baixou esse item e quantidade acima da disponível.",
 	}, a.toolSell)
 	mcp.AddTool(s, &mcp.Tool{
+		Name:        "abrir_embalagem",
+		Description: "Abre embalagens fechadas (case, box) que têm vínculo com o conteúdo no dashboard: o case sai e as boxes entram soltas, com o custo dividido. Use quando o pedido vendeu o conteúdo e não há unidade solta suficiente em estoque. Devolve o registro do conteúdo para usar em dar_baixa.",
+	}, a.toolOpen)
+	mcp.AddTool(s, &mcp.Tool{
 		Name:        "venda_sem_lastro",
 		Description: "Registra uma venda confirmada da Liga que não tem nenhum registro no estoque do dashboard. Use só depois de estoque_buscar não achar o item por número nem por nome.",
 	}, a.toolSellUnbacked)
@@ -433,6 +437,30 @@ func (a *app) toolSell(ctx context.Context, _ *mcp.CallToolRequest, in sellInput
 		out.RestanteID = holding.ID
 	}
 	return nil, out, nil
+}
+
+type openInput struct {
+	Jogo string `json:"jogo" jsonschema:"onepiece, pokemon ou riftbound"`
+	ID   string `json:"id" jsonschema:"id do registro da embalagem fechada, vindo de estoque_buscar"`
+	Qty  int    `json:"qty" jsonschema:"quantas embalagens abrir, o mínimo que cobre o pedido"`
+}
+
+type openOutput struct {
+	Conteudo holdingView `json:"conteudo"`
+}
+
+func (a *app) toolOpen(ctx context.Context, _ *mcp.CallToolRequest, in openInput) (*mcp.CallToolResult, openOutput, error) {
+	if !validGame(in.Jogo) {
+		return nil, openOutput{}, fmt.Errorf("jogo inválido: %q (use onepiece, pokemon ou riftbound)", in.Jogo)
+	}
+	if strings.TrimSpace(in.ID) == "" || in.Qty < 1 {
+		return nil, openOutput{}, errors.New("informe o id da embalagem e qty de pelo menos 1")
+	}
+	child, err := a.openPack(ctx, in.Jogo, in.ID, in.Qty)
+	if err != nil {
+		return nil, openOutput{}, fmt.Errorf("não abriu: %v (sem vínculo de embalagem no dashboard é pendência)", err)
+	}
+	return nil, openOutput{Conteudo: holdingOf(child)}, nil
 }
 
 type unbackedInput struct {

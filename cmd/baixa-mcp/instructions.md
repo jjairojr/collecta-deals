@@ -209,9 +209,13 @@ achar, tente o nome; se o jogo for incerto, tente os três. Só `em_estoque` ser
   anunciado é o `Foil JP`; venda EN/PT que só casaria com o `AR (JP)` é pendência.
 - Selado: case pelo nome por extenso (`(JAP) Caixa de Booster - Storm Emeralda` = `Storm Emeralda (With Shrink)`; Caixa
   ME5 pode ter um id interno no número). `Kit com 12 Blister Quádruplo/Triplo ME4/ME5` sem registro de kit é baixado como
-  12 unidades do blister avulso por kit, com `total_brl` = preço do kit × kits. `Booster Avulso - <set>` contra só uma
-  `Caixa de Booster` no dashboard, ou GEM Pack de volume que não existe (Vol.5 com só Vol.2/3/4/6 cadastrados), é
-  pendência.
+  12 unidades do blister avulso por kit, com `total_brl` = preço do kit × kits. GEM Pack de volume que não existe (Vol.5 com só
+  Vol.2/3/4/6 cadastrados) é pendência.
+- Embalagem vinculada: a Liga anuncia o conteúdo das embalagens fechadas (box = soltas + as de dentro dos cases). Pedido
+  de `Caixa de Booster` ou `Booster Avulso` sem unidade solta suficiente em `em_estoque`: chame `abrir_embalagem` no
+  registro do case (ou da box) com o mínimo de embalagens que cobre o pedido e dê `dar_baixa` no registro que ela
+  devolve. A fila já recebe a saída do case na Liga. Se `abrir_embalagem` recusar por falta de vínculo, é pendência.
+  Booster nunca abre case: sem box solta, pendência.
 - Qty do pedido maior que a soma dos lotes: baixe o que existe e registre o resto com `venda_sem_lastro`, com pendência
   "possível venda sem estoque" (acontece quando o site ou o balcão levaram o resto e a Liga não foi reduzida).
 - Nenhum candidato pelo nome em nenhum jogo, ou o único registro já está em `vendidos_recentes` de outro pedido: venda

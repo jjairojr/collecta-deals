@@ -93,6 +93,19 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 	fx := s.storefrontFX()
 	resp.FXRate = fx
 	var artVersion int64
+	reserved := map[string]int{}
+	if s.Checkout.Orders != nil {
+		held, err := s.Checkout.Orders.Reserved(time.Now())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		reserved, err = s.packClaims(held)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 	for _, id := range s.orderedGameIDs() {
 		gs := s.games[id]
 		if gs.Cardimg != nil {
@@ -106,6 +119,11 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 		all, err := gs.Trades.List()
 		if err != nil {
 			continue
+		}
+		all, _, err = s.expandStock(gs.Game.ID, all)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		lookup, _ := s.priceLookup(gs)
 		for _, t := range all {
@@ -132,16 +150,9 @@ func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if s.Checkout.Orders != nil {
-		reserved, err := s.Checkout.Orders.Reserved(time.Now())
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		var drained []storefrontItem
-		resp.Items, drained = subtractReserved(resp.Items, reserved)
-		sold = append(drained, sold...)
-	}
+	var drained []storefrontItem
+	resp.Items, drained = subtractReserved(resp.Items, reserved)
+	sold = append(drained, sold...)
 	resp.SoldOut = soldOutOnly(resp.Items, sold)
 	listed, err := s.listedKits()
 	if err != nil {

@@ -11,6 +11,7 @@ import {
   Copy,
   ImagePlus,
   Layers,
+  PackageOpen,
   Save,
   Search,
   Share2,
@@ -24,6 +25,7 @@ import {
   gameHasDeals,
   getGame,
   getKits,
+  getPacks,
   getPortfolio,
   mergeTrades,
   productIDFromTcgURL,
@@ -32,12 +34,14 @@ import {
   type Kit,
   type LigaInput,
   type ListingInput,
+  type PackLink,
   type PortfolioResponse,
   type TradeView,
 } from "../api";
 import { brl, brl0, shipsFromLabel, usd } from "../format";
 import CardArt from "./CardArt";
 import KitsEditor from "./KitsEditor";
+import PacksEditor, { packStockNote } from "./PacksEditor";
 import ShareList from "./ShareList";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -250,6 +254,30 @@ export default function StockPage() {
     }
   }, []);
 
+  const [packs, setPacks] = useState<PackLink[]>([]);
+
+  const loadPacks = useCallback(async () => {
+    try {
+      setPacks(await getPacks());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "failed to load packs");
+    }
+  }, []);
+
+  const packsByTrade = useMemo(() => {
+    const parent: Record<string, PackLink> = {};
+    const child: Record<string, PackLink> = {};
+    for (const p of packs) {
+      for (const id of p.parentIDs) {
+        parent[id] = p;
+      }
+      for (const id of p.childIDs) {
+        child[id] = p;
+      }
+    }
+    return { parent, child };
+  }, [packs]);
+
   const kitsByTrade = useMemo(() => {
     const out: Record<string, Kit[]> = {};
     for (const k of kits) {
@@ -293,7 +321,12 @@ export default function StockPage() {
   useEffect(() => {
     load();
     loadKits();
-  }, [load, loadKits]);
+    loadPacks();
+  }, [load, loadKits, loadPacks]);
+
+  const reloadPacks = useCallback(async () => {
+    await Promise.all([load(), loadPacks()]);
+  }, [load, loadPacks]);
 
   const fx = data?.fxRate ?? 0;
   const holdings = useMemo(() => (data?.trades ?? []).filter((t) => !t.realized), [data]);
@@ -686,6 +719,7 @@ export default function StockPage() {
                   onToggle={toggleSelect}
                   onEditImage={setImgEditId}
                   kits={kitsByTrade[t.id]}
+                  packNote={packNote(packsByTrade.parent[t.id], packsByTrade.child[t.id])}
                 />
               ))}
             </tbody>
@@ -869,6 +903,16 @@ export default function StockPage() {
               onChanged={loadKits}
             />
 
+            {imgEditTrade.kind === "sealed" && (
+              <PacksEditor
+                trade={imgEditTrade}
+                asParent={packsByTrade.parent[imgEditId]}
+                asChild={packsByTrade.child[imgEditId]}
+                candidates={holdings.filter((h) => h.kind === "sealed" && h.id !== imgEditId)}
+                onChanged={reloadPacks}
+              />
+            )}
+
             <div className="mt-5 flex items-center justify-between gap-2">
               <Button
                 variant="ghost"
@@ -901,6 +945,17 @@ export default function StockPage() {
   );
 }
 
+function packNote(asParent: PackLink | undefined, asChild: PackLink | undefined): string {
+  const notes: string[] = [];
+  if (asChild) {
+    notes.push(packStockNote(asChild));
+  }
+  if (asParent) {
+    notes.push(`${asParent.units} × ${asParent.childName} por unidade`);
+  }
+  return notes.join(" · ");
+}
+
 function StockRow({
   t,
   fx,
@@ -910,6 +965,7 @@ function StockRow({
   onToggle,
   onEditImage,
   kits,
+  packNote,
 }: {
   t: TradeView;
   fx: number;
@@ -919,6 +975,7 @@ function StockRow({
   onToggle: (id: string) => void;
   onEditImage: (id: string) => void;
   kits: Kit[] | undefined;
+  packNote: string;
 }) {
   const ask = row?.askBRL ?? 0;
   const listed = Boolean(row?.listed);
@@ -959,7 +1016,7 @@ function StockRow({
             onMouseLeave={() => setPreview(null)}
             onFocus={openPreview}
             onBlur={() => setPreview(null)}
-            title="Imagem, preço no cartão, pré-venda e kits"
+            title="Imagem, preço no cartão, pré-venda, kits e embalagem"
             className="group relative h-12 w-[34px] shrink-0 overflow-hidden rounded"
           >
             <CardArt
@@ -996,6 +1053,17 @@ function StockRow({
               >
                 <Layers className="h-3 w-3" />
                 Kits: {kits.map((k) => `${k.units} un ${brl(k.askBRL)}${k.listed ? "" : " (oculto)"}`).join(" · ")}
+              </button>
+            )}
+            {packNote && (
+              <button
+                type="button"
+                onClick={() => onEditImage(t.id)}
+                title="Vínculo de embalagem — clique para editar"
+                className="mt-0.5 flex items-center gap-1 rounded bg-brand/20 px-1.5 text-[10px] font-bold text-brand-label hover:bg-brand/30"
+              >
+                <PackageOpen className="h-3 w-3" />
+                {packNote}
               </button>
             )}
           </div>

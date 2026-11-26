@@ -23,6 +23,7 @@ import (
 	"opdeals/internal/game"
 	"opdeals/internal/kits"
 	"opdeals/internal/model"
+	"opdeals/internal/packs"
 	"opdeals/internal/publishq"
 	"opdeals/internal/purchases"
 	"opdeals/internal/quotes"
@@ -69,6 +70,7 @@ type Server struct {
 	postSale       postSaleState
 	SyncQueue      *syncqueue.Store
 	Kits           *kits.Store
+	Packs          *packs.Store
 	Publish        *publishq.Store
 	AdTests        *adtestq.Store
 	JPImport       *JPImport
@@ -210,6 +212,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/kits", s.handleKitsCreate)
 	mux.HandleFunc("PUT /api/kits/{id}", s.handleKitsUpdate)
 	mux.HandleFunc("DELETE /api/kits/{id}", s.handleKitsDelete)
+	mux.HandleFunc("GET /api/packs", s.handlePacksList)
+	mux.HandleFunc("POST /api/packs", s.handlePacksCreate)
+	mux.HandleFunc("DELETE /api/packs/{id}", s.handlePacksDelete)
+	mux.HandleFunc("POST /api/trades/{id}/open", s.handleTradesOpen)
 	mux.HandleFunc("GET /api/promos", s.handlePromosList)
 	mux.HandleFunc("POST /api/promos", s.handlePromosCreate)
 	mux.HandleFunc("PUT /api/promos/{code}", s.handlePromosUpdate)
