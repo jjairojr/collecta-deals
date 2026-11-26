@@ -235,6 +235,8 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("PATCH /api/orders/{id}", s.handleOrderPatch)
 		mux.HandleFunc("POST /api/orders/{id}/return-stock", s.handleOrderReturnStock)
 		mux.HandleFunc("POST /api/orders/mp-webhook", s.handleMPWebhook)
+		mux.HandleFunc("GET /api/recovery/orders", s.adminOnly(s.handleRecoveryList))
+		mux.HandleFunc("POST /api/recovery/orders/{id}/sent", s.adminOnly(s.handleRecoverySent))
 	}
 	if s.PostSaleEnabled() {
 		s.postSaleRoutes(mux)
