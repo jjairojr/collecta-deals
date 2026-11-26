@@ -25,7 +25,6 @@ export const STORE_PROFILES = [STORE.instagram, STORE.facebook, STORE.ligaStore,
 
 export const SHIPPING = {
   minBRL: 25,
-  freeAboveBRL: 300,
   handlingDays: [0, 1],
   transitDays: [1, 10],
 } as const;

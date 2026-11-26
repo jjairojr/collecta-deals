@@ -2,7 +2,6 @@ import { brl } from "@/lib/format";
 import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
 import { contentsOf, releaseLabel, type SealedCollection, type SealedShelf } from "@/lib/sealed-guide";
 import type { FaqItem } from "@/lib/seo";
-import { SHIPPING } from "@/lib/store";
 import type { Sealed } from "@/lib/types";
 
 function priceLine(s: Sealed): string {
@@ -22,7 +21,7 @@ export const SEALED_LANGUAGES: FaqItem = {
 
 export const SEALED_SHIPPING: FaqItem = {
   q: "Como é o envio dos selados?",
-  a: `Embalagem reforçada e envio pelos Correios para todo o Brasil com código de rastreio, com frete grátis acima de R$ ${SHIPPING.freeAboveBRL}. Em Goiânia você retira na loja física sem pagar frete.`,
+  a: `Embalagem reforçada e envio pelos Correios para todo o Brasil com código de rastreio. Em Goiânia você retira na loja física sem pagar frete.`,
 };
 
 export const SEALED_PAYMENT: FaqItem = {
