@@ -237,6 +237,10 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("POST /api/orders/mp-webhook", s.handleMPWebhook)
 		mux.HandleFunc("GET /api/recovery/orders", s.adminOnly(s.handleRecoveryList))
 		mux.HandleFunc("POST /api/recovery/orders/{id}/sent", s.adminOnly(s.handleRecoverySent))
+		// O Atendente usa as mesmas rotas com o token de agente do pós-venda
+		// (Authorization: Bearer POSTSALE_AGENT_TOKEN); ele não tem o token de admin.
+		mux.HandleFunc("GET /api/postsale/agent/recovery/orders", s.agentOnly(s.handleRecoveryList))
+		mux.HandleFunc("POST /api/postsale/agent/recovery/orders/{id}/sent", s.agentOnly(s.handleRecoverySent))
 	}
 	if s.PostSaleEnabled() {
 		s.postSaleRoutes(mux)
