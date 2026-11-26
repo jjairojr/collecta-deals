@@ -10,6 +10,8 @@ import { gamePixel } from "@/lib/games";
 interface NavGame {
   id: string;
   name: string;
+  /** Has graded slabs in stock: shows the GRADUADAS entry. */
+  graded?: boolean;
 }
 
 export default function TabBar({
@@ -175,6 +177,7 @@ function GameMenu({ game }: { game: NavGame }) {
         >
           <MenuLink href={`/singles/${game.id}`} label="SINGLES" />
           <MenuLink href={`/selado/${game.id}`} label="SELADOS" />
+          {game.graded && <MenuLink href={`/graduadas/${game.id}`} label="GRADUADAS" />}
         </div>
       </div>
 
@@ -197,6 +200,13 @@ function GameMenu({ game }: { game: NavGame }) {
               label="SELADOS"
               onNavigate={() => setMenu(null)}
             />
+            {game.graded && (
+              <MenuLink
+                href={`/graduadas/${game.id}`}
+                label="GRADUADAS"
+                onNavigate={() => setMenu(null)}
+              />
+            )}
           </div>
         </div>
       )}

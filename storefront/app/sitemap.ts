@@ -75,6 +75,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
   for (const g of games) {
+    if (singles.some((s) => s.game === g.id && s.grade)) {
+      urls.push({
+        url: absoluteURL(`/graduadas/${g.id}`),
+        changeFrequency: "daily",
+        priority: 0.8,
+      });
+    }
+  }
+  for (const g of games) {
     urls.push({
       url: absoluteURL(`/singles/${g.id}`),
       changeFrequency: "daily",

@@ -17,6 +17,7 @@ import {
 import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gameArtHue, gamePixel } from "@/lib/games";
+import { graderOf } from "@/lib/grade";
 import { setLabel, setPath } from "@/lib/sets";
 import type { SingleDetail } from "@/lib/types";
 
@@ -79,7 +80,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                 angle="90"
                 label={
                   item.grade
-                    ? "FOTO REAL DA CARTA\nSLAB PSA"
+                    ? `FOTO REAL DA CARTA\nSLAB ${graderOf(item.grade)}`
                     : "FOTO REAL DA CARTA"
                 }
                 imageURL={item.imageURL}
@@ -95,7 +96,8 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
           <div className="flex flex-wrap gap-2">
             {item.grade && (
               <Badge className="bg-brand-soft text-outline">
-                {item.grade} GEM MT
+                {item.grade}
+                {/^PSA\s*10$/i.test(item.grade) ? " GEM MT" : ""}
               </Badge>
             )}
             {item.language && (
