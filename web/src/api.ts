@@ -1654,3 +1654,306 @@ export function releaseConversation(id: string): Promise<Conversation> {
 export function closeConversation(id: string): Promise<Conversation> {
   return conversationAction(id, "close", {});
 }
+
+export type ArenaPointKind =
+  | "WELCOME"
+  | "ATTENDANCE"
+  | "PURCHASE"
+  | "ADJUST"
+  | "ENTRY_REDEEM"
+  | "DUEL_STAKE"
+  | "DUEL_PAYOUT"
+  | "DUEL_REFUND"
+  | "REVERSAL";
+
+export type ArenaDuelStatus =
+  | "INVITED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "NEGOTIATING"
+  | "LOCKED"
+  | "DISPUTED"
+  | "SETTLED"
+  | "DRAWN"
+  | "CANCELLED"
+  | "ANNULLED";
+
+export type ArenaReport = "WIN" | "LOSS" | "DRAW";
+
+export type ArenaOutcome = "CHALLENGER" | "OPPONENT" | "DRAW";
+
+export type ArenaDuelFilter = "OPEN" | "DISPUTED" | "ALL";
+
+export interface ArenaOverview {
+  members: number;
+  pending: number;
+  minors: number;
+  circulating: number;
+  burned: number;
+  duelsWeek: number;
+  disputes: number;
+  openEvents: number;
+}
+
+export interface ArenaGame {
+  id: number;
+  slug: string;
+  name: string;
+}
+
+export interface ArenaPlayer {
+  id: string;
+  username: string;
+  displayName: string;
+}
+
+export interface ArenaPending extends ArenaPlayer {
+  arenaStatus: string;
+  arenaMinor: boolean;
+  arenaRequestedAt: string | null;
+  arenaApprovedAt: string | null;
+  pointsBalance: number;
+  createdAt: string;
+}
+
+export interface ArenaMember extends ArenaPlayer {
+  arenaStatus: "MEMBER" | "REMOVED";
+  arenaMinor: boolean;
+  arenaRequestedAt: string | null;
+  arenaApprovedAt: string | null;
+  pointsBalance: number;
+  checkins: number;
+}
+
+export interface ArenaEntry {
+  id: string;
+  amount: number;
+  kind: ArenaPointKind;
+  reason: string | null;
+  actor: string | null;
+  createdAt: string;
+  duelId: string | null;
+  reversedEntryId: string | null;
+  game: ArenaGame | null;
+  event: { id: string; name: string } | null;
+}
+
+export interface ArenaStatement {
+  entries: ArenaEntry[];
+  nextCursor: string | null;
+}
+
+export interface ArenaEventBase {
+  id: string;
+  name: string;
+  playedAt: string;
+  checkinOpen: boolean;
+  checkinCode: string;
+  endedAt: string | null;
+  game: ArenaGame;
+}
+
+export interface ArenaPodiumEntry {
+  place: number;
+  user: ArenaPlayer;
+}
+
+export interface ArenaEvent extends ArenaEventBase {
+  createdBy: string;
+  podium: ArenaPodiumEntry[];
+  checkins: number;
+  duels: number;
+}
+
+export interface ArenaCheckin {
+  createdAt: string;
+  paidWithPoints: boolean;
+  place: number | null;
+  user: ArenaPlayer & { arenaMinor: boolean };
+}
+
+export interface ArenaEventDetail extends ArenaEventBase {
+  checkins: ArenaCheckin[];
+  openDuels: number;
+  disputedDuels: number;
+}
+
+export interface ArenaPodiumInput {
+  first: string | null;
+  second: string | null;
+  third: string | null;
+}
+
+export interface ArenaEndResult {
+  annulled: number;
+  event: ArenaEventDetail;
+}
+
+export interface ArenaEventInput {
+  gameId: number;
+  name: string;
+  playedAt: string;
+  checkinOpen: boolean;
+}
+
+export type ArenaCreditInput =
+  | { kind: "PURCHASE"; userId: string; cents: number; reason: string }
+  | { kind: "ADJUST"; userId: string; amount: number; reason: string };
+
+export interface ArenaCreditEntry {
+  id: string;
+  amount: number;
+  kind: ArenaPointKind;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface ArenaDuel {
+  id: string;
+  status: ArenaDuelStatus;
+  challengerStake: number;
+  opponentStake: number;
+  challengerReport: ArenaReport | null;
+  opponentReport: ArenaReport | null;
+  outcome: ArenaOutcome | null;
+  feeBurned: number;
+  createdAt: string;
+  lockedAt: string | null;
+  settledAt: string | null;
+  firstReportAt: string | null;
+  resolvedBy: string | null;
+  resolveReason: string | null;
+  challenger: ArenaPlayer;
+  opponent: ArenaPlayer;
+  event: { id: string; name: string; game: { slug: string; name: string } };
+}
+
+function messageOf(text: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed === "object" && parsed !== null && "message" in parsed && typeof parsed.message === "string") {
+      return parsed.message || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function arenaError(res: Response): Promise<Error> {
+  if (res.status === 401) {
+    return new Error("unauthorized");
+  }
+  const text = (await res.text()).trim();
+  return new Error(messageOf(text) ?? (text || `falha na Arena: HTTP ${res.status}`));
+}
+
+async function arenaCall<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${base}/arena${path}`, init);
+  if (!res.ok) {
+    throw await arenaError(res);
+  }
+  const data: T = await res.json();
+  return data;
+}
+
+function arenaGet<T>(path: string, params?: URLSearchParams): Promise<T> {
+  const query = params?.toString() ?? "";
+  return arenaCall<T>(query ? `${path}?${query}` : path);
+}
+
+function arenaPost<T>(path: string, body: object): Promise<T> {
+  return arenaCall<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function arenaID(id: string): string {
+  return encodeURIComponent(id);
+}
+
+export function getArenaOverview(): Promise<ArenaOverview> {
+  return arenaGet<ArenaOverview>("/overview");
+}
+
+export function listArenaGames(): Promise<ArenaGame[]> {
+  return arenaGet<ArenaGame[]>("/games");
+}
+
+export function listArenaPending(): Promise<ArenaPending[]> {
+  return arenaGet<ArenaPending[]>("/pending");
+}
+
+export function listArenaMembers(q: string): Promise<ArenaMember[]> {
+  const params = new URLSearchParams();
+  if (q.trim()) {
+    params.set("q", q.trim());
+  }
+  return arenaGet<ArenaMember[]>("/members", params);
+}
+
+export function approveArenaMember(id: string, minor: boolean): Promise<ArenaPlayer> {
+  return arenaPost<ArenaPlayer>(`/members/${arenaID(id)}/approve`, { minor });
+}
+
+export function rejectArenaMember(id: string): Promise<ArenaPlayer> {
+  return arenaPost<ArenaPlayer>(`/members/${arenaID(id)}/reject`, {});
+}
+
+export function setArenaMinor(id: string, minor: boolean): Promise<ArenaPlayer> {
+  return arenaPost<ArenaPlayer>(`/members/${arenaID(id)}/minor`, { minor });
+}
+
+export function removeArenaMember(id: string, reason: string): Promise<ArenaPlayer> {
+  return arenaPost<ArenaPlayer>(`/members/${arenaID(id)}/remove`, { reason });
+}
+
+export function getArenaStatement(id: string, cursor?: string): Promise<ArenaStatement> {
+  const params = new URLSearchParams();
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+  return arenaGet<ArenaStatement>(`/members/${arenaID(id)}/statement`, params);
+}
+
+export function listArenaEvents(): Promise<ArenaEvent[]> {
+  return arenaGet<ArenaEvent[]>("/events");
+}
+
+export function createArenaEvent(input: ArenaEventInput): Promise<ArenaEventBase> {
+  return arenaPost<ArenaEventBase>("/events", input);
+}
+
+export function getArenaEvent(id: string): Promise<ArenaEventDetail> {
+  return arenaGet<ArenaEventDetail>(`/events/${arenaID(id)}`);
+}
+
+export function setArenaCheckin(id: string, open: boolean): Promise<ArenaEventBase> {
+  return arenaPost<ArenaEventBase>(`/events/${arenaID(id)}/checkin`, { open });
+}
+
+export function endArenaEvent(id: string, podium: ArenaPodiumInput): Promise<ArenaEndResult> {
+  return arenaPost<ArenaEndResult>(`/events/${arenaID(id)}/end`, podium);
+}
+
+export function creditArena(input: ArenaCreditInput): Promise<ArenaCreditEntry> {
+  return arenaPost<ArenaCreditEntry>("/credit", input);
+}
+
+export function reverseArenaEntry(id: string, reason: string): Promise<ArenaCreditEntry> {
+  return arenaPost<ArenaCreditEntry>(`/entries/${arenaID(id)}/reverse`, { reason });
+}
+
+export function listArenaDuels(status: ArenaDuelFilter): Promise<ArenaDuel[]> {
+  return arenaGet<ArenaDuel[]>("/duels", new URLSearchParams({ status }));
+}
+
+export function resolveArenaDuel(id: string, outcome: ArenaOutcome, reason: string): Promise<ArenaDuel> {
+  return arenaPost<ArenaDuel>(`/duels/${arenaID(id)}/resolve`, { outcome, reason });
+}
+
+export function annulArenaDuel(id: string, reason: string): Promise<ArenaDuel> {
+  return arenaPost<ArenaDuel>(`/duels/${arenaID(id)}/annul`, { reason });
+}

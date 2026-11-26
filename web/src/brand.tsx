@@ -19,6 +19,7 @@ import {
   Store,
   Swords,
   Ticket,
+  Trophy,
   Truck,
   Upload,
   Wand2,
@@ -43,7 +44,8 @@ export type View =
   | "guialiga"
   | "ligaexport"
   | "sincronizar"
-  | "cupons";
+  | "cupons"
+  | "arena";
 
 export type Icon = ComponentType<{ className?: string }>;
 
@@ -89,6 +91,7 @@ export const navGroups: NavGroup[] = [
       { key: "pedidos", label: "Pedidos", icon: Truck },
       { key: "conversas", label: "Conversas", icon: MessageCircle },
       { key: "cupons", label: "Cupons", icon: Ticket },
+      { key: "arena", label: "Arena", icon: Trophy },
       { key: "compras", label: "Estoque e Compras", icon: ShoppingCart },
       { key: "sincronizar", label: "Sincronizar", icon: RefreshCw },
       { key: "importar", label: "Importar / Exportar", icon: Plane },

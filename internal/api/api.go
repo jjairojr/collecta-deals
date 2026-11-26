@@ -18,6 +18,7 @@ import (
 
 	"opdeals/internal/adtestq"
 	"opdeals/internal/cardimg"
+	"opdeals/internal/collecta"
 	"opdeals/internal/compare"
 	"opdeals/internal/expenses"
 	"opdeals/internal/game"
@@ -74,6 +75,7 @@ type Server struct {
 	Publish        *publishq.Store
 	AdTests        *adtestq.Store
 	JPImport       *JPImport
+	Arena          collecta.Arena
 	imports        *importsCache
 	releasing      sync.Map
 }
@@ -220,6 +222,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/promos", s.handlePromosCreate)
 	mux.HandleFunc("PUT /api/promos/{code}", s.handlePromosUpdate)
 	mux.HandleFunc("DELETE /api/promos/{code}", s.handlePromosDelete)
+	s.arenaRoutes(mux)
 	if s.adminToken != "" {
 		mux.HandleFunc("POST /api/admin/reload", s.handleAdminReload)
 	}

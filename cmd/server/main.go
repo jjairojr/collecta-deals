@@ -15,6 +15,7 @@ import (
 	"opdeals/internal/api"
 	"opdeals/internal/cardimg"
 	"opdeals/internal/clearance"
+	"opdeals/internal/collecta"
 	"opdeals/internal/compare"
 	"opdeals/internal/expenses"
 	"opdeals/internal/flaresolverr"
@@ -499,6 +500,11 @@ func run() error {
 		return fmt.Errorf("checkout: %w", err)
 	}
 	srv.Checkout = checkout
+	if *collectaAPI != "" && *collectaStoreToken != "" {
+		srv.Arena = collecta.New(*collectaAPI, *collectaStoreToken)
+	} else {
+		logger.Printf("COLLECTA_API and COLLECTA_STORE_TOKEN must both be set: Arena admin disabled")
+	}
 	srv.Checkout.Promos = promos.NewStore(*promosPath)
 	srv.Kits = kits.NewStore(*kitsPath)
 	srv.Packs = packs.NewStore(*packsPath)

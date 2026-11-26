@@ -28,6 +28,7 @@ import GuiaLigaPage from "./components/GuiaLigaPage";
 import LigaExportPage from "./components/LigaExportPage";
 import SyncQueuePage, { useSyncPending } from "./components/SyncQueuePage";
 import PromosPage from "./components/PromosPage";
+import ArenaPage from "./components/ArenaPage";
 import ConversasPage from "./components/ConversasPage";
 import SelectionTray from "./components/SelectionTray";
 import AppSidebar from "./components/AppSidebar";
@@ -107,6 +108,10 @@ const pageMeta: Record<View, { title: string; description: string }> = {
   cupons: {
     title: "Cupons",
     description: "Códigos de desconto da vitrine: criar, limitar, pausar e ver quanto cada um rendeu.",
+  },
+  arena: {
+    title: "Arena Collecta",
+    description: "Pontos da loja: membros, torneios com check-in, lançamento de Collectas e X1 entre jogadores.",
   },
   sincronizar: {
     title: "Sincronizar",
@@ -287,6 +292,10 @@ export default function App() {
               ) : activeView === "cupons" ? (
                 <div className="mt-6">
                   <PromosPage />
+                </div>
+              ) : activeView === "arena" ? (
+                <div className="mt-6">
+                  <ArenaPage />
                 </div>
               ) : activeView === "sincronizar" ? (
                 <div className="mt-6">
