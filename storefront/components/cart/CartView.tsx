@@ -16,7 +16,7 @@ import { useAccount } from "@/lib/account";
 import { useCart } from "@/lib/cart";
 import { freeShippingMinLabel } from "@/lib/free-shipping";
 import { brl } from "@/lib/format";
-import { installmentsFor, shipsFromLabel, unitPriceFor } from "@/lib/payment";
+import { installmentsFor, shipsFromLabel, unitPriceFor, SEM_JUROS } from "@/lib/payment";
 import type { CartLine } from "@/lib/types";
 import type { BoosterKitOffer } from "@/lib/offers";
 import CartKitOffer from "@/components/cart/CartKitOffer";
@@ -248,8 +248,8 @@ export default function CartView({
           </div>
           <p className="mt-2 text-xs text-muted">
             {cardTotal !== total
-              ? `sem o frete · no Pix · ${brl(cardTotal)} no cartão em até ${installments}x sem juros`
-              : `sem o frete · Pix ou cartão em até ${installments}x sem juros`}
+              ? `sem o frete · no Pix · ${brl(cardTotal)} no cartão em até ${installments}x${SEM_JUROS}`
+              : `sem o frete · Pix ou cartão em até ${installments}x${SEM_JUROS}`}
           </p>
 
           <Link

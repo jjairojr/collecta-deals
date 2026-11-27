@@ -10,6 +10,7 @@ import { GAME_NAMES } from "@/lib/games";
 import { SINGLES_PAGE_SIZE } from "@/lib/paging";
 import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
 import { findSet, setsOf } from "@/lib/sets";
+import { SEM_JUROS } from "@/lib/payment";
 
 export const revalidate = 60;
 
@@ -35,7 +36,7 @@ export async function generateMetadata({
   }
   return {
     title: `Cartas ${found.label} de ${name} — singles e preços`,
-    description: `${found.count} cartas da coleção ${found.label} de ${name} em estoque na Collecta, a partir de ${brl(found.minPrice)}. Conferidas uma a uma, Pix ou cartão em até 6x sem juros e envio para todo o Brasil.`,
+    description: `${found.count} cartas da coleção ${found.label} de ${name} em estoque na Collecta, a partir de ${brl(found.minPrice)}. Conferidas uma a uma, Pix ou cartão em até 6x${SEM_JUROS} e envio para todo o Brasil.`,
     alternates: { canonical: `/singles/${jogo}/colecao/${found.slug}` },
     robots: live ? undefined : { index: false },
   };

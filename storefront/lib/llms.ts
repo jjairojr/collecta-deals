@@ -1,7 +1,7 @@
 import { gradedGames, scopeToGraded, type Catalog } from "@/lib/catalog";
 import { brl } from "@/lib/format";
 import { GAME_NAMES, isGameId } from "@/lib/games";
-import { MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
+import { MAX_INSTALLMENTS, shipsFromLabel, SEM_JUROS } from "@/lib/payment";
 import { categoryPath, liveCategories } from "@/lib/accessory-guide";
 import { GAME_HUBS } from "@/lib/game-hubs";
 import { GUIDES, guidePath } from "@/lib/guides";
@@ -41,7 +41,7 @@ export function llmsLines(catalog: Catalog): string[] {
     `- Horário: todos os dias, das ${STORE.opens} às ${STORE.closes}`,
     `- WhatsApp: ${STORE.phone}`,
     `- Empresa: ${STORE.legalName}, CNPJ ${STORE.cnpj}`,
-    `- Pagamento: Pix ou cartão pelo Mercado Pago, no checkout do site; no cartão, em até ${MAX_INSTALLMENTS}x sem juros, sobre o preço no cartão`,
+    `- Pagamento: Pix ou cartão pelo Mercado Pago, no checkout do site; no cartão, em até ${MAX_INSTALLMENTS}x${SEM_JUROS}, sobre o preço no cartão`,
     `- Entrega: Correios para todo o Brasil com rastreio, frete calculado pelo CEP no checkout (a partir de uns ${brl(SHIPPING.minBRL * 100)})${freeShippingMinBRL > 0 ? `; PAC grátis a partir de ${freeShippingMinLabel(freeShippingMinBRL)} em produtos` : ""}; postagem em até ${handling} e transporte de ${SHIPPING.transitDays[0]} a ${SHIPPING.transitDays[1]} dias úteis; retirada grátis na loja em Goiânia`,
     "- Torneios: toda semana na loja, com torneios com premiação, torneios gratuitos e encontros 4fun; mesas para jogar todos os dias",
     `- Perfis: ${STORE_PROFILES.join(", ")}`,

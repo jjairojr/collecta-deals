@@ -30,6 +30,7 @@ import {
   MIN_COLLECTION_ITEMS,
 } from "@/lib/sealed-guide";
 import { productFaq, SEALED_GENERAL } from "@/lib/sealed-faq";
+import { SEM_JUROS } from "@/lib/payment";
 
 export const revalidate = 60;
 
@@ -107,7 +108,7 @@ export default async function SeladoSlugPage({
           <CategoryIntro>
             {list.length > 0 ? `${list.length} produtos selados de ${gameName} em estoque: ` : `Produtos selados de ${gameName}: `}
             booster boxes, ETBs, bundles, blisters e decks com lacre original de fábrica, conferidos antes do envio. Pix ou
-            cartão em até 6x sem juros, envio para todo o Brasil ou retirada na loja em Goiânia.
+            cartão em até 6x{SEM_JUROS}, envio para todo o Brasil ou retirada na loja em Goiânia.
           </CategoryIntro>
           <ShippingFacts freeShippingMinBRL={freeShippingMinBRL} />
           <SealedGrid

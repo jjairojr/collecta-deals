@@ -14,6 +14,7 @@ import { brl } from "@/lib/format";
 import { loadMarket } from "@/lib/market";
 import { baseCardName, setLabel, setPath } from "@/lib/sets";
 import type { Single } from "@/lib/types";
+import { SEM_JUROS } from "@/lib/payment";
 
 export const revalidate = 60;
 
@@ -46,7 +47,7 @@ export async function generateMetadata({
     },
     description: item.soldOut
       ? `${label} de ${item.gameLabel} (${collection}) está esgotada na Collecta. Último preço ${brl(item.price)}. Peça pelo WhatsApp e avisamos quando voltar ao estoque. Envio para todo o Brasil e retirada em Goiânia.`
-      : `${label} de ${item.gameLabel}, coleção ${collection}, condição ${item.condition}, por ${brl(item.price)}. Em estoque, conferida uma a uma. Envio para todo o Brasil, Pix ou cartão em até 6x sem juros.`,
+      : `${label} de ${item.gameLabel}, coleção ${collection}, condição ${item.condition}, por ${brl(item.price)}. Em estoque, conferida uma a uma. Envio para todo o Brasil, Pix ou cartão em até 6x${SEM_JUROS}.`,
     alternates: { canonical: `/carta/${slug}` },
     robots: live ? undefined : { index: false },
     openGraph: productOpenGraph(`/carta/${slug}`, item.imageURL),
@@ -144,7 +145,7 @@ export default async function CartaPage({
             <div>
               <dt className="font-bold text-white">Como pagar?</dt>
               <dd className="mt-1">
-                Pix ou cartão em até 6x sem juros pelo Mercado Pago, direto no checkout do site. Também dá para fechar pelo
+                Pix ou cartão em até 6x{SEM_JUROS} pelo Mercado Pago, direto no checkout do site. Também dá para fechar pelo
                 WhatsApp. Devolução em até 7 dias conforme a{" "}
                 <Link href="/politica-de-devolucao" className="text-brand-soft underline-offset-4 hover:underline">
                   política de trocas

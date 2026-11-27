@@ -4,6 +4,7 @@ import Container from "@/components/ui/Container";
 import Section from "@/components/ui/DocSection";
 import SectionHead from "@/components/ui/SectionHead";
 import { STORE } from "@/lib/store";
+import { SEM_JUROS } from "@/lib/payment";
 
 export const metadata: Metadata = {
   title: "Termos de uso e venda",
@@ -40,7 +41,7 @@ export default function TermosPage() {
         </Section>
         <Section title="Pagamento">
           <p>
-            Pix ou cartão em até 6x sem juros, processados pelo Mercado Pago. O pedido é confirmado quando o Mercado Pago aprova
+            Pix ou cartão em até 6x{SEM_JUROS}, processados pelo Mercado Pago. O pedido é confirmado quando o Mercado Pago aprova
             o pagamento.
           </p>
         </Section>

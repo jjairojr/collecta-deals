@@ -7,7 +7,7 @@ import { brl } from "@/lib/format";
 import { gameArtHue } from "@/lib/games";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import { singleToCartLine } from "@/lib/cart-lines";
-import { installmentPlan, unitPriceFor } from "@/lib/payment";
+import { installmentPlan, unitPriceFor, INTEREST_FREE } from "@/lib/payment";
 import { stockLabel } from "@/lib/stock";
 import type { Single } from "@/lib/types";
 
@@ -73,7 +73,7 @@ export default function SingleCard({
           <span className="truncate font-pixel text-[10px] leading-relaxed text-brand sm:text-[12px]">
             {brl(item.price)}
           </span>
-          {plan && (
+          {plan && INTEREST_FREE && (
             <span className="-mt-1 truncate text-[11px] text-muted">
               ou {plan.count}x de {brl(plan.each)} sem juros
             </span>

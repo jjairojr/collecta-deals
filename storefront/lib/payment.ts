@@ -1,8 +1,16 @@
 export type PaymentMethod = "pix" | "card";
 
-// Até 6x sem juros no cartão, para todos os produtos, sempre sobre o preço no
+// Até 6x no cartão, para todos os produtos, sempre sobre o preço no
 // cartão (decisão do Jairo, 27/11). O checkout manda o mesmo limite ao Mercado Pago.
 export const MAX_INSTALLMENTS = 6;
+
+// "Sem juros" só vale se a conta do Mercado Pago estiver no parcelamento sem
+// acréscimos (o vendedor paga o custo). Sem isso, o Checkout Pro cobra os juros
+// do cliente em 2x a 6x, e o site não pode prometer. Liga com
+// NEXT_PUBLIC_PARCELAS_SEM_JUROS=1 na Vercel (inlined no build).
+export const INTEREST_FREE = process.env.NEXT_PUBLIC_PARCELAS_SEM_JUROS === "1";
+/** " sem juros" quando a conta absorve os juros; vazio enquanto não. */
+export const SEM_JUROS = INTEREST_FREE ? " sem juros" : "";
 /** Mesmo limite de MAX_INSTALLMENTS: o preço no cartão não muda mais o parcelamento. */
 export const CARD_PRICED_INSTALLMENTS = MAX_INSTALLMENTS;
 
