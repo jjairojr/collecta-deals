@@ -5,7 +5,7 @@ import Section from "@/components/ui/DocSection";
 import SectionHead from "@/components/ui/SectionHead";
 import { loadCatalog } from "@/lib/catalog";
 import { brl } from "@/lib/format";
-import { freeShippingMinLabel } from "@/lib/free-shipping";
+import { freeShippingMinLabel, PAC_MAX_ITEMS_BRL } from "@/lib/free-shipping";
 import { SHIPPING, STORE_ADDRESS_LINE } from "@/lib/store";
 
 const handling = `${SHIPPING.handlingDays[1]} ${SHIPPING.handlingDays[1] === 1 ? "dia útil" : "dias úteis"}`;
@@ -34,7 +34,8 @@ export default async function FretePage() {
               <strong>Frete grátis no PAC para todo o Brasil</strong> em compras a partir de{" "}
               {freeShippingMinLabel(freeShippingMinBRL)} em produtos: no checkout, a opção PAC dos Correios sai de
               graça. As outras opções de envio continuam pagas. O valor conta o preço da forma de pagamento escolhida
-              (Pix ou cartão), sem o frete. Se o PAC não atender o seu CEP, não há opção grátis.
+              (Pix ou cartão), sem o frete. Se o PAC não atender o seu CEP, ou se a compra passar de{" "}
+              {brl(PAC_MAX_ITEMS_BRL * 100)} em produtos (acima disso os Correios não oferecem o PAC), não há opção grátis.
             </p>
           )}
         </Section>

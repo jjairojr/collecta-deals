@@ -62,7 +62,7 @@ export default async function AcessorioSlugPage({
           ])}
         />
       )}
-      <SealedDetailView item={item} />
+      <SealedDetailView item={item} freeShippingMinBRL={freeShippingMinBRL} />
     </>
   );
 }

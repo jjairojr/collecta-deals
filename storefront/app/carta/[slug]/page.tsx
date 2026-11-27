@@ -9,6 +9,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import { loadCatalog, loadSingleDetail } from "@/lib/catalog";
+import { freeShippingSentence, pageShowsFreeShipping } from "@/lib/free-shipping";
 import { breadcrumbJsonLd, productOpenGraph, singleProductJsonLd } from "@/lib/seo";
 import { brl } from "@/lib/format";
 import { loadMarket } from "@/lib/market";
@@ -93,7 +94,7 @@ export default async function CartaPage({
           ])}
         />
       )}
-      <SingleDetailView item={item} />
+      <SingleDetailView item={item} freeShippingMinBRL={freeShippingMinBRL} />
       <Container className="pb-6">
         <div className="-mt-4 mb-10 max-w-2xl lg:ml-auto lg:w-[55%]">
           <MarketPrice rows={market} cardLabel={cardLabel(item)} />
@@ -140,6 +141,9 @@ export default async function CartaPage({
               <dd className="mt-1">
                 Carta em sleeve e toploader, embalagem rígida e envio pelos Correios para todo o Brasil com código de
                 rastreio. Em Goiânia você pode retirar na loja sem frete.
+                {pageShowsFreeShipping(freeShippingMinBRL, item.price) && (
+                  <> Tem {freeShippingSentence(freeShippingMinBRL)}.</>
+                )}
               </dd>
             </div>
             <div>

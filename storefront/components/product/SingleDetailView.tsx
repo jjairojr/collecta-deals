@@ -8,6 +8,7 @@ import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import SoldOutBox from "@/components/product/SoldOutBox";
+import FreeShippingNote from "@/components/product/FreeShippingNote";
 import {
   singleItem,
   trackAddToCart,
@@ -23,7 +24,7 @@ import { LOW_STOCK, stockLabel } from "@/lib/stock";
 import { setLabel, setPath } from "@/lib/sets";
 import type { SingleDetail } from "@/lib/types";
 
-export default function SingleDetailView({ item }: { item: SingleDetail }) {
+export default function SingleDetailView({ item, freeShippingMinBRL = 0 }: { item: SingleDetail; freeShippingMinBRL?: number }) {
   const { add } = useCart();
   const plan = installmentPlan(unitPriceFor(item, "card"));
   const [qty, setQty] = useState(1);
@@ -150,6 +151,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                     : ` em até 6x${SEM_JUROS}`}
                 </p>
               )}
+              <FreeShippingNote minBRL={freeShippingMinBRL} priceCents={item.price} />
               {item.marketAvg && (
                 <p className="mt-2 text-[13px] text-muted">
                   média de mercado {brl(item.marketAvg)}

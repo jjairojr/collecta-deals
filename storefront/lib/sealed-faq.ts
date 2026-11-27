@@ -1,4 +1,5 @@
 import { brl } from "@/lib/format";
+import { freeShippingSentence, pageShowsFreeShipping } from "@/lib/free-shipping";
 import { MAX_INSTALLMENTS, shipsFromLabel, SEM_JUROS } from "@/lib/payment";
 import { contentsOf, releaseLabel, type SealedCollection, type SealedShelf } from "@/lib/sealed-guide";
 import type { FaqItem } from "@/lib/seo";
@@ -61,7 +62,15 @@ export function shelfPriceFaq(shelf: SealedShelf, items: Sealed[]): FaqItem {
   };
 }
 
-export function productFaq(item: Sealed, collection: SealedCollection | undefined): FaqItem[] {
+/** The shipping answer, with the free PAC rule when it applies to this price. */
+export function sealedShipping(minBRL: number, priceCents?: number): FaqItem {
+  const free = priceCents === undefined ? minBRL > 0 : pageShowsFreeShipping(minBRL, priceCents);
+  return free
+    ? { ...SEALED_SHIPPING, a: `${SEALED_SHIPPING.a} Tem ${freeShippingSentence(minBRL)}.` }
+    : SEALED_SHIPPING;
+}
+
+export function productFaq(item: Sealed, collection: SealedCollection | undefined, freeShippingMinBRL = 0): FaqItem[] {
   const out: FaqItem[] = [];
   if (!item.soldOut) {
     out.push({ q: `Quanto custa o ${item.headline ?? item.name}?`, a: `${priceLine(item)}, na Collecta.` });
@@ -79,5 +88,5 @@ export function productFaq(item: Sealed, collection: SealedCollection | undefine
       a: `${collection.name} foi lançada em ${releaseLabel(collection.released)}.`,
     });
   }
-  return [...out, ...SEALED_GENERAL];
+  return [...out, ...SEALED_GENERAL.map((f) => (f === SEALED_SHIPPING ? sealedShipping(freeShippingMinBRL, item.price) : f))];
 }
