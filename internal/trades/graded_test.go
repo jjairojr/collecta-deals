@@ -14,7 +14,9 @@ func TestIsGraded(t *testing.T) {
 }
 
 func TestGradedSlabIgnoresRawMarket(t *testing.T) {
-	lookup := func(number, name, set string) (float64, string, bool) { return 90, "https://www.tcgplayer.com/product/1", true }
+	lookup := func(number, name, set string) (float64, string, bool) {
+		return 90, "https://www.tcgplayer.com/product/1", true
+	}
 	slab := Trade{Number: "170", Name: "Squirtle", Condition: "PSA 10", Qty: 1, BuyBRL: 1500, RefUSD: 90, ManualBRL: 2800, Status: "holding"}
 	v := BuildPortfolio([]Trade{slab}, 90, 0.1925, lookup).Trades[0]
 	if v.MarketKnown || v.MarketUSD != 0 {
