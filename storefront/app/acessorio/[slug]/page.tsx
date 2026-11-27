@@ -49,9 +49,10 @@ export default async function AcessorioSlugPage({
     permanentRedirect(res.redirect);
   }
   const { item, live } = res;
+  const { freeShippingMinBRL } = await loadCatalog();
   return (
     <>
-      {live && <JsonLd data={accessoryProductJsonLd(item)} />}
+      {live && <JsonLd data={accessoryProductJsonLd(item, freeShippingMinBRL)} />}
       {live && (
         <JsonLd
           data={breadcrumbJsonLd([

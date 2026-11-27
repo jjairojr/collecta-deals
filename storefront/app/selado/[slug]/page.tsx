@@ -1,5 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
+import ShippingFacts from "@/components/ui/ShippingFacts";
 import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import SealedGrid from "@/components/SealedGrid";
@@ -81,7 +82,7 @@ export default async function SeladoSlugPage({
   const { slug } = await params;
   const gameName = GAME_NAMES[slug];
   if (gameName) {
-    const { sealed } = await loadCatalog();
+    const { sealed, freeShippingMinBRL } = await loadCatalog();
     const list = sealed.filter((s) => s.game === slug);
     return (
       <>
@@ -108,6 +109,7 @@ export default async function SeladoSlugPage({
             booster boxes, ETBs, bundles, blisters e decks com lacre original de fábrica, conferidos antes do envio. Pix ou
             cartão em até 6x sem juros, envio para todo o Brasil ou retirada na loja em Goiânia.
           </CategoryIntro>
+          <ShippingFacts freeShippingMinBRL={freeShippingMinBRL} />
           <SealedGrid
             list={list}
             listId={`selado_${slug}`}
@@ -130,14 +132,14 @@ export default async function SeladoSlugPage({
     permanentRedirect(res.redirect);
   }
   const { item, live } = res;
-  const { sealed } = await loadCatalog();
+  const { sealed, freeShippingMinBRL } = await loadCatalog();
   const collection = collectionOf(item);
   const siblings = collection ? collectionItems(collection, sealed) : [];
   const others = siblings.filter((s) => s.slug !== item.slug);
   const hasCollectionPage = collection !== undefined && siblings.length >= MIN_COLLECTION_ITEMS;
   return (
     <>
-      {live && <JsonLd data={sealedProductJsonLd(item)} />}
+      {live && <JsonLd data={sealedProductJsonLd(item, freeShippingMinBRL)} />}
       {live && (
         <JsonLd
           data={breadcrumbJsonLd([

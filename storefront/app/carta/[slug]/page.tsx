@@ -67,7 +67,7 @@ export default async function CartaPage({
     permanentRedirect(res.redirect);
   }
   const { item, live } = res;
-  const [{ singles }, market] = await Promise.all([loadCatalog(), loadMarket(item)]);
+  const [{ singles, freeShippingMinBRL }, market] = await Promise.all([loadCatalog(), loadMarket(item)]);
   const others = singles.filter((s) => s.game === item.game && s.slug !== item.slug);
   const base = baseCardName(item.name);
   const versions = others.filter((s) => s.number === item.number);
@@ -81,7 +81,7 @@ export default async function CartaPage({
   const collection = setLabel(item.game, item.set);
   return (
     <>
-      {live && <JsonLd data={singleProductJsonLd(item)} />}
+      {live && <JsonLd data={singleProductJsonLd(item, freeShippingMinBRL)} />}
       {live && (
         <JsonLd
           data={breadcrumbJsonLd([

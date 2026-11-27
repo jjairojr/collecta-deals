@@ -47,7 +47,14 @@ export const metadata: Metadata = {
   // Merchant Center verifies by reading the served HTML, so the tag has to be
   // rendered server-side — the GA snippet only appears after hydration and is
   // invisible to the verifier.
-  verification: { google: "XoLIZnAr8k3IRTvhhH2xi3uSc1Rr3Z4GYa4VTPg5_2w" },
+  // Bing Webmaster: colar o código da tag msvalidate.01 em BING_SITE_VERIFICATION
+  // (variável da Vercel). Sem ela, nenhuma tag do Bing sai no HTML.
+  verification: {
+    google: "XoLIZnAr8k3IRTvhhH2xi3uSc1Rr3Z4GYa4VTPg5_2w",
+    ...(process.env.BING_SITE_VERIFICATION
+      ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } }
+      : {}),
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",
