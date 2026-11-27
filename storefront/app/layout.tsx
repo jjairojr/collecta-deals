@@ -13,6 +13,7 @@ import TabBar from "@/components/chrome/TabBar";
 import Footer from "@/components/chrome/Footer";
 import Scanlines from "@/components/chrome/Scanlines";
 import CartToast from "@/components/cart/CartToast";
+import { pickCardAccessory } from "@/lib/offers";
 import MetaPixel from "@/components/chrome/MetaPixel";
 import JsonLd from "@/components/seo/JsonLd";
 
@@ -86,7 +87,7 @@ export default async function RootLayout({
           <TabBar games={games} showAccessories={showAccessories} />
           <main className="min-h-[60vh]">{children}</main>
           <Footer />
-          <CartToast />
+          <CartToast accessory={pickCardAccessory(accessories)} />
         </CartProvider>
         </AccountProvider>
         <MetaPixel />

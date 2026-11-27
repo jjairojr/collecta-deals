@@ -23,7 +23,7 @@ interface CartContext {
   lines: CartLine[];
   count: number;
   total: number;
-  lastAdded: { name: string; nonce: number } | null;
+  lastAdded: LastAdded | null;
   add: (line: Omit<CartLine, "qty">, qty?: number) => void;
   setQty: (line: CartLine, qty: number) => void;
   remove: (line: CartLine) => void;
@@ -32,14 +32,19 @@ interface CartContext {
   cap: (stock: Record<string, number>) => void;
 }
 
+// What the "added to cart" toast shows and offers on: the last line added.
+export interface LastAdded {
+  name: string;
+  sku: string;
+  kind: CartLine["kind"];
+  nonce: number;
+}
+
 const Ctx = createContext<CartContext | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
-  const [lastAdded, setLastAdded] = useState<{
-    name: string;
-    nonce: number;
-  } | null>(null);
+  const [lastAdded, setLastAdded] = useState<LastAdded | null>(null);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -81,6 +86,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
     setLastAdded((prev) => ({
       name: line.name,
+      sku: line.sku,
+      kind: line.kind,
       nonce: (prev?.nonce ?? 0) + 1,
     }));
   }, []);

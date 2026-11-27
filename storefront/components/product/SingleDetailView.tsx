@@ -18,11 +18,14 @@ import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gameArtHue, gamePixel } from "@/lib/games";
 import { graderOf } from "@/lib/grade";
+import { installmentPlan } from "@/lib/payment";
+import { LOW_STOCK, stockLabel } from "@/lib/stock";
 import { setLabel, setPath } from "@/lib/sets";
 import type { SingleDetail } from "@/lib/types";
 
 export default function SingleDetailView({ item }: { item: SingleDetail }) {
   const { add } = useCart();
+  const plan = installmentPlan(item.price);
   const [qty, setQty] = useState(1);
   const [wished, setWished] = useState(false);
 
@@ -103,9 +106,9 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             {item.language && (
               <Badge className="bg-royal text-white">{item.language}</Badge>
             )}
-            {!item.soldOut && item.qty === 1 && (
+            {!item.soldOut && item.qty > 0 && item.qty <= LOW_STOCK && (
               <Badge className="border-2 border-brand bg-outline text-brand">
-                SO 1 UNIDADE
+                {stockLabel(item.qty)}
               </Badge>
             )}
           </div>
@@ -137,6 +140,11 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                   </span>
                 )}
               </div>
+              {plan && (
+                <p className="mt-2 text-[13px] text-muted">
+                  ou {plan.count}x de {brl(plan.each)} no cartão
+                </p>
+              )}
               {item.marketAvg && (
                 <p className="mt-2 text-[13px] text-muted">
                   média de mercado {brl(item.marketAvg)}
