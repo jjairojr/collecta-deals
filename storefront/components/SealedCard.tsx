@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { sealedItem, trackSelectItem } from "@/lib/analytics";
 import { brl } from "@/lib/format";
-import { CARD_PRICED_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
+import { CARD_PRICED_INSTALLMENTS, shipsFromLabel, SEM_JUROS } from "@/lib/payment";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import { stockLabel } from "@/lib/stock";
 import type { Accessory, Sealed } from "@/lib/types";
@@ -55,7 +55,7 @@ export default function SealedCard({ item }: { item: Sealed | Accessory }) {
         </span>
         {item.cardPrice !== undefined && (
           <span className="text-xs text-on-soft">
-            ou {brl(item.cardPrice)} em até {CARD_PRICED_INSTALLMENTS}x sem juros no cartão
+            ou {brl(item.cardPrice)} em até {CARD_PRICED_INSTALLMENTS}x{SEM_JUROS} no cartão
           </span>
         )}
         {bestSaving > 0 && (

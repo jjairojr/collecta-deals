@@ -5,6 +5,7 @@ import { packSingles } from "@/lib/singles-pack";
 import ListPageJsonLd from "@/components/seo/ListPageJsonLd";
 import { loadCatalog } from "@/lib/catalog";
 import { isGameId } from "@/lib/games";
+import { SEM_JUROS } from "@/lib/payment";
 
 export const revalidate = 60;
 
@@ -12,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const { singles, live } = await loadCatalog();
   return {
     title: "Cartas avulsas (singles) de TCG",
-    description: `${singles.length} cartas avulsas de Pokémon, One Piece, Riftbound, Lorcana e Gundam em estoque, conferidas uma a uma. Pix ou cartão em até 6x sem juros e envio para todo o Brasil.`,
+    description: `${singles.length} cartas avulsas de Pokémon, One Piece, Riftbound, Lorcana e Gundam em estoque, conferidas uma a uma. Pix ou cartão em até 6x${SEM_JUROS} e envio para todo o Brasil.`,
     alternates: { canonical: "/singles" },
     robots: live ? undefined : { index: false },
   };

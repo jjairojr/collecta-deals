@@ -9,6 +9,7 @@ import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { GAME_IDS, GAME_NAMES } from "@/lib/games";
 import { SINGLES_PAGE_SIZE } from "@/lib/paging";
 import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
+import { SEM_JUROS } from "@/lib/payment";
 
 export const revalidate = 60;
 
@@ -30,7 +31,7 @@ export async function generateMetadata({
   const count = singles.filter((s) => s.game === jogo).length;
   return {
     title: `Cartas ${name} avulsas — singles, preços e coleções`,
-    description: `${count > 0 ? `${count} cartas` : "Cartas"} ${name} avulsas em estoque na Collecta, por coleção e com preço de cada carta. Originais, conferidas uma a uma. Pix ou cartão em até 6x sem juros, envio para todo o Brasil ou retirada em Goiânia.`,
+    description: `${count > 0 ? `${count} cartas` : "Cartas"} ${name} avulsas em estoque na Collecta, por coleção e com preço de cada carta. Originais, conferidas uma a uma. Pix ou cartão em até 6x${SEM_JUROS}, envio para todo o Brasil ou retirada em Goiânia.`,
     alternates: { canonical: `/singles/${jogo}` },
     robots: live && count > 0 ? undefined : { index: false },
   };

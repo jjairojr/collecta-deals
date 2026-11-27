@@ -2,6 +2,7 @@ import Link from "next/link";
 import { brl, pixelText } from "@/lib/format";
 import { GAME_BLURB } from "@/lib/games";
 import { setPath, type SetSummary } from "@/lib/sets";
+import { SEM_JUROS } from "@/lib/payment";
 
 export function CategoryIntro({ children }: { children: React.ReactNode }) {
   return <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-muted">{children}</p>;
@@ -11,7 +12,7 @@ export function GameIntro({ game, name, count }: { game: string; name: string; c
   return (
     <CategoryIntro>
       {count > 0 ? `${count} cartas em estoque agora. ` : ""}
-      {GAME_BLURB[game]} Pague por Pix ou cartão em até 6x sem juros, receba em todo o Brasil ou retire na loja em Goiânia.
+      {GAME_BLURB[game]} Pague por Pix ou cartão em até 6x{SEM_JUROS}, receba em todo o Brasil ou retire na loja em Goiânia.
     </CategoryIntro>
   );
 }
@@ -95,7 +96,7 @@ export function GameFaq({ name }: { name: string }) {
         <div>
           <dt className="font-bold text-white">Quais as formas de pagamento?</dt>
           <dd className="mt-1">
-            Pix ou cartão em até 6x sem juros pelo Mercado Pago, direto no site. Devolução em até 7 dias conforme a{" "}
+            Pix ou cartão em até 6x{SEM_JUROS} pelo Mercado Pago, direto no site. Devolução em até 7 dias conforme a{" "}
             <Link href="/politica-de-devolucao" className="text-brand-soft underline-offset-4 hover:underline">
               política de trocas
             </Link>

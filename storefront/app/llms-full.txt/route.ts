@@ -4,7 +4,7 @@ import { freeShippingMinLabel } from "@/lib/free-shipping";
 import { GAME_NAMES, isGameId } from "@/lib/games";
 import { GUIDES } from "@/lib/guides";
 import { llmsLines } from "@/lib/llms";
-import { MAX_INSTALLMENTS } from "@/lib/payment";
+import { MAX_INSTALLMENTS, SEM_JUROS } from "@/lib/payment";
 import { SEALED_GENERAL } from "@/lib/sealed-faq";
 import { setsOf } from "@/lib/sets";
 import { absoluteURL } from "@/lib/site";
@@ -36,7 +36,7 @@ export async function GET(): Promise<Response> {
     `Mais: ${absoluteURL("/frete")}`,
     "",
     "## Pagamento",
-    `Pix ou cartão pelo Mercado Pago, direto no checkout do site. No cartão, em até ${MAX_INSTALLMENTS}x sem juros, sobre o preço no cartão. O pedido é confirmado quando o Mercado Pago aprova o pagamento. Ao iniciar o pagamento, os itens ficam reservados por 2 horas.`,
+    `Pix ou cartão pelo Mercado Pago, direto no checkout do site. No cartão, em até ${MAX_INSTALLMENTS}x${SEM_JUROS}, sobre o preço no cartão. O pedido é confirmado quando o Mercado Pago aprova o pagamento. Ao iniciar o pagamento, os itens ficam reservados por 2 horas.`,
     "",
     "## Devolução e trocas",
     "Arrependimento: até 7 dias corridos depois do recebimento, sem justificar o motivo (artigo 49 do CDC); a loja devolve o valor total pago, incluindo o frete da compra, e paga o frete de retorno.",

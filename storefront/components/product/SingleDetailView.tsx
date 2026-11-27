@@ -18,7 +18,7 @@ import { useCart } from "@/lib/cart";
 import { brl, pixelText } from "@/lib/format";
 import { gameArtHue, gamePixel } from "@/lib/games";
 import { graderOf } from "@/lib/grade";
-import { installmentPlan, unitPriceFor } from "@/lib/payment";
+import { installmentPlan, unitPriceFor, SEM_JUROS, INTEREST_FREE } from "@/lib/payment";
 import { LOW_STOCK, stockLabel } from "@/lib/stock";
 import { setLabel, setPath } from "@/lib/sets";
 import type { SingleDetail } from "@/lib/types";
@@ -141,7 +141,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                   </span>
                 )}
               </div>
-              {plan && (
+              {plan && INTEREST_FREE && (
                 <p className="mt-2 text-[13px] text-muted">
                   ou {plan.count}x de {brl(plan.each)} sem juros no cartão
                 </p>
@@ -205,7 +205,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
           <p className="mt-6 text-[14px] leading-relaxed text-muted">
             {item.name} ({item.number}) é uma carta original de {item.gameLabel} da coleção{" "}
             {setLabel(item.game, item.set)},{item.variant ? ` versão ${item.variant},` : ""} em
-            condição {item.condition}, conferida uma a uma antes do envio. Pague por Pix ou cartão em até 6x sem juros,
+            condição {item.condition}, conferida uma a uma antes do envio. Pague por Pix ou cartão em até 6x{SEM_JUROS},
             receba em todo o Brasil pelos Correios ou retire na loja em Goiânia.
             {item.soldOut ? " No momento está esgotada: peça pelo WhatsApp e avisamos quando voltar." : ""}
           </p>
