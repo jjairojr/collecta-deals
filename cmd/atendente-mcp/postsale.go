@@ -134,8 +134,8 @@ type composeOutput struct {
 }
 
 const composeGuide = `Escreva como o Jairo, dono da loja, escreve do celular: 2 balões curtos separados por uma quebra de linha.
-Balão 1: agradecimento + carinho com o que comprou, numa frase só. Um produto: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙 Esse Jolteon é lindo demais, já tá separado aqui". Vários: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙 Suas cartas já tão separadas aqui", sem nomes.
-Balão 1 (shipped = true, o pedido já saiu): troque "já tá separado aqui" por "já tá a caminho" ("Suas cartas já tão a caminho"). Nunca diga que está separado.
+Balão 1: agradecimento + carinho com o que comprou, numa frase só. Um produto: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙 Esse Jolteon é lindo demais, vamos separar o seu pedido". Vários: "Oii [primeiro nome], tudo bem? Muito obrigado pela compra! 💙 Vamos separar o seu pedido", sem nomes.
+Balão 1 (shipped = true, o pedido já saiu): troque "vamos separar o seu pedido" por "já tá a caminho" ("Suas cartas já tão a caminho"). Nunca diga que o pedido já está separado.
 Balão 2 (Liga, com envio): "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br 🩷"
 Balão 2 (site, com envio): "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido 🩷"
 Balão 2 (retirada): "Se quiser, separo mais alguma coisa pra você pegar junto 🩷"
