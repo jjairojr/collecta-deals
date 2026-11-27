@@ -9,6 +9,7 @@ import {
   type VitrineBarImage,
   type VitrineImage,
   type VitrineConfig,
+  type VitrineHeroSlide,
   type VitrinePhrase,
   type VitrinePopup,
   type VitrineProduct,
@@ -23,6 +24,7 @@ const MAX_PHRASES = 6;
 const MAX_TIERS = 4;
 const MAX_BAR_IMAGES = 6;
 const MAX_POPUPS = 8;
+const MAX_SLIDES = 8;
 
 // Sizes sent to the art team (27/11): the site shows the art at these
 // proportions, so a file with another one gets cut. Weight is a target, not a
@@ -56,6 +58,14 @@ function emptyPopup(): VitrinePopup {
   return { enabled: false, sku: "", title: "", text: "" };
 }
 
+function emptySlide(): VitrineHeroSlide {
+  return { enabled: true, kind: "produto", sku: "", badge: "", phrase: "", href: "" };
+}
+
+function emptyImage(): VitrineImage {
+  return { desktop: "", mobile: "", alt: "" };
+}
+
 function emptyBarImage(): VitrineBarImage {
   return { desktop: "", mobile: "", alt: "", href: "" };
 }
@@ -78,7 +88,10 @@ function clean(c: VitrineConfig): VitrineConfig {
         }
       : undefined;
   const popups = (c.popups ?? []).filter((p) => p.enabled || p.sku.trim() || p.title.trim());
-  return { phrases, barImages, banner, popups };
+  const heroSlides = (c.heroSlides ?? [])
+    .filter((s) => (s.kind === "produto" ? Boolean(s.sku?.trim()) : hasImage(s.image) || Boolean(s.href?.trim())))
+    .map((s) => (s.kind === "produto" ? { ...s, image: undefined } : { ...s, sku: undefined }));
+  return { phrases, barImages, banner, popups, heroStyle: c.heroStyle ?? "vitrine", heroSlides };
 }
 
 // Puts what the server sent into the editing shape: an old single pop-up becomes
@@ -89,6 +102,8 @@ function editable(c: VitrineConfig): VitrineConfig {
     barImages: c.barImages ?? [],
     banner: c.banner ?? emptyBanner(),
     popups: c.popups ?? (c.popup ? [c.popup] : []),
+    heroStyle: c.heroStyle ?? "vitrine",
+    heroSlides: c.heroSlides ?? [],
     updatedAt: c.updatedAt,
   };
 }
@@ -148,6 +163,18 @@ export default function VitrinePage() {
   const tiers = banner.tiers ?? [];
   const setTiers = (t: VitrineTier[]) => setBanner({ tiers: t });
   const popups = config.popups ?? [];
+  const slides = config.heroSlides ?? [];
+  const setSlide = (i: number, p: Partial<VitrineHeroSlide>) =>
+    setConfig({ ...config, heroSlides: slides.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+  const moveSlide = (i: number, delta: number) => {
+    const j = i + delta;
+    if (j < 0 || j >= slides.length) {
+      return;
+    }
+    const next = [...slides];
+    [next[i], next[j]] = [next[j], next[i]];
+    setConfig({ ...config, heroSlides: next });
+  };
   const setPopup = (i: number, p: Partial<VitrinePopup>) =>
     setConfig({ ...config, popups: popups.map((x, j) => (j === i ? { ...x, ...p } : x)) });
   const barImages = config.barImages ?? [];
@@ -158,6 +185,86 @@ export default function VitrinePage() {
 
   return (
     <div className="space-y-4">
+      <Card className="space-y-3 p-4">
+        <SectionTitle
+          title="Carrossel do topo da home"
+          hint="Substitui o topo da home enquanto houver um slide valendo. Produto: foto, nome, preço no Pix e parcela vêm do catálogo; some sozinho se sair de estoque ou da data. Imagem: a arte enviada (computador 2720×800, celular 1080×1080), com link. A ordem da lista é a ordem do carrossel. Sem slide valendo, volta o topo de sempre."
+        />
+        <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+          {([
+            ["vitrine", "Vitrine: um produto por vez, grande, fundo limpo"],
+            ["destaque", "Destaque: cards com a cor do jogo, dois por vez no computador"],
+          ] as const).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-2">
+              <input type="radio" name="heroStyle" checked={(config.heroStyle ?? "vitrine") === value} onChange={() => setConfig({ ...config, heroStyle: value })} />
+              {label}
+            </label>
+          ))}
+        </div>
+        {slides.map((slide, i) => (
+          <div key={i} className="space-y-2 rounded-md border border-slate-800 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-4 text-sm text-slate-300">
+                <span className="text-slate-500">#{i + 1}</span>
+                <label className="flex items-center gap-2">
+                  <Checkbox checked={slide.enabled} onChange={(e) => setSlide(i, { enabled: e.target.checked })} />
+                  Ligado
+                </label>
+                <select
+                  className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm"
+                  value={slide.kind}
+                  onChange={(e) => setSlide(i, e.target.value === "imagem" ? { kind: "imagem", image: slide.image ?? emptyImage() } : { kind: "produto" })}
+                >
+                  <option value="produto">Produto</option>
+                  <option value="imagem">Imagem</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" onClick={() => moveSlide(i, -1)} disabled={i === 0} aria-label="Subir slide">↑</Button>
+                <Button variant="ghost" onClick={() => moveSlide(i, 1)} disabled={i === slides.length - 1} aria-label="Descer slide">↓</Button>
+                <Button variant="ghost" onClick={() => setConfig({ ...config, heroSlides: slides.filter((_, j) => j !== i) })} aria-label="Remover slide">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {slide.kind === "produto" ? (
+              <Field label="Produto (kits aparecem como “Kit N”)">
+                <ProductPicker products={products} value={slide.sku ?? ""} onChange={(sku) => setSlide(i, { sku })} />
+              </Field>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                  <ImageUpload label="Computador" spec={ART.banner.desktop} value={slide.image?.desktop ?? ""} onChange={(desktop) => setSlide(i, { image: { ...(slide.image ?? emptyImage()), desktop } })} />
+                  <ImageUpload label="Celular" spec={ART.banner.mobile} value={slide.image?.mobile ?? ""} onChange={(mobile) => setSlide(i, { image: { ...(slide.image ?? emptyImage()), mobile } })} />
+                </div>
+                <Field label="Descrição (para quem não vê a imagem)">
+                  <Input value={slide.image?.alt ?? ""} maxLength={120} onChange={(e) => setSlide(i, { image: { ...(slide.image ?? emptyImage()), alt: e.target.value } })} />
+                </Field>
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-[140px_1fr_1fr_160px_160px]">
+              <Field label="Selo">
+                <Input value={slide.badge ?? ""} maxLength={20} placeholder="Kit, Natal…" onChange={(e) => setSlide(i, { badge: e.target.value })} />
+              </Field>
+              <Field label="Frase (até 90 letras)">
+                <Input value={slide.phrase ?? ""} maxLength={90} placeholder="sem preço, frete ou pressa" onChange={(e) => setSlide(i, { phrase: e.target.value })} />
+              </Field>
+              <Field label={slide.kind === "imagem" ? "Link do site" : "Link (opcional; padrão: página do produto)"}>
+                <Input value={slide.href ?? ""} placeholder="ex.: /selado/pokemon" onChange={(e) => setSlide(i, { href: e.target.value })} />
+              </Field>
+              <DateField label="de" value={slide.from} onChange={(v) => setSlide(i, { from: v })} />
+              <DateField label="até" value={slide.until} onChange={(v) => setSlide(i, { until: v })} />
+            </div>
+          </div>
+        ))}
+        {slides.length < MAX_SLIDES && (
+          <Button variant="ghost" onClick={() => setConfig({ ...config, heroSlides: [...slides, emptySlide()] })}>
+            <Plus className="h-4 w-4" />
+            Slide
+          </Button>
+        )}
+      </Card>
+
       <Card className="space-y-3 p-4">
         <SectionTitle title="Faixa do topo" hint="Frases extras que entram antes das fixas, cada uma com datas. Até 70 letras." />
         {config.phrases.map((p, i) => (

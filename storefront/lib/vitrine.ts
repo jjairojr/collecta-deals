@@ -38,11 +38,25 @@ export interface VitrinePopup {
   text?: string;
 }
 
+/** One slide of the home carousel, as the backend sends it (already live today). */
+export interface VitrineHeroSlide {
+  kind: "produto" | "imagem";
+  sku?: string;
+  image?: VitrineImage;
+  badge?: string;
+  phrase?: string;
+  href?: string;
+}
+
+export type HeroStyle = "vitrine" | "destaque";
+
 export interface VitrineLive {
   phrases: string[];
   barImage?: VitrineBarImage;
   banner?: VitrineBanner;
   popup?: VitrinePopup;
+  heroStyle?: HeroStyle;
+  heroSlides?: VitrineHeroSlide[];
 }
 
 const EMPTY: VitrineLive = { phrases: [] };
@@ -73,11 +87,23 @@ export async function loadVitrine(): Promise<VitrineLive> {
     }
     const data = (await res.json()) as Partial<VitrineLive>;
     const banner = data.banner?.title ? data.banner : undefined;
+    const heroSlides = (Array.isArray(data.heroSlides) ? data.heroSlides : []).flatMap((sl): VitrineHeroSlide[] => {
+      if (sl.kind === "produto" && sl.sku) {
+        return [sl];
+      }
+      if (sl.kind === "imagem" && sl.image && sl.href) {
+        const image = withImage(base, sl.image);
+        return image ? [{ ...sl, image }] : [];
+      }
+      return [];
+    });
     return {
       phrases: Array.isArray(data.phrases) ? data.phrases.filter((p) => typeof p === "string" && p.trim()) : [],
       barImage: data.barImage?.href ? withImage(base, data.barImage) : undefined,
       banner: banner ? { ...banner, image: banner.image && banner.href ? withImage(base, banner.image) : undefined } : undefined,
       popup: data.popup?.sku ? data.popup : undefined,
+      heroStyle: data.heroStyle === "destaque" ? "destaque" : "vitrine",
+      heroSlides,
     };
   } catch {
     return EMPTY;
@@ -92,14 +118,14 @@ export interface PopupProduct {
   line: Omit<CartLine, "qty">;
 }
 
-function productHref(item: { kind: string; slug: string }): string {
+export function productHref(item: { kind: string; slug: string }): string {
   if (item.kind === "single") {
     return `/carta/${item.slug}`;
   }
   return item.kind === "accessory" ? `/acessorio/${item.slug}` : `/selado/${item.slug}`;
 }
 
-function findKit(catalog: Catalog, sku: string): { product: Sealed | Accessory; kit: KitOffer } | null {
+export function findKit(catalog: Catalog, sku: string): { product: Sealed | Accessory; kit: KitOffer } | null {
   for (const product of [...catalog.sealed, ...catalog.accessories]) {
     const kit = product.kits?.find((k) => k.sku === sku);
     if (kit) {

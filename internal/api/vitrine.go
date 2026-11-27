@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -67,6 +68,21 @@ func (s *Server) handleVitrinePut(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Same rule for the carousel: a product slide live today must be on sale.
+	for i, sl := range c.HeroSlidesOn(s.psNow()) {
+		if sl.Kind != vitrine.SlideProduct {
+			continue
+		}
+		ok, err := s.popupSKUListed(sl.SKU)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			writeError(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("o SKU %s do slide %d de hoje não está à venda na vitrine", sl.SKU, i+1)})
+			return
+		}
+	}
 	saved, err := s.Vitrine.Put(c, s.psNow())
 	if errors.Is(err, vitrine.ErrInvalid) {
 		writeError(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -94,6 +110,21 @@ func (s *Server) handleVitrineLive(w http.ResponseWriter, r *http.Request) {
 			live.Popup = &cp
 			break
 		}
+	}
+	// Product slides whose SKU went out of stock (or off the vitrine) drop out on
+	// their own; with none left the site keeps its usual hero.
+	slides := live.HeroSlides[:0:0]
+	for _, sl := range live.HeroSlides {
+		if sl.Kind == vitrine.SlideProduct {
+			if ok, err := s.popupSKUListed(sl.SKU); err != nil || !ok {
+				continue
+			}
+		}
+		slides = append(slides, sl)
+	}
+	live.HeroSlides = slides
+	if len(slides) == 0 {
+		live.HeroStyle = ""
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, live)

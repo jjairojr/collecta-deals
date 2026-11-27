@@ -36,6 +36,7 @@ export default function ArtPlaceholder({
   alt = "",
   priority = false,
   sizes = "(min-width: 1024px) 240px, (min-width: 640px) 30vw, 45vw",
+  fit = "cover",
 }: {
   hue?: Hue;
   angle?: Angle;
@@ -45,6 +46,8 @@ export default function ArtPlaceholder({
   priority?: boolean;
   /** How wide the photo shows, for the optimizer to pick the file (next/image `sizes`). */
   sizes?: string;
+  /** "contain" shows the whole product (boxes in the home carousel); default crops to fill. */
+  fit?: "cover" | "contain";
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -61,7 +64,7 @@ export default function ArtPlaceholder({
         sizes={sizes}
         priority={priority}
         onError={() => setFailed(true)}
-        className="h-full w-full object-cover"
+        className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
       />
     );
   }
@@ -77,7 +80,7 @@ export default function ArtPlaceholder({
         fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         onError={() => setFailed(true)}
-        className="h-full w-full object-cover"
+        className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
       />
     );
   }
