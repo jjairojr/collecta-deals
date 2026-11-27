@@ -37,6 +37,23 @@ export const STORE_MAPS_URL = `https://www.google.com/maps/search/?api=1&query=$
 export const STORE_MAPS_EMBED_URL = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
 export const STORE_WHATSAPP_URL = `https://wa.me/${STORE.phoneDigits}`;
 
+/**
+ * The store's WhatsApp number for wa.me links, always with the country code
+ * (wa.me needs it). NEXT_PUBLIC_WHATSAPP can override it, but a number saved
+ * without the 55 (as it was on Vercel: 62993399980) gets it added, and anything
+ * that is not a Brazilian number falls back to STORE.phoneDigits.
+ */
+export function storeWhatsAppDigits(): string {
+  const raw = (process.env.NEXT_PUBLIC_WHATSAPP ?? "").replace(/\D/g, "");
+  if (raw.length === 10 || raw.length === 11) {
+    return `55${raw}`;
+  }
+  if (raw.startsWith("55") && (raw.length === 12 || raw.length === 13)) {
+    return raw;
+  }
+  return STORE.phoneDigits;
+}
+
 export const STORE_PHOTOS = [
   { src: "/loja/fachada.jpg", alt: "Fachada rosa da Collecta TCG na Galeria Badra, Setor Oeste, Goiânia", width: 957, height: 1200 },
   { src: "/loja/interior.jpg", alt: "Interior da Collecta TCG com vitrines de cartas, geladeira e mesas de jogo", width: 960, height: 1200 },

@@ -3,6 +3,7 @@ import Container from "@/components/ui/Container";
 import SectionHead from "@/components/ui/SectionHead";
 import WhatsAppLink from "@/components/chrome/WhatsAppLink";
 import Section from "@/components/ui/DocSection";
+import { storeWhatsAppDigits } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "Política de devolução e trocas",
@@ -12,8 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default function PoliticaDeDevolucaoPage() {
-  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP;
-  const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}` : "https://wa.me/";
+  const whatsappHref = `https://wa.me/${storeWhatsAppDigits()}`;
 
   return (
     <Container narrow className="py-9">

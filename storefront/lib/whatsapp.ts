@@ -1,4 +1,5 @@
 import { brl } from "@/lib/format";
+import { storeWhatsAppDigits } from "@/lib/store";
 import type { CartLine } from "@/lib/types";
 
 export interface OrderCoupon {
@@ -25,9 +26,5 @@ export function buildOrder(lines: CartLine[], total: number, coupons: OrderCoupo
 }
 
 export function whatsappURL(text: string): string {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP ?? "";
-  const encoded = encodeURIComponent(text);
-  return number
-    ? `https://wa.me/${number}?text=${encoded}`
-    : `https://wa.me/?text=${encoded}`;
+  return `https://wa.me/${storeWhatsAppDigits()}?text=${encodeURIComponent(text)}`;
 }
