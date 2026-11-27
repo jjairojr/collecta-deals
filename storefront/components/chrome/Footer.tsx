@@ -2,11 +2,10 @@ import Link from "next/link";
 import Container from "@/components/ui/Container";
 import TrackedLink from "@/components/chrome/TrackedLink";
 import WhatsAppLink from "@/components/chrome/WhatsAppLink";
-import { STORE, STORE_ADDRESS_LINE, STORE_MAPS_URL } from "@/lib/store";
+import { STORE, STORE_ADDRESS_LINE, STORE_MAPS_URL, storeWhatsAppDigits } from "@/lib/store";
 
 export default function Footer() {
-  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP;
-  const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}` : "https://wa.me/";
+  const whatsappHref = `https://wa.me/${storeWhatsAppDigits()}`;
 
   return (
     <footer className="mt-16 border-t-[6px] border-outline bg-brand">
