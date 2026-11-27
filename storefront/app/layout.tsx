@@ -5,9 +5,11 @@ import "./globals.css";
 import { AccountProvider } from "@/lib/account";
 import { CartProvider } from "@/lib/cart";
 import { gradedGames, loadCatalog } from "@/lib/catalog";
+import { loadVitrine, popupProduct } from "@/lib/vitrine";
 import { organizationJsonLd, storeJsonLd, webSiteJsonLd } from "@/lib/seo";
 import { siteURL } from "@/lib/site";
 import AnnouncementBar from "@/components/chrome/AnnouncementBar";
+import ExitPopup from "@/components/promo/ExitPopup";
 import Header from "@/components/chrome/Header";
 import TabBar from "@/components/chrome/TabBar";
 import Footer from "@/components/chrome/Footer";
@@ -65,7 +67,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const catalog = await loadCatalog();
+  const [catalog, vitrine] = await Promise.all([loadCatalog(), loadVitrine()]);
   const { navGames, accessories } = catalog;
   const graded = gradedGames(catalog);
   const games = navGames.map((g) => ({ id: g.id, name: g.name, graded: graded.has(g.id) }));
@@ -82,12 +84,13 @@ export default async function RootLayout({
         <AccountProvider>
         <CartProvider>
           <Scanlines />
-          <AnnouncementBar freeShippingMinBRL={catalog.freeShippingMinBRL} />
+          <AnnouncementBar extra={vitrine.phrases} freeShippingMinBRL={catalog.freeShippingMinBRL} />
           <Header />
           <TabBar games={games} showAccessories={showAccessories} />
           <main className="min-h-[60vh]">{children}</main>
           <Footer />
           <CartToast accessory={pickCardAccessory(accessories)} />
+          <ExitPopup product={popupProduct(catalog, vitrine.popup)} />
         </CartProvider>
         </AccountProvider>
         <MetaPixel />

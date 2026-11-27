@@ -28,13 +28,22 @@ function NoteRow({ notes, hidden }: { notes: string[]; hidden?: boolean }) {
   );
 }
 
-// The free shipping line only shows when the backend reports the rule
-// (freeShippingMinBRL), so the bar never promises what the checkout does not give.
-export default function AnnouncementBar({ freeShippingMinBRL = 0 }: { freeShippingMinBRL?: number }) {
-  const notes =
-    freeShippingMinBRL > 0
-      ? [`FRETE GRATIS NO PAC ACIMA DE ${freeShippingMinLabel(freeShippingMinBRL)}`, ...NOTES]
-      : [...NOTES];
+// `extra` are the phrases from the dashboard's "Vitrine" screen that are live
+// today; they lead the bar. The free shipping line only shows when the backend
+// reports the rule (freeShippingMinBRL), so the bar never promises what the
+// checkout does not give.
+export default function AnnouncementBar({
+  extra = [],
+  freeShippingMinBRL = 0,
+}: {
+  extra?: string[];
+  freeShippingMinBRL?: number;
+}) {
+  const notes = [
+    ...extra,
+    ...(freeShippingMinBRL > 0 ? [`FRETE GRATIS NO PAC ACIMA DE ${freeShippingMinLabel(freeShippingMinBRL)}`] : []),
+    ...NOTES,
+  ];
   return (
     <div className="overflow-hidden border-b-4 border-outline bg-royal py-2 text-brand-soft">
       <div className="flex w-max animate-marquee sm:hidden">
