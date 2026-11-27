@@ -104,7 +104,7 @@ func (s *Server) notify(title, msg string) {
 }
 
 func renderOffer(firstName string, number int, pitch string) string {
-	return fmt.Sprintf("Oi %s! Obrigado por comprar na Collecta 💗 Seu pedido #%d tá sendo separado. Quer aproveitar o mesmo frete? %s Responde aqui que a gente adiciona antes de enviar!", firstName, number, pitch)
+	return fmt.Sprintf("Oi %s! Obrigado por comprar na Collecta 💗 Vamos separar o seu pedido #%d. Quer aproveitar o mesmo frete? %s Responde aqui que a gente adiciona antes de enviar!", firstName, number, pitch)
 }
 
 func offerText(c conversations.Conversation) string {

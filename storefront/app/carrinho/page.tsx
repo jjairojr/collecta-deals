@@ -11,10 +11,10 @@ export const metadata = {
 export const revalidate = 60;
 
 export default async function CarrinhoPage() {
-  const { sealed } = await loadCatalog();
+  const { sealed, freeShippingMinBRL } = await loadCatalog();
   return (
     <Suspense>
-      <CartView kitOffer={pickBoosterKit(sealed)} />
+      <CartView kitOffer={pickBoosterKit(sealed)} freeShippingMinBRL={freeShippingMinBRL} />
     </Suspense>
   );
 }

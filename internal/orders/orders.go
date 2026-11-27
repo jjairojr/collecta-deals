@@ -103,10 +103,13 @@ type Address struct {
 }
 
 type Shipping struct {
-	ServiceID    int     `json:"serviceID"`
-	ServiceName  string  `json:"serviceName"`
-	Company      string  `json:"company"`
-	PriceBRL     float64 `json:"priceBRL"`
+	ServiceID   int     `json:"serviceID"`
+	ServiceName string  `json:"serviceName"`
+	Company     string  `json:"company"`
+	PriceBRL    float64 `json:"priceBRL"`
+	// CostBRL is the carrier's quoted price for the chosen service, also when the
+	// buyer pays nothing (free PAC): the freight the store pays is CostBRL - PriceBRL.
+	CostBRL      float64 `json:"costBRL,omitempty"`
 	DeliveryDays int     `json:"deliveryDays"`
 	JoinOrder    int     `json:"joinOrder,omitempty"`
 }

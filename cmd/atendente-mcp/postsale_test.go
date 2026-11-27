@@ -220,7 +220,7 @@ func TestComposeListAndMessageMapping(t *testing.T) {
 	if n := len(api.all()); n != 1 {
 		t.Fatalf("dash text reached the server: %d requests", n)
 	}
-	text := "Oii Ana, tudo bem? Muito obrigado pela compra! 💙\nEsse Shanks é lindo demais, já tá separado aqui\nSe quiser, separo mais alguma coisa pra você pegar junto 🩷"
+	text := "Oii Ana, tudo bem? Muito obrigado pela compra! 💙\nEsse Shanks é lindo demais, vamos separar o seu pedido\nSe quiser, separo mais alguma coisa pra você pegar junto 🩷"
 	out, errText := callWith[composeInput, replyOutput](t, f, "posvenda_mensagem", composeInput{ConversaID: "c9", Texto: text})
 	if errText != "" || out.Status != "draft" {
 		t.Fatalf("compose %+v %q", out, errText)

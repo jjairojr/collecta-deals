@@ -3,7 +3,9 @@ import Link from "next/link";
 import Container from "@/components/ui/Container";
 import Section from "@/components/ui/DocSection";
 import SectionHead from "@/components/ui/SectionHead";
+import { loadCatalog } from "@/lib/catalog";
 import { brl } from "@/lib/format";
+import { freeShippingMinLabel } from "@/lib/free-shipping";
 import { SHIPPING, STORE_ADDRESS_LINE } from "@/lib/store";
 
 const handling = `${SHIPPING.handlingDays[1]} ${SHIPPING.handlingDays[1] === 1 ? "dia útil" : "dias úteis"}`;
@@ -14,7 +16,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/frete" },
 };
 
-export default function FretePage() {
+export const revalidate = 60;
+
+export default async function FretePage() {
+  const { freeShippingMinBRL } = await loadCatalog();
   return (
     <Container narrow className="py-9">
       <SectionHead title="Frete e prazo de entrega" eyebrow="COLLECTA" size="md" heading="h1" />
@@ -24,6 +29,14 @@ export default function FretePage() {
             O frete é calculado pelo CEP no checkout, com as opções de entrega disponíveis para o seu endereço e o preço
             de cada uma. O envio mais barato começa em cerca de {brl(SHIPPING.minBRL * 100)}.
           </p>
+          {freeShippingMinBRL > 0 && (
+            <p>
+              <strong>Frete grátis no PAC para todo o Brasil</strong> em compras a partir de{" "}
+              {freeShippingMinLabel(freeShippingMinBRL)} em produtos: no checkout, a opção PAC dos Correios sai de
+              graça. As outras opções de envio continuam pagas. O valor conta o preço da forma de pagamento escolhida
+              (Pix ou cartão), sem o frete. Se o PAC não atender o seu CEP, não há opção grátis.
+            </p>
+          )}
         </Section>
         <Section title="Prazo">
           <p>
