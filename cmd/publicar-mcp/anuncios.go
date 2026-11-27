@@ -100,12 +100,16 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		}
 		t.Link = link
 	}
-	available, err := a.adBudgetLeft(ctx)
+	available, err := a.adBudgetLeft(ctx, t.Objective)
 	if err != nil {
 		return nil, proposeOutput{}, err
 	}
 	if t.BudgetCents > available {
-		return nil, proposeOutput{}, fmt.Errorf("cabem só %s na semana: proponha um teste menor ou espere", reais(available))
+		pool := "na semana"
+		if t.Objective == "mensagens" {
+			pool = "na verba de compra de cartas (R$ 250 por semana e R$ 1.000 por mês)"
+		}
+		return nil, proposeOutput{}, fmt.Errorf("cabem só %s %s: proponha um teste menor ou espere", reais(available), pool)
 	}
 	stage := filepath.Join(a.cfg.DataDir, "anuncios", randomID())
 	creatives, err := a.stageCreatives(stage, in.Criativos)
@@ -142,12 +146,18 @@ func siteLink(raw string) (string, error) {
 	return u.String(), nil
 }
 
-func (a *app) adBudgetLeft(ctx context.Context) (int64, error) {
+// adBudgetLeft is what a new test of this objective can still spend: mensagens
+// (compra de cartas) has its own budget on the dashboard, apart from sales.
+func (a *app) adBudgetLeft(ctx context.Context, objective string) (int64, error) {
 	var list struct {
-		AvailableCents int64 `json:"availableCents"`
+		AvailableCents         int64 `json:"availableCents"`
+		AvailableMessagesCents int64 `json:"availableMessagesCents"`
 	}
 	if err := a.call(ctx, http.MethodGet, "/api/adtests?status="+adtestq.StatusRunning, nil, &list); err != nil {
 		return 0, err
+	}
+	if objective == "mensagens" {
+		return list.AvailableMessagesCents, nil
 	}
 	return list.AvailableCents, nil
 }
@@ -265,17 +275,20 @@ type adStatusItem struct {
 type adStatusOutput struct {
 	Testes      []adStatusItem `json:"testes"`
 	SobraSemana string         `json:"sobra_na_semana"`
+	// SobraMensagens is the separate buying budget (mensagens) still free.
+	SobraMensagens string `json:"sobra_compra_de_cartas"`
 }
 
 func (a *app) toolAdTests(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, adStatusOutput, error) {
 	var list struct {
-		Items          []adtestq.Test `json:"items"`
-		AvailableCents int64          `json:"availableCents"`
+		Items                  []adtestq.Test `json:"items"`
+		AvailableCents         int64          `json:"availableCents"`
+		AvailableMessagesCents int64          `json:"availableMessagesCents"`
 	}
 	if err := a.call(ctx, http.MethodGet, "/api/adtests", nil, &list); err != nil {
 		return nil, adStatusOutput{}, err
 	}
-	out := adStatusOutput{Testes: []adStatusItem{}, SobraSemana: reais(list.AvailableCents)}
+	out := adStatusOutput{Testes: []adStatusItem{}, SobraSemana: reais(list.AvailableCents), SobraMensagens: reais(list.AvailableMessagesCents)}
 	since := a.now().Add(-adStatusSince)
 	for _, t := range list.Items {
 		if t.CreatedAt.Before(since) {

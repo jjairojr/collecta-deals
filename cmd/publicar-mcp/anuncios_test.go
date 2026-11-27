@@ -44,11 +44,12 @@ func (f *fixture) serveAds(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/api/adtests":
 		all, lerr := f.ads.List(r.URL.Query().Get("status"))
 		avail, aerr := f.ads.Available()
-		if lerr != nil || aerr != nil {
-			writeErr(errors.Join(lerr, aerr))
+		msgs, merr := f.ads.AvailableFor("mensagens")
+		if lerr != nil || aerr != nil || merr != nil {
+			writeErr(errors.Join(lerr, aerr, merr))
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"items": all, "availableCents": avail})
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": all, "availableCents": avail, "availableMessagesCents": msgs})
 		return
 	case action == "started":
 		var in struct {
@@ -704,5 +705,34 @@ func TestMessagesMeasuredByConversations(t *testing.T) {
 	metric, count := measure("mensagens", rows)
 	if metric != "conversas iniciadas" || count(rows[0]) != 6 || count(rows[1]) != 0 {
 		t.Fatalf("métrica = %q %v %v", metric, count(rows[0]), count(rows[1]))
+	}
+}
+
+// A verba de compra de cartas (mensagens) é separada da de vendas: um teste de
+// mensagens passa mesmo com a semana de vendas cheia.
+func TestMessagesUseOwnBudget(t *testing.T) {
+	f, _, _ := newAdFixture(t)
+	for i := 0; i < 2; i++ {
+		args := proposeArgs(f.creatives(t), 300)
+		if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+			t.Fatal(errText)
+		}
+	}
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 50)); !strings.Contains(errText, "na semana") {
+		t.Fatalf("vendas devia estar cheia: %q", errText)
+	}
+	msg := proposeArgs(f.creatives(t), 150)
+	msg["objetivo"] = "mensagens"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", msg); errText != "" {
+		t.Fatalf("mensagens tem verba própria: %q", errText)
+	}
+	msg2 := proposeArgs(f.creatives(t), 150)
+	msg2["objetivo"] = "mensagens"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", msg2); !strings.Contains(errText, "compra de cartas") {
+		t.Fatalf("mensagens passou de R$ 250 na semana: %q", errText)
+	}
+	status, _ := callTool[adStatusOutput](t, f, "testes_anuncio", nil)
+	if status.SobraMensagens != "R$ 100,00" {
+		t.Fatalf("sobra de compra de cartas = %q", status.SobraMensagens)
 	}
 }
