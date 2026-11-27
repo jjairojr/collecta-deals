@@ -30,6 +30,7 @@ const PIXEL_EVENTS: Record<string, string> = {
   add_to_wishlist: "AddToWishlist",
   search: "Search",
   begin_checkout: "InitiateCheckout",
+  add_payment_info: "AddPaymentInfo",
   generate_lead: "Lead",
   purchase: "Purchase",
   whatsapp_contact: "Contact",
@@ -198,6 +199,25 @@ export function trackBeginCheckout(
     currency: CURRENCY,
     value: reais(totalCents),
     coupon,
+    items: lines.map(cartLineItem),
+  });
+}
+
+// Checkout steps: the shipping chosen (step 2) and the payment chosen (step 3).
+export function trackAddShippingInfo(lines: CartLine[], totalCents: number, tier: string): void {
+  send("add_shipping_info", {
+    currency: CURRENCY,
+    value: reais(totalCents),
+    shipping_tier: tier,
+    items: lines.map(cartLineItem),
+  });
+}
+
+export function trackAddPaymentInfo(lines: CartLine[], totalCents: number, paymentType: string): void {
+  send("add_payment_info", {
+    currency: CURRENCY,
+    value: reais(totalCents),
+    payment_type: paymentType,
     items: lines.map(cartLineItem),
   });
 }
