@@ -106,7 +106,7 @@ export default async function SeladoSlugPage({
           <CategoryIntro>
             {list.length > 0 ? `${list.length} produtos selados de ${gameName} em estoque: ` : `Produtos selados de ${gameName}: `}
             booster boxes, ETBs, bundles, blisters e decks com lacre original de fábrica, conferidos antes do envio. Pix ou
-            cartão em até 12x, envio para todo o Brasil ou retirada na loja em Goiânia.
+            cartão em até 6x sem juros, envio para todo o Brasil ou retirada na loja em Goiânia.
           </CategoryIntro>
           <SealedGrid
             list={list}

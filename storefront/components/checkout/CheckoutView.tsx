@@ -725,7 +725,7 @@ export default function CheckoutView({ joinOrder: initialJoin }: { joinOrder?: s
               />
               <OptionChip
                 title="Cartão de crédito"
-                detail={`em até ${installments}x`}
+                detail={`em até ${installments}x sem juros`}
                 price={brl(cardCents)}
                 selected={payment === "card"}
                 onSelect={() => setPayment("card")}
@@ -900,7 +900,7 @@ export default function CheckoutView({ joinOrder: initialJoin }: { joinOrder?: s
             </span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            {payment === "pix" ? "no Pix" : `no cartão em até ${installments}x`}
+            {payment === "pix" ? "no Pix" : `no cartão em até ${installments}x sem juros`}
           </p>
           {shipsFrom && (
             <p className="mt-3 rounded-[8px] border-[3px] border-brand px-3 py-2 text-xs text-white">

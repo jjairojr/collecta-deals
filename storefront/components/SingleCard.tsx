@@ -7,7 +7,7 @@ import { brl } from "@/lib/format";
 import { gameArtHue } from "@/lib/games";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import { singleToCartLine } from "@/lib/cart-lines";
-import { installmentPlan } from "@/lib/payment";
+import { installmentPlan, unitPriceFor } from "@/lib/payment";
 import { stockLabel } from "@/lib/stock";
 import type { Single } from "@/lib/types";
 
@@ -21,7 +21,7 @@ export default function SingleCard({
   showLanguage?: boolean;
 }) {
   const { add } = useCart();
-  const plan = installmentPlan(item.price);
+  const plan = installmentPlan(unitPriceFor(item, "card"));
 
   const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -75,7 +75,7 @@ export default function SingleCard({
           </span>
           {plan && (
             <span className="-mt-1 truncate text-[11px] text-muted">
-              ou {plan.count}x de {brl(plan.each)}
+              ou {plan.count}x de {brl(plan.each)} sem juros
             </span>
           )}
           <button

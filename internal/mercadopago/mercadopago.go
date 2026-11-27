@@ -159,7 +159,7 @@ func paymentMethods(method Method, installments int) *preference.PaymentMethodsR
 		excluded = append(excluded, "bank_transfer")
 	}
 	if installments <= 0 {
-		installments = 12
+		installments = 6
 	}
 	types := make([]preference.ExcludedPaymentTypeRequest, 0, len(excluded))
 	for _, id := range excluded {

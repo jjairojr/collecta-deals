@@ -2,7 +2,7 @@ import "server-only";
 import { loadCatalog } from "@/lib/catalog";
 import { feedID, maker } from "@/lib/product-id";
 import { absoluteURL } from "@/lib/site";
-import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS } from "@/lib/payment";
+import { MAX_INSTALLMENTS } from "@/lib/payment";
 import type { Accessory, Sealed, Single } from "@/lib/types";
 
 // One normalized catalog row, serialized by the Google Merchant (RSS) and Meta
@@ -92,7 +92,7 @@ function singleRow(s: Single): FeedItem | null {
       150,
     ),
     description: clamp(
-      `Carta ${s.name}${numberNote} de ${s.gameLabel}${setNote}${variantNote}, condição ${s.condition}. Conferida uma a uma na Collecta. Pix ou cartão em até 12x e envio para todo o Brasil.`,
+      `Carta ${s.name}${numberNote} de ${s.gameLabel}${setNote}${variantNote}, condição ${s.condition}. Conferida uma a uma na Collecta. Pix ou cartão em até 6x sem juros e envio para todo o Brasil.`,
       5000,
     ),
     link: absoluteURL(`/carta/${s.slug}`),
@@ -130,7 +130,7 @@ async function sealedRow(s: Sealed): Promise<FeedItem | null> {
       150,
     ),
     description: clamp(
-      `Comprar ${s.name} lacrado na Collecta: ${s.format ?? "produto selado"} de ${s.gameLabel}${lang}, com lacre original. Pix ou cartão em até ${s.cardPrice !== undefined ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS}x e envio para todo o Brasil.`,
+      `Comprar ${s.name} lacrado na Collecta: ${s.format ?? "produto selado"} de ${s.gameLabel}${lang}, com lacre original. Pix ou cartão em até ${MAX_INSTALLMENTS}x sem juros e envio para todo o Brasil.`,
       5000,
     ),
     link: absoluteURL(`/selado/${s.slug}`),
@@ -157,7 +157,7 @@ async function accessoryRow(a: Accessory): Promise<FeedItem | null> {
     id: feedID(a.slug),
     title: clamp(`${a.name} — Acessório TCG`, 150),
     description: clamp(
-      `${a.name} — acessório para card game, produto novo, serve para qualquer jogo. Pix ou cartão em até 12x e envio para todo o Brasil na Collecta.`,
+      `${a.name} — acessório para card game, produto novo, serve para qualquer jogo. Pix ou cartão em até 6x sem juros e envio para todo o Brasil na Collecta.`,
       5000,
     ),
     link: absoluteURL(`/acessorio/${a.slug}`),

@@ -1,10 +1,13 @@
 export type PaymentMethod = "pix" | "card";
 
-export const MAX_INSTALLMENTS = 12;
-export const CARD_PRICED_INSTALLMENTS = 6;
+// Até 6x sem juros no cartão, para todos os produtos, sempre sobre o preço no
+// cartão (decisão do Jairo, 27/11). O checkout manda o mesmo limite ao Mercado Pago.
+export const MAX_INSTALLMENTS = 6;
+/** Mesmo limite de MAX_INSTALLMENTS: o preço no cartão não muda mais o parcelamento. */
+export const CARD_PRICED_INSTALLMENTS = MAX_INSTALLMENTS;
 
-export function installmentsFor(items: { cardPrice?: number }[]): number {
-  return items.some((i) => i.cardPrice !== undefined) ? CARD_PRICED_INSTALLMENTS : MAX_INSTALLMENTS;
+export function installmentsFor(_items: { cardPrice?: number }[]): number {
+  return MAX_INSTALLMENTS;
 }
 
 export function unitPriceFor(item: { price: number; cardPrice?: number }, method: PaymentMethod): number {

@@ -42,9 +42,11 @@ type Checkout struct {
 }
 
 const (
-	maxLineQty             = 20
-	maxInstallments        = 12
-	cardPricedInstallments = 6
+	maxLineQty = 20
+	// Até 6x sem juros no cartão, em todos os pedidos (decisão do Jairo, 27/11:
+	// "a partir de 6x cobramos taxa da maquininha"). Pix é sempre 1x.
+	maxInstallments        = 6
+	cardPricedInstallments = maxInstallments
 )
 
 var (
@@ -796,11 +798,6 @@ func installments(o orders.Order) int {
 	switch o.PaymentMethod {
 	case orders.PaymentPix:
 		return 1
-	case orders.PaymentAny:
-		return maxInstallments
-	}
-	if anyCardPriced(o.Lines) {
-		return cardPricedInstallments
 	}
 	return maxInstallments
 }

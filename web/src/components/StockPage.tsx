@@ -892,7 +892,7 @@ export default function StockPage() {
               </div>
             </div>
             <p className="mt-2 text-[11px] text-slate-500">
-              O preço da tabela vale para o Pix. Com preço no cartão, o cartão sai em até 6x. Deixe a data em
+              O preço da tabela vale para o Pix. O cartão sai em até 6x sem juros, sobre o preço no cartão. Deixe a data em
               branco quando o produto já estiver em estoque.
             </p>
 
