@@ -24,15 +24,19 @@ const (
 	MaxPhrases   = 6
 	MaxBarImages = 6
 	MaxPopups    = 8
-	maxAltLen    = 120
-	MaxTiers     = 4
-	maxPhraseLen = 70
-	maxTitleLen  = 60
-	maxTextLen   = 160
-	maxLabelLen  = 30
-	maxCTALen    = 24
-	dateLayout   = "2006-01-02"
-	siteOrigin   = "https://www.collectatcg.com.br/"
+	// MaxHeroSlides caps the home carousel.
+	MaxHeroSlides     = 8
+	maxSlidePhraseLen = 90
+	maxBadgeLen       = 20
+	maxAltLen         = 120
+	MaxTiers          = 4
+	maxPhraseLen      = 70
+	maxTitleLen       = 60
+	maxTextLen        = 160
+	maxLabelLen       = 30
+	maxCTALen         = 24
+	dateLayout        = "2006-01-02"
+	siteOrigin        = "https://www.collectatcg.com.br/"
 )
 
 var goiania = loadLocation("America/Sao_Paulo")
@@ -102,6 +106,33 @@ type Popup struct {
 	Window
 }
 
+// Hero carousel slides (topo da home). A "produto" slide names a SKU (a kit too)
+// and the site reads its photo, name and prices from the catalog; an "imagem"
+// slide is uploaded art with a link. Slides are shown in list order.
+const (
+	SlideProduct = "produto"
+	SlideImage   = "imagem"
+
+	// Two colour variants of the same carousel, in the store's palette:
+	// "rosa" (pink background, blue card) and "azul" (royal blue background, pink card).
+	HeroStylePink = "rosa"
+	HeroStyleBlue = "azul"
+)
+
+type HeroSlide struct {
+	Enabled bool   `json:"enabled"`
+	Kind    string `json:"kind"`
+	SKU     string `json:"sku,omitempty"`
+	Image   *Image `json:"image,omitempty"`
+	// Badge is a short tag on the slide ("Kit", "Pré-venda", "Natal", "Novo").
+	Badge  string `json:"badge,omitempty"`
+	Phrase string `json:"phrase,omitempty"`
+	// Href overrides where the slide leads (default: the product page). Required
+	// for an image slide.
+	Href string `json:"href,omitempty"`
+	Window
+}
+
 type Config struct {
 	Phrases   []Phrase   `json:"phrases"`
 	BarImages []BarImage `json:"barImages,omitempty"`
@@ -109,9 +140,13 @@ type Config struct {
 	// Popups are tried in order: the site shows the first one switched on, inside
 	// its dates and with its product on sale. A config saved before the list
 	// existed had a single Popup; reading it moves that one into Popups.
-	Popups    []Popup   `json:"popups,omitempty"`
-	Popup     *Popup    `json:"popup,omitempty"`
-	UpdatedAt time.Time `json:"updatedAt,omitempty"`
+	Popups []Popup `json:"popups,omitempty"`
+	Popup  *Popup  `json:"popup,omitempty"`
+	// HeroStyle picks the carousel colours ("rosa" or "azul"); empty means
+	// "rosa". With no live slide the home keeps its usual hero.
+	HeroStyle  string      `json:"heroStyle,omitempty"`
+	HeroSlides []HeroSlide `json:"heroSlides,omitempty"`
+	UpdatedAt  time.Time   `json:"updatedAt,omitempty"`
 }
 
 // Live is what the storefront shows right now: only the pieces inside their
@@ -121,6 +156,10 @@ type Live struct {
 	BarImage *BarImage `json:"barImage,omitempty"`
 	Banner   *Banner   `json:"banner,omitempty"`
 	Popup    *Popup    `json:"popup,omitempty"`
+	// HeroSlides are the carousel slides switched on and inside their dates;
+	// the API also drops product slides whose SKU is not on sale.
+	HeroStyle  string      `json:"heroStyle,omitempty"`
+	HeroSlides []HeroSlide `json:"heroSlides,omitempty"`
 }
 
 // Example is the Natal content proposed on 27/11/2026. It is never written by
@@ -145,6 +184,9 @@ func Example() Config {
 }
 
 var freeShippingRe = regexp.MustCompile(`(?i)frete\s+(gr[aá]tis|gratuito|zero)`)
+
+// pressureRe: words the store does not use to push a sale (combinado com o Jairo).
+var pressureRe = regexp.MustCompile(`(?i)\bcorre\b|[uú]ltimas\s+unidades`)
 
 func checkText(field, s string, min, max int) error {
 	n := utf8.RuneCountInString(strings.TrimSpace(s))
@@ -258,6 +300,9 @@ func Validate(c Config) error {
 			return err
 		}
 	}
+	if err := validateHero(c); err != nil {
+		return err
+	}
 	popups := c.popupList()
 	if len(popups) > MaxPopups {
 		return fmt.Errorf("no máximo %d pop-ups", MaxPopups)
@@ -280,6 +325,77 @@ func Validate(c Config) error {
 		}
 	}
 	return nil
+}
+
+func validateHero(c Config) error {
+	switch c.HeroStyle {
+	case "", HeroStylePink, HeroStyleBlue:
+	default:
+		return fmt.Errorf("cor do carrossel precisa ser %q ou %q", HeroStylePink, HeroStyleBlue)
+	}
+	if len(c.HeroSlides) > MaxHeroSlides {
+		return fmt.Errorf("no máximo %d slides no carrossel", MaxHeroSlides)
+	}
+	for i, sl := range c.HeroSlides {
+		field := fmt.Sprintf("slide %d", i+1)
+		switch sl.Kind {
+		case SlideProduct:
+			if strings.TrimSpace(sl.SKU) == "" {
+				return fmt.Errorf("%s: escolha o produto", field)
+			}
+		case SlideImage:
+			if sl.Image == nil {
+				return fmt.Errorf("%s: envie as imagens", field)
+			}
+			if err := checkImage(field, *sl.Image); err != nil {
+				return err
+			}
+			if err := checkHref(field, sl.Href, true); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%s: tipo precisa ser %q ou %q", field, SlideProduct, SlideImage)
+		}
+		if err := checkText("selo do "+field, sl.Badge, 0, maxBadgeLen); err != nil {
+			return err
+		}
+		if err := checkText("frase do "+field, sl.Phrase, 0, maxSlidePhraseLen); err != nil {
+			return err
+		}
+		for _, s := range []string{sl.Badge, sl.Phrase} {
+			if pressureRe.MatchString(s) {
+				return fmt.Errorf("%s: sem \"corre\" nem \"últimas unidades\"", field)
+			}
+		}
+		if err := checkHref(field, sl.Href, false); err != nil {
+			return err
+		}
+		if err := checkWindow(field, sl.Window); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// HeroSlidesOn lists, in order, the slides switched on and inside their dates on
+// now's day; the caller drops product slides whose SKU is not on sale.
+func (c Config) HeroSlidesOn(now time.Time) []HeroSlide {
+	day := now.In(goiania).Format(dateLayout)
+	var out []HeroSlide
+	for _, sl := range c.HeroSlides {
+		if sl.Enabled && sl.activeOn(day) {
+			out = append(out, sl)
+		}
+	}
+	return out
+}
+
+// HeroStyleOrDefault is the style the site should use.
+func (c Config) HeroStyleOrDefault() string {
+	if c.HeroStyle == "" {
+		return HeroStylePink
+	}
+	return c.HeroStyle
 }
 
 // checkImage: both files are required and must be ones uploaded here (never a
@@ -324,6 +440,10 @@ func (c Config) LiveAt(now time.Time) Live {
 		cp := ps[0]
 		out.Popup = &cp
 	}
+	if sl := c.HeroSlidesOn(now); len(sl) > 0 {
+		out.HeroStyle = c.HeroStyleOrDefault()
+		out.HeroSlides = sl
+	}
 	return out
 }
 
@@ -363,6 +483,15 @@ func normalize(c Config) Config {
 	}
 	for i := range c.Popups {
 		c.Popups[i].SKU = strings.TrimSpace(c.Popups[i].SKU)
+	}
+	for i := range c.HeroSlides {
+		sl := &c.HeroSlides[i]
+		sl.SKU = strings.TrimSpace(sl.SKU)
+		sl.Badge = strings.TrimSpace(sl.Badge)
+		sl.Phrase = strings.TrimSpace(sl.Phrase)
+		if sl.Kind == SlideProduct {
+			sl.Image = nil
+		}
 	}
 	return c
 }

@@ -2001,6 +2001,17 @@ export interface VitrinePopup extends VitrineWindow {
   text?: string;
 }
 
+/** One slide of the home carousel: a product (photo and prices from the catalog) or uploaded art. */
+export interface VitrineHeroSlide extends VitrineWindow {
+  enabled: boolean;
+  kind: "produto" | "imagem";
+  sku?: string;
+  image?: VitrineImage;
+  badge?: string;
+  phrase?: string;
+  href?: string;
+}
+
 export interface VitrineConfig {
   phrases: VitrinePhrase[];
   barImages?: VitrineBarImage[];
@@ -2008,6 +2019,9 @@ export interface VitrineConfig {
   popups?: VitrinePopup[];
   /** Only in configs saved before the list of pop-ups; the server migrates it. */
   popup?: VitrinePopup;
+  /** Carousel colours: "rosa" (pink background, blue card) or "azul" (royal background, pink card). */
+  heroStyle?: "rosa" | "azul";
+  heroSlides?: VitrineHeroSlide[];
   updatedAt?: string;
 }
 

@@ -2,6 +2,7 @@ package vitrine
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,5 +108,81 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 	if again, _ := s.Get(); len(again.Phrases) != 2 {
 		t.Fatal("put inválido não pode apagar o que estava salvo")
+	}
+}
+
+func TestHeroSlidesValidation(t *testing.T) {
+	ok := Config{HeroStyle: HeroStyleBlue, HeroSlides: []HeroSlide{
+		{Enabled: true, Kind: SlideProduct, SKU: "sealed|pokemon|x|||", Badge: "Kit", Phrase: "Cada pacote sai mais barato no kit"},
+	}}
+	if err := Validate(ok); err != nil {
+		t.Fatal(err)
+	}
+	bad := map[string]HeroSlide{
+		"sem sku":          {Enabled: true, Kind: SlideProduct},
+		"tipo":             {Enabled: true, Kind: "video", SKU: "a"},
+		"imagem sem link":  {Enabled: true, Kind: SlideImage, Image: &Image{Desktop: "/api/storefront/vitrine/img/0123456789abcdef.webp", Mobile: "/api/storefront/vitrine/img/0123456789abcdef.webp", Alt: "Natal"}},
+		"imagem externa":   {Enabled: true, Kind: SlideImage, Href: "/selado", Image: &Image{Desktop: "https://x.com/a.png", Mobile: "https://x.com/a.png", Alt: "Natal"}},
+		"frete":            {Enabled: true, Kind: SlideProduct, SKU: "a", Phrase: "Frete grátis acima de 600"},
+		"corre":            {Enabled: true, Kind: SlideProduct, SKU: "a", Phrase: "Corre que acaba"},
+		"ultimas":          {Enabled: true, Kind: SlideProduct, SKU: "a", Badge: "Últimas unidades"},
+		"selo longo":       {Enabled: true, Kind: SlideProduct, SKU: "a", Badge: strings.Repeat("x", 21)},
+		"frase longa":      {Enabled: true, Kind: SlideProduct, SKU: "a", Phrase: strings.Repeat("x", 91)},
+		"link de fora":     {Enabled: true, Kind: SlideProduct, SKU: "a", Href: "https://outro.site/x"},
+		"datas invertidas": {Enabled: true, Kind: SlideProduct, SKU: "a", Window: Window{From: "2026-12-10", Until: "2026-12-01"}},
+	}
+	for name, sl := range bad {
+		if err := Validate(Config{HeroSlides: []HeroSlide{sl}}); err == nil {
+			t.Errorf("%s: devia recusar", name)
+		}
+	}
+	if err := Validate(Config{HeroStyle: "destaque"}); err == nil {
+		t.Error("estilo desconhecido devia recusar")
+	}
+	many := make([]HeroSlide, MaxHeroSlides+1)
+	for i := range many {
+		many[i] = HeroSlide{Kind: SlideProduct, SKU: "a"}
+	}
+	if err := Validate(Config{HeroSlides: many}); err == nil {
+		t.Error("slides demais devia recusar")
+	}
+}
+
+func TestHeroSlidesLiveKeepOrderAndDates(t *testing.T) {
+	c := Config{HeroSlides: []HeroSlide{
+		{Enabled: true, Kind: SlideProduct, SKU: "a", Window: Window{Until: "2026-12-01"}},
+		{Enabled: false, Kind: SlideProduct, SKU: "desligado"},
+		{Enabled: true, Kind: SlideProduct, SKU: "b"},
+		{Enabled: true, Kind: SlideProduct, SKU: "c", Window: Window{From: "2026-12-02"}},
+	}}
+	got := func(day string) string {
+		var ids []string
+		for _, sl := range c.LiveAt(at(day)).HeroSlides {
+			ids = append(ids, sl.SKU)
+		}
+		return strings.Join(ids, ",")
+	}
+	if g := got("2026-12-01"); g != "a,b" {
+		t.Fatalf("01/12 = %q", g)
+	}
+	if g := got("2026-12-02"); g != "b,c" {
+		t.Fatalf("02/12 = %q", g)
+	}
+	if live := c.LiveAt(at("2026-12-01")); live.HeroStyle != HeroStylePink {
+		t.Fatalf("estilo padrão = %q", live.HeroStyle)
+	}
+	if live := (Config{}).LiveAt(at("2026-12-01")); live.HeroStyle != "" || len(live.HeroSlides) != 0 {
+		t.Fatalf("sem slides o site mantém o hero de hoje: %+v", live)
+	}
+}
+
+func TestOldConfigWithoutHeroStillLoads(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "vitrine.json")
+	if err := os.WriteFile(path, []byte(`{"phrases":[{"text":"Para chegar até 24/12, peça até 09/12"}],"popup":{"enabled":true,"sku":"a","title":"Leve"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := NewStore(path).Get()
+	if err != nil || len(c.HeroSlides) != 0 || len(c.Popups) != 1 || len(c.Phrases) != 1 {
+		t.Fatalf("config antiga: %+v %v", c, err)
 	}
 }

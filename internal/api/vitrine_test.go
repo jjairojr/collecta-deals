@@ -203,3 +203,30 @@ func TestVitrineLivePopupSkipsUnlisted(t *testing.T) {
 		t.Fatalf("pop-up de hoje com produto fora da vitrine devia ser recusado: %d", rec.Code)
 	}
 }
+
+func TestVitrineHeroSlidesLiveDropUnlisted(t *testing.T) {
+	s, sku := vitrineServer(t)
+	c := vitrine.Config{Phrases: []vitrine.Phrase{}, HeroStyle: vitrine.HeroStyleBlue, HeroSlides: []vitrine.HeroSlide{
+		{Enabled: true, Kind: vitrine.SlideProduct, SKU: sku, Badge: "Novo", Phrase: "Teach chegou"},
+		{Enabled: true, Kind: vitrine.SlideProduct, SKU: "single|onepiece|nao-existe||", Window: vitrine.Window{From: "2026-12-05"}},
+	}}
+	if rec := vitrineDo(t, s, http.MethodPut, "/api/vitrine", "secret", c); rec.Code != http.StatusOK {
+		t.Fatalf("salvar: %d %s", rec.Code, rec.Body)
+	}
+	today := c
+	today.HeroSlides = append(today.HeroSlides, vitrine.HeroSlide{Enabled: true, Kind: vitrine.SlideProduct, SKU: "single|onepiece|nao-existe||"})
+	if rec := vitrineDo(t, s, http.MethodPut, "/api/vitrine", "secret", today); rec.Code != http.StatusBadRequest {
+		t.Fatalf("slide de hoje sem estoque devia recusar: %d", rec.Code)
+	}
+	var live vitrine.Live
+	rec := vitrineDo(t, s, http.MethodGet, "/api/storefront/vitrine", "", nil)
+	if err := json.Unmarshal(rec.Body.Bytes(), &live); err != nil || len(live.HeroSlides) != 1 || live.HeroSlides[0].SKU != sku || live.HeroStyle != vitrine.HeroStyleBlue {
+		t.Fatalf("01/12 = %s", rec.Body)
+	}
+	s.postSale.now = func() time.Time { return time.Date(2026, 12, 6, 15, 0, 0, 0, saoPaulo) }
+	live = vitrine.Live{}
+	rec = vitrineDo(t, s, http.MethodGet, "/api/storefront/vitrine", "", nil)
+	if err := json.Unmarshal(rec.Body.Bytes(), &live); err != nil || len(live.HeroSlides) != 1 || live.HeroSlides[0].SKU != sku {
+		t.Fatalf("06/12: o slide sem estoque some e fica só o Teach: %s", rec.Body)
+	}
+}
