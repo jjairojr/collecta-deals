@@ -100,4 +100,3 @@ export default function ArtPlaceholder({
 function isItemPhoto(url: string): boolean {
   return url.includes("/api/item-photos/");
 }
-
