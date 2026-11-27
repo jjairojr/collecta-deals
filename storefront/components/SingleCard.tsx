@@ -7,6 +7,8 @@ import { brl } from "@/lib/format";
 import { gameArtHue } from "@/lib/games";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import { singleToCartLine } from "@/lib/cart-lines";
+import { installmentPlan } from "@/lib/payment";
+import { stockLabel } from "@/lib/stock";
 import type { Single } from "@/lib/types";
 
 // Grid item used across Home (featured) and Browse. The whole card links to the
@@ -19,6 +21,7 @@ export default function SingleCard({
   showLanguage?: boolean;
 }) {
   const { add } = useCart();
+  const plan = installmentPlan(item.price);
 
   const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -52,7 +55,7 @@ export default function SingleCard({
           </span>
         )}
         <span className="absolute bottom-2 right-2 bg-outline px-1.5 py-1 font-pixel text-[8px] text-white">
-          {item.qty} UN
+          {stockLabel(item.qty)}
         </span>
       </div>
 
@@ -70,6 +73,11 @@ export default function SingleCard({
           <span className="truncate font-pixel text-[10px] leading-relaxed text-brand sm:text-[12px]">
             {brl(item.price)}
           </span>
+          {plan && (
+            <span className="-mt-1 truncate text-[11px] text-muted">
+              ou {plan.count}x de {brl(plan.each)}
+            </span>
+          )}
           <button
             type="button"
             onClick={onAdd}
