@@ -60,7 +60,16 @@ func (s *Server) handleAdTestList(w http.ResponseWriter, r *http.Request) {
 		adTestError(w, err)
 		return
 	}
-	writeJSON(w, map[string]any{"items": all, "availableCents": available, "weeklyCapCents": adtestq.WeeklyCapCents})
+	messages, err := s.AdTests.AvailableFor("mensagens")
+	if err != nil {
+		adTestError(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"items": all, "availableCents": available, "weeklyCapCents": adtestq.WeeklyCapCents,
+		"availableMessagesCents": messages, "messagesWeeklyCapCents": adtestq.MessagesWeeklyCapCents,
+		"messagesMonthlyCapCents": adtestq.MessagesMonthlyCapCents,
+	})
 }
 
 func (s *Server) handleAdTestStarted(w http.ResponseWriter, r *http.Request) {

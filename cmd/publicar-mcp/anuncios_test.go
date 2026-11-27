@@ -44,11 +44,12 @@ func (f *fixture) serveAds(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/api/adtests":
 		all, lerr := f.ads.List(r.URL.Query().Get("status"))
 		avail, aerr := f.ads.Available()
-		if lerr != nil || aerr != nil {
-			writeErr(errors.Join(lerr, aerr))
+		msgs, merr := f.ads.AvailableFor("mensagens")
+		if lerr != nil || aerr != nil || merr != nil {
+			writeErr(errors.Join(lerr, aerr, merr))
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"items": all, "availableCents": avail})
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": all, "availableCents": avail, "availableMessagesCents": msgs})
 		return
 	case action == "started":
 		var in struct {
@@ -663,5 +664,75 @@ func TestExecutorTrialReelFailureRetries(t *testing.T) {
 	approved, _ := f.store.List(publishq.StatusApproved)
 	if len(approved) != 1 || approved[0].Attempts != 1 {
 		t.Fatalf("falha passageira devia voltar na próxima rodada: %+v", approved)
+	}
+}
+
+// "A Collecta compra cartas" (Jairo, 27/11): anúncio que abre conversa no
+// WhatsApp da loja e otimiza conversas iniciadas (Click to WhatsApp).
+func TestMessagesObjectiveOpensWhatsApp(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	args := proposeArgs(f.creatives(t), 100)
+	args["objetivo"] = "mensagens"
+	args["publico"] = "brasil"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+		t.Fatal(errText)
+	}
+	approveAds(t, f)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	campaigns := meta.find("act_1/campaigns")
+	if len(campaigns) != 1 || campaigns[0].form["objective"] != "OUTCOME_ENGAGEMENT" {
+		t.Fatalf("campanha = %+v", campaigns)
+	}
+	set := meta.find("act_1/adsets")[0].form
+	if set["destination_type"] != "WHATSAPP" || set["optimization_goal"] != "CONVERSATIONS" || set["billing_event"] != "IMPRESSIONS" || !strings.Contains(set["promoted_object"], `"page_id":"page"`) || !strings.Contains(set["targeting"], `"countries":["BR"]`) {
+		t.Fatalf("conjunto = %+v", set)
+	}
+	for i, c := range meta.find("act_1/adcreatives") {
+		spec := c.form["object_story_spec"]
+		if !strings.Contains(spec, `"type":"WHATSAPP_MESSAGE"`) || !strings.Contains(spec, `"app_destination":"WHATSAPP"`) {
+			t.Fatalf("criativo %d sem botão do WhatsApp: %s", i, spec)
+		}
+	}
+}
+
+func TestMessagesMeasuredByConversations(t *testing.T) {
+	var rows []insightRow
+	if err := json.Unmarshal([]byte(`[{"ad_id":"a","spend":"30","clicks":"40","actions":[{"action_type":"onsite_conversion.messaging_conversation_started_7d","value":"6"}]},{"ad_id":"b","spend":"30","clicks":"50"}]`), &rows); err != nil {
+		t.Fatal(err)
+	}
+	metric, count := measure("mensagens", rows)
+	if metric != "conversas iniciadas" || count(rows[0]) != 6 || count(rows[1]) != 0 {
+		t.Fatalf("métrica = %q %v %v", metric, count(rows[0]), count(rows[1]))
+	}
+}
+
+// A verba de compra de cartas (mensagens) é separada da de vendas: um teste de
+// mensagens passa mesmo com a semana de vendas cheia.
+func TestMessagesUseOwnBudget(t *testing.T) {
+	f, _, _ := newAdFixture(t)
+	for i := 0; i < 2; i++ {
+		args := proposeArgs(f.creatives(t), 300)
+		if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+			t.Fatal(errText)
+		}
+	}
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 50)); !strings.Contains(errText, "na semana") {
+		t.Fatalf("vendas devia estar cheia: %q", errText)
+	}
+	msg := proposeArgs(f.creatives(t), 150)
+	msg["objetivo"] = "mensagens"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", msg); errText != "" {
+		t.Fatalf("mensagens tem verba própria: %q", errText)
+	}
+	msg2 := proposeArgs(f.creatives(t), 150)
+	msg2["objetivo"] = "mensagens"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", msg2); !strings.Contains(errText, "compra de cartas") {
+		t.Fatalf("mensagens passou de R$ 250 na semana: %q", errText)
+	}
+	status, _ := callTool[adStatusOutput](t, f, "testes_anuncio", nil)
+	if status.SobraMensagens != "R$ 100,00" {
+		t.Fatalf("sobra de compra de cartas = %q", status.SobraMensagens)
 	}
 }

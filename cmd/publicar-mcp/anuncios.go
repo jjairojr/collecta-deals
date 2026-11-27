@@ -51,7 +51,7 @@ type adCreativeInput struct {
 }
 
 type proposeInput struct {
-	Objetivo   string            `json:"objetivo" jsonschema:"seguidores (leva para o perfil do Instagram) ou vendas (otimiza compra no site)"`
+	Objetivo   string            `json:"objetivo" jsonschema:"seguidores (leva para o perfil do Instagram), vendas (otimiza compra no site) ou mensagens (abre conversa no WhatsApp da loja e otimiza conversas iniciadas; ex.: A Collecta compra cartas). mensagens exige o WhatsApp da loja ligado à Página do Facebook"`
 	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse), brasil (Brasil, interesse em Pokémon, One Piece ou card game) ou remarketing (Brasil, só quem visitou o site, pôs no carrinho ou interagiu com o @tcgcollecta, sem quem já comprou; exige os públicos no anuncios.env). Nos três: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
 	Link       string            `json:"link,omitempty" jsonschema:"só em vendas: página do site para onde o anúncio leva (https://www.collectatcg.com.br/...)"`
 	Criativos  []adCreativeInput `json:"criativos" jsonschema:"de 2 a 5 criativos, cada um com um gancho diferente"`
@@ -80,8 +80,8 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		Note:        cleanLine(in.Motivo),
 	}
 	switch {
-	case t.Objective != "seguidores" && t.Objective != "vendas":
-		return nil, proposeOutput{}, fmt.Errorf("objetivo %q não existe: seguidores ou vendas", in.Objetivo)
+	case t.Objective != "seguidores" && t.Objective != "vendas" && t.Objective != "mensagens":
+		return nil, proposeOutput{}, fmt.Errorf("objetivo %q não existe: seguidores, vendas ou mensagens", in.Objetivo)
 	case t.Audience != "goiania" && t.Audience != "brasil" && t.Audience != "remarketing":
 		return nil, proposeOutput{}, fmt.Errorf("publico %q não existe: goiania, brasil ou remarketing", in.Publico)
 	case t.BudgetCents < adtestq.MinBudgetCents || t.BudgetCents > adtestq.MaxBudgetCents:
@@ -100,12 +100,16 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		}
 		t.Link = link
 	}
-	available, err := a.adBudgetLeft(ctx)
+	available, err := a.adBudgetLeft(ctx, t.Objective)
 	if err != nil {
 		return nil, proposeOutput{}, err
 	}
 	if t.BudgetCents > available {
-		return nil, proposeOutput{}, fmt.Errorf("cabem só %s na semana: proponha um teste menor ou espere", reais(available))
+		pool := "na semana"
+		if t.Objective == "mensagens" {
+			pool = "na verba de compra de cartas (R$ 250 por semana e R$ 1.000 por mês)"
+		}
+		return nil, proposeOutput{}, fmt.Errorf("cabem só %s %s: proponha um teste menor ou espere", reais(available), pool)
 	}
 	stage := filepath.Join(a.cfg.DataDir, "anuncios", randomID())
 	creatives, err := a.stageCreatives(stage, in.Criativos)
@@ -142,12 +146,18 @@ func siteLink(raw string) (string, error) {
 	return u.String(), nil
 }
 
-func (a *app) adBudgetLeft(ctx context.Context) (int64, error) {
+// adBudgetLeft is what a new test of this objective can still spend: mensagens
+// (compra de cartas) has its own budget on the dashboard, apart from sales.
+func (a *app) adBudgetLeft(ctx context.Context, objective string) (int64, error) {
 	var list struct {
-		AvailableCents int64 `json:"availableCents"`
+		AvailableCents         int64 `json:"availableCents"`
+		AvailableMessagesCents int64 `json:"availableMessagesCents"`
 	}
 	if err := a.call(ctx, http.MethodGet, "/api/adtests?status="+adtestq.StatusRunning, nil, &list); err != nil {
 		return 0, err
+	}
+	if objective == "mensagens" {
+		return list.AvailableMessagesCents, nil
 	}
 	return list.AvailableCents, nil
 }
@@ -211,7 +221,7 @@ func (a *app) stageCreatives(stage string, in []adCreativeInput) ([]adtestq.Crea
 	return out, nil
 }
 
-var objectiveLabel = map[string]string{"seguidores": "seguidores (perfil do Instagram)", "vendas": "vendas no site"}
+var objectiveLabel = map[string]string{"seguidores": "seguidores (perfil do Instagram)", "vendas": "vendas no site", "mensagens": "conversas no WhatsApp da loja"}
 var audienceLabel = map[string]string{"goiania": "Goiânia, 30 km", "brasil": "Brasil, interesse em TCG", "remarketing": "Remarketing (site e Instagram, sem compradores)"}
 
 func (a *app) adDecideURL(t adtestq.Test, action string) string {
@@ -265,17 +275,20 @@ type adStatusItem struct {
 type adStatusOutput struct {
 	Testes      []adStatusItem `json:"testes"`
 	SobraSemana string         `json:"sobra_na_semana"`
+	// SobraMensagens is the separate buying budget (mensagens) still free.
+	SobraMensagens string `json:"sobra_compra_de_cartas"`
 }
 
 func (a *app) toolAdTests(ctx context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, adStatusOutput, error) {
 	var list struct {
-		Items          []adtestq.Test `json:"items"`
-		AvailableCents int64          `json:"availableCents"`
+		Items                  []adtestq.Test `json:"items"`
+		AvailableCents         int64          `json:"availableCents"`
+		AvailableMessagesCents int64          `json:"availableMessagesCents"`
 	}
 	if err := a.call(ctx, http.MethodGet, "/api/adtests", nil, &list); err != nil {
 		return nil, adStatusOutput{}, err
 	}
-	out := adStatusOutput{Testes: []adStatusItem{}, SobraSemana: reais(list.AvailableCents)}
+	out := adStatusOutput{Testes: []adStatusItem{}, SobraSemana: reais(list.AvailableCents), SobraMensagens: reais(list.AvailableMessagesCents)}
 	since := a.now().Add(-adStatusSince)
 	for _, t := range list.Items {
 		if t.CreatedAt.Before(since) {

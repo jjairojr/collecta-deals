@@ -33,17 +33,22 @@ const (
 
 const (
 	WeeklyCapCents = 62000
-	MaxBudgetCents = 30000
-	BudgetWindow   = 7 * 24 * time.Hour
-	MinBudgetCents = 3000
-	MinDays        = 3
-	MaxDays        = 7
-	MinCreatives   = 2
-	MaxCreatives   = 5
+	// Mensagens (compra de cartas, clique para WhatsApp) has its own budget,
+	// outside the sales one (Jairo, 27/11: "até R$ 1.000/mês"): R$ 250 a week
+	// (rolling 7 days) and R$ 1.000 a calendar month in Goiânia.
+	MessagesWeeklyCapCents  = 25000
+	MessagesMonthlyCapCents = 100000
+	MaxBudgetCents          = 30000
+	BudgetWindow            = 7 * 24 * time.Hour
+	MinBudgetCents          = 3000
+	MinDays                 = 3
+	MaxDays                 = 7
+	MinCreatives            = 2
+	MaxCreatives            = 5
 )
 
 var (
-	objectives = map[string]bool{"seguidores": true, "vendas": true}
+	objectives = map[string]bool{"seguidores": true, "vendas": true, "mensagens": true}
 	audiences  = map[string]bool{"goiania": true, "brasil": true, "remarketing": true}
 	kinds      = map[string]bool{"video": true, "imagem": true}
 )
@@ -160,24 +165,61 @@ func (s *Store) persist(all []Test) error {
 	return os.Rename(tmp, s.path)
 }
 
-func committed(all []Test, since time.Time) int64 {
+// messagesPool reports whether an objective spends the separate buying budget.
+func messagesPool(objective string) bool {
+	return objective == "mensagens"
+}
+
+// committed sums the budget of non-rejected tests created since `since` in the
+// same pool as `objective` (mensagens alone; everything else together).
+func committed(all []Test, since time.Time, objective string) int64 {
 	var sum int64
 	for _, t := range all {
-		if t.Status != StatusRejected && !t.CreatedAt.Before(since) {
+		if t.Status != StatusRejected && !t.CreatedAt.Before(since) && messagesPool(t.Objective) == messagesPool(objective) {
 			sum += t.BudgetCents
 		}
 	}
 	return sum
 }
 
+var saoPaulo = func() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return time.FixedZone("BRT", -3*60*60)
+	}
+	return loc
+}()
+
+func monthStart(now time.Time) time.Time {
+	local := now.In(saoPaulo)
+	return time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, saoPaulo)
+}
+
+// available is what a new test of `objective` can still spend.
+func available(all []Test, now time.Time, objective string) int64 {
+	week := committed(all, now.Add(-BudgetWindow), objective)
+	if !messagesPool(objective) {
+		return max(0, WeeklyCapCents-week)
+	}
+	month := committed(all, monthStart(now), objective)
+	return max(0, min(MessagesWeeklyCapCents-week, MessagesMonthlyCapCents-month))
+}
+
+// Available is what is left this week for sales and followers tests.
 func (s *Store) Available() (int64, error) {
+	return s.AvailableFor("vendas")
+}
+
+// AvailableFor is what is left for a test of this objective (mensagens has its
+// own weekly and monthly budget).
+func (s *Store) AvailableFor(objective string) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all, err := s.load()
 	if err != nil {
 		return 0, err
 	}
-	return max(0, WeeklyCapCents-committed(all, s.now().Add(-BudgetWindow))), nil
+	return available(all, s.now(), objective), nil
 }
 
 func (s *Store) Add(t Test) (Test, error) {
@@ -190,7 +232,7 @@ func (s *Store) Add(t Test) (Test, error) {
 	if err != nil {
 		return Test{}, err
 	}
-	if committed(all, s.now().Add(-BudgetWindow))+t.BudgetCents > WeeklyCapCents {
+	if t.BudgetCents > available(all, s.now(), t.Objective) {
 		return Test{}, ErrOverBudget
 	}
 	t.ID = randomHex(8)

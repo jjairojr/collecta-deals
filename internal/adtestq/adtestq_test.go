@@ -113,3 +113,45 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal("falhou depois de terminar")
 	}
 }
+
+func messages(budget int64) Test {
+	t := sample(budget)
+	t.Objective = "mensagens"
+	return t
+}
+
+func TestMessagesBudgetIsSeparateWeeklyAndMonthly(t *testing.T) {
+	now := time.Date(2026, 12, 1, 12, 0, 0, 0, saoPaulo)
+	s := newStore(t, &now)
+	for _, b := range []int64{30000, 29000, 3000} { // vendas: semana cheia (R$ 620)
+		if _, err := s.Add(sample(b)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Add(sample(MinBudgetCents)); !errors.Is(err, ErrOverBudget) {
+		t.Fatalf("vendas devia estar cheia: %v", err)
+	}
+	if _, err := s.Add(messages(25000)); err != nil {
+		t.Fatalf("mensagens tem verba própria: %v", err)
+	}
+	if _, err := s.Add(messages(MinBudgetCents)); !errors.Is(err, ErrOverBudget) {
+		t.Fatalf("mensagens passou de R$ 250 na semana: %v", err)
+	}
+	for i, day := range []int{8, 15, 22} { // R$ 250 por semana até R$ 1.000 no mês
+		now = time.Date(2026, 12, day, 13+i, 0, 0, 0, saoPaulo) // um pouco depois dos 7 dias
+		if _, err := s.Add(messages(25000)); err != nil {
+			t.Fatalf("dia %d: %v", day, err)
+		}
+	}
+	now = time.Date(2026, 12, 30, 12, 0, 0, 0, saoPaulo)
+	if left, _ := s.AvailableFor("mensagens"); left != 0 {
+		t.Fatalf("mês cheio devia deixar 0, sobra %d", left)
+	}
+	if _, err := s.Add(messages(MinBudgetCents)); !errors.Is(err, ErrOverBudget) {
+		t.Fatalf("mensagens passou de R$ 1.000 no mês: %v", err)
+	}
+	now = time.Date(2027, 1, 2, 12, 0, 0, 0, saoPaulo)
+	if _, err := s.Add(messages(25000)); err != nil {
+		t.Fatalf("mês novo libera a verba: %v", err)
+	}
+}
