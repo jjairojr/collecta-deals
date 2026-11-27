@@ -49,6 +49,9 @@ type storefrontResponse struct {
 	Items      []storefrontItem `json:"items"`
 	SoldOut    []storefrontItem `json:"soldOut"`
 	Kits       []storefrontKit  `json:"kits"`
+	// FreeShippingMinBRL is the products total from which PAC is free; 0 when
+	// there is no free shipping. The site shows the rule only when it is on here.
+	FreeShippingMinBRL float64 `json:"freeShippingMinBRL,omitempty"`
 }
 
 type storefrontKit struct {
@@ -89,6 +92,9 @@ const (
 // the shared accessories, stripped of cost/profit, for the public catalog site.
 func (s *Server) handleStorefront(w http.ResponseWriter, r *http.Request) {
 	resp := storefrontResponse{Items: []storefrontItem{}, SoldOut: []storefrontItem{}}
+	if s.Checkout.Quoter != nil && s.Checkout.FromCEP != "" {
+		resp.FreeShippingMinBRL = s.Checkout.FreeShippingMin
+	}
 	var sold []storefrontItem
 	fx := s.storefrontFX()
 	resp.FXRate = fx

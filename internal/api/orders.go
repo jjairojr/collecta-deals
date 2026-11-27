@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -397,6 +398,23 @@ func itemsTotal(lines []orders.Line) float64 {
 	return round2(sum)
 }
 
+// applyFreeShipping makes PAC free when the products reach min (FREE_SHIPPING_MIN_BRL),
+// keeping its quoted price so the order records what the store pays. The other
+// services stay paid. A CEP without PAC gets no free option.
+func applyFreeShipping(services []shipping.Service, min, items float64) {
+	if min <= 0 || items < min {
+		return
+	}
+	for i := range services {
+		if services[i].ID == shipping.PACServiceID && services[i].PriceBRL > 0 {
+			services[i].QuotedBRL = services[i].PriceBRL
+			services[i].PriceBRL = 0
+			sort.SliceStable(services, func(a, b int) bool { return services[a].PriceBRL < services[b].PriceBRL })
+			return
+		}
+	}
+}
+
 func (s *Server) quoteShipping(ctx context.Context, cep string, lines []orders.Line) ([]shipping.Service, error) {
 	services := make([]shipping.Service, 0, 5)
 	if cep != "" && s.Checkout.Quoter != nil && s.Checkout.FromCEP != "" {
@@ -409,9 +427,7 @@ func (s *Server) quoteShipping(ctx context.Context, cep string, lines []orders.L
 			s.logCheckout("frete %s: %v", cep, err)
 		}
 		services = append(services, quoted...)
-		if min := s.Checkout.FreeShippingMin; min > 0 && len(services) > 0 && itemsTotal(lines) >= min {
-			services[0].PriceBRL = 0
-		}
+		applyFreeShipping(services, s.Checkout.FreeShippingMin, itemsTotal(lines))
 	}
 	services = append(services, shipping.Pickup(), shipping.Join())
 	return services, nil
@@ -620,7 +636,11 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 		ServiceName:  chosen.Name,
 		Company:      chosen.Company,
 		PriceBRL:     round2(chosen.PriceBRL),
+		CostBRL:      round2(chosen.PriceBRL),
 		DeliveryDays: chosen.DeliveryDays,
+	}
+	if chosen.QuotedBRL > 0 {
+		ship.CostBRL = round2(chosen.QuotedBRL)
 	}
 	if chosen.ID == shipping.JoinServiceID {
 		base, ok := s.joinableOrder(in.Shipping.JoinOrder, in.Buyer)

@@ -62,6 +62,7 @@ interface RawResponse {
   items: RawItem[];
   soldOut?: RawItem[];
   kits?: RawKit[];
+  freeShippingMinBRL?: number;
 }
 
 interface RawKit {
@@ -106,6 +107,9 @@ export interface Catalog {
   games: Game[]; // games that have singles — home cabinets + /singles JOGO filter
   navGames: Game[]; // games with any stock (singles or sealed) — header nav
   live: boolean; // true when served by the real backend, false when mock fallback
+  // Products total (reais) from which PAC ships free; 0 = no free shipping. Comes
+  // from the backend, so the site only promises what the checkout gives.
+  freeShippingMinBRL: number;
 }
 
 function slugify(s: string): string {
@@ -450,6 +454,7 @@ function mockCatalog(): Catalog {
     games: deriveGames(singles),
     navGames: deriveGames([...singles, ...sealed]),
     live: false,
+    freeShippingMinBRL: 0,
   };
 }
 
@@ -527,6 +532,7 @@ export async function loadCatalog(): Promise<Catalog> {
     games: deriveGames(singles),
     navGames: deriveGames([...singles, ...sealed]),
     live: true,
+    freeShippingMinBRL: data.freeShippingMinBRL && data.freeShippingMinBRL > 0 ? data.freeShippingMinBRL : 0,
   };
 }
 

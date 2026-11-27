@@ -27,7 +27,14 @@ type Service struct {
 	Company      string  `json:"company"`
 	PriceBRL     float64 `json:"priceBRL"`
 	DeliveryDays int     `json:"deliveryDays"`
+	// QuotedBRL is what the carrier charges when the store pays the freight and
+	// PriceBRL shows 0 to the buyer; empty otherwise.
+	QuotedBRL float64 `json:"quotedBRL,omitempty"`
 }
+
+// PACServiceID is Correios PAC in Melhor Envio's numbering, the service the free
+// shipping rule applies to.
+const PACServiceID = 1
 
 type Quoter interface {
 	Quote(ctx context.Context, fromCEP, toCEP string, products []Product) ([]Service, error)

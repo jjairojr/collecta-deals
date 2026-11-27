@@ -60,10 +60,14 @@ func (g *fakeGateway) GetPayment(_ context.Context, id int64) (mercadopago.Payme
 
 type fakeQuoter struct {
 	products []shipping.Product
+	list     []shipping.Service // when set, returned instead of the default two
 }
 
 func (q *fakeQuoter) Quote(_ context.Context, _, _ string, products []shipping.Product) ([]shipping.Service, error) {
 	q.products = products
+	if q.list != nil {
+		return append([]shipping.Service(nil), q.list...), nil
+	}
 	return []shipping.Service{
 		{ID: 17, Name: "Mini Envios", Company: "Correios", PriceBRL: 12, DeliveryDays: 9},
 		{ID: 2, Name: "SEDEX", Company: "Correios", PriceBRL: 35.1, DeliveryDays: 3},
@@ -521,10 +525,19 @@ func TestOrdersAdminListAndPatch(t *testing.T) {
 	}
 }
 
-func TestShippingQuoteAppliesFreeShipping(t *testing.T) {
-	f := checkoutServer(t)
-	f.s.Checkout.FreeShippingMin = 300
-	body := map[string]interface{}{"cep": "04538-132", "lines": []map[string]interface{}{{"sku": teachSKU, "qty": 2, "unitCents": 25000}}}
+// withPAC makes the fake carrier answer like Melhor Envio does for a normal CEP:
+// Mini Envios, PAC and SEDEX, cheapest first.
+func withPAC(f *checkoutFixture) {
+	f.quoter.list = []shipping.Service{
+		{ID: 17, Name: "Mini Envios", Company: "Correios", PriceBRL: 12, DeliveryDays: 9},
+		{ID: shipping.PACServiceID, Name: "PAC", Company: "Correios", PriceBRL: 19.9, DeliveryDays: 8},
+		{ID: 2, Name: "SEDEX", Company: "Correios", PriceBRL: 35.1, DeliveryDays: 3},
+	}
+}
+
+func quoteServices(t *testing.T, f *checkoutFixture, qty int) []shipping.Service {
+	t.Helper()
+	body := map[string]interface{}{"cep": "04538-132", "lines": []map[string]interface{}{{"sku": teachSKU, "qty": qty, "unitCents": 25000}}}
 	rec := f.do(t, http.MethodPost, "/api/shipping/quote", body, storefrontHeaders())
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
@@ -535,8 +548,93 @@ func TestShippingQuoteAppliesFreeShipping(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Services) != 4 || out.Services[0].PriceBRL != 0 || out.Services[1].PriceBRL != 35.1 || out.Services[2].ID != shipping.PickupServiceID || out.Services[3].ID != shipping.JoinServiceID {
-		t.Fatalf("services = %+v", out.Services)
+	return out.Services
+}
+
+func TestFreeShippingMakesOnlyPACFree(t *testing.T) {
+	f := checkoutServer(t)
+	withPAC(f)
+	f.s.Checkout.FreeShippingMin = 400
+	got := quoteServices(t, f, 2) // R$ 500 em produtos
+	if len(got) != 5 || got[0].ID != shipping.PACServiceID || got[0].PriceBRL != 0 || got[0].QuotedBRL != 19.9 {
+		t.Fatalf("PAC devia vir grátis e primeiro, com o custo cotado: %+v", got)
+	}
+	if got[1].ID != 17 || got[1].PriceBRL != 12 || got[2].ID != 2 || got[2].PriceBRL != 35.1 {
+		t.Fatalf("Mini Envios e SEDEX continuam pagos: %+v", got)
+	}
+	if got[3].ID != shipping.PickupServiceID || got[4].ID != shipping.JoinServiceID {
+		t.Fatalf("retirada e juntar continuam no fim: %+v", got)
+	}
+
+	below := quoteServices(t, f, 1) // R$ 250, abaixo do mínimo
+	for _, s := range below {
+		if s.ID == shipping.PACServiceID && (s.PriceBRL != 19.9 || s.QuotedBRL != 0) {
+			t.Fatalf("abaixo do mínimo o PAC é cobrado: %+v", s)
+		}
+	}
+}
+
+func TestFreeShippingWithoutPACGivesNothingFree(t *testing.T) {
+	f := checkoutServer(t)
+	f.s.Checkout.FreeShippingMin = 400 // o fake padrão só tem Mini Envios e SEDEX
+	for _, s := range quoteServices(t, f, 2) {
+		if s.ID != shipping.PickupServiceID && s.ID != shipping.JoinServiceID && s.PriceBRL == 0 {
+			t.Fatalf("sem PAC nenhuma opção paga pode sair grátis: %+v", s)
+		}
+	}
+}
+
+func TestOrderRecordsPACCostWhenFree(t *testing.T) {
+	f := checkoutServer(t)
+	withPAC(f)
+	f.s.Checkout.FreeShippingMin = 400
+	body := validOrderBody(2, 25000)
+	body["shipping"] = map[string]interface{}{"serviceID": shipping.PACServiceID, "priceBRL": 0}
+	rec := f.do(t, http.MethodPost, "/api/orders", body, storefrontHeaders())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	o := createdOrder(t, f, rec.Body.Bytes())
+	if o.Shipping.PriceBRL != 0 || o.Shipping.CostBRL != 19.9 || o.Totals.ShippingBRL != 0 || o.Totals.TotalBRL != 500 {
+		t.Fatalf("PAC grátis devia gravar o custo cotado: shipping=%+v totals=%+v", o.Shipping, o.Totals)
+	}
+
+	paid := validOrderBody(1, 25000)
+	paid["buyer"] = map[string]string{"name": "Bia Lima", "email": "bia@example.com", "phone": "(11) 98888-7777", "cpf": "111.444.777-35"}
+	rec = f.do(t, http.MethodPost, "/api/orders", paid, storefrontHeaders())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create pago: %d %s", rec.Code, rec.Body.String())
+	}
+	o = createdOrder(t, f, rec.Body.Bytes())
+	if o.Shipping.PriceBRL != 12 || o.Shipping.CostBRL != 12 {
+		t.Fatalf("frete pago grava custo = preço: %+v", o.Shipping)
+	}
+}
+
+func createdOrder(t *testing.T, f *checkoutFixture, body []byte) orders.Order {
+	t.Helper()
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	o, err := f.s.Checkout.Orders.Get(out.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return o
+}
+
+func TestStorefrontExposesFreeShippingMin(t *testing.T) {
+	f := checkoutServer(t)
+	f.s.Checkout.FreeShippingMin = 600
+	rec := f.do(t, http.MethodGet, "/api/storefront", nil, nil)
+	var out struct {
+		Min float64 `json:"freeShippingMinBRL"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || rec.Code != http.StatusOK || out.Min != 600 {
+		t.Fatalf("storefront: %d min=%v %s", rec.Code, out.Min, rec.Body.String()[:min(200, rec.Body.Len())])
 	}
 }
 
