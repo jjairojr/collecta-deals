@@ -41,7 +41,7 @@ export default function AnnouncementBar({
 }) {
   const notes = [
     ...extra,
-    ...(freeShippingMinBRL > 0 ? [`FRETE GRATIS NO PAC ACIMA DE ${freeShippingMinLabel(freeShippingMinBRL)}`] : []),
+    ...(freeShippingMinBRL > 0 ? [`FRETE GRATIS NO PAC A PARTIR DE ${freeShippingMinLabel(freeShippingMinBRL)}`] : []),
     ...NOTES,
   ];
   return (
