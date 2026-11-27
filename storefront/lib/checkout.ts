@@ -28,6 +28,8 @@ export interface ShippingOption {
   company: string;
   priceBRL: number;
   deliveryDays: number;
+  /** What the carrier charges when the store pays the freight (free PAC). */
+  quotedBRL?: number;
 }
 
 export interface Buyer {
