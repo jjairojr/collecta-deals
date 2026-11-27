@@ -33,7 +33,7 @@ function NoteRow({ notes, hidden }: { notes: string[]; hidden?: boolean }) {
 export default function AnnouncementBar({ freeShippingMinBRL = 0 }: { freeShippingMinBRL?: number }) {
   const notes =
     freeShippingMinBRL > 0
-      ? [`FRETE GRATIS NO PAC ACIMA DE ${freeShippingMinLabel(freeShippingMinBRL)}`, ...NOTES]
+      ? [`FRETE GRATIS NO PAC A PARTIR DE ${freeShippingMinLabel(freeShippingMinBRL)}`, ...NOTES]
       : [...NOTES];
   return (
     <div className="overflow-hidden border-b-4 border-outline bg-royal py-2 text-brand-soft">
