@@ -6,6 +6,7 @@ import Breadcrumb from "@/components/ui/Breadcrumb";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
 import Stepper from "@/components/ui/Stepper";
 import SoldOutBox from "@/components/product/SoldOutBox";
+import FreeShippingNote from "@/components/product/FreeShippingNote";
 import { sealedItem, trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { useCart } from "@/lib/cart";
 import { kitLabel, kitStock, kitToCartLine, sealedToCartLine } from "@/lib/cart-lines";
@@ -16,8 +17,10 @@ import type { AccessoryDetail, KitOffer, SealedDetail } from "@/lib/types";
 
 export default function SealedDetailView({
   item,
+  freeShippingMinBRL = 0,
 }: {
   item: SealedDetail | AccessoryDetail;
+  freeShippingMinBRL?: number;
 }) {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
@@ -205,6 +208,7 @@ export default function SealedDetailView({
                   .
                 </p>
               )}
+              <FreeShippingNote minBRL={freeShippingMinBRL} priceCents={item.price} />
               {item.shipsFrom && (
                 <p className="mt-4 rounded-[8px] border-[3px] border-brand bg-outline px-3 py-2 text-sm text-white">
                   <strong>Pré-venda:</strong> envio e retirada a partir de {shipsFromLabel(item.shipsFrom)}.

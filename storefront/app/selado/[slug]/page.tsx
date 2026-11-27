@@ -29,7 +29,7 @@ import {
   liveShelves,
   MIN_COLLECTION_ITEMS,
 } from "@/lib/sealed-guide";
-import { productFaq, SEALED_GENERAL } from "@/lib/sealed-faq";
+import { productFaq, SEALED_GENERAL, SEALED_SHIPPING, sealedShipping } from "@/lib/sealed-faq";
 import { SEM_JUROS } from "@/lib/payment";
 
 export const revalidate = 60;
@@ -120,7 +120,7 @@ export default async function SeladoSlugPage({
           <SealedCollectionLinks title={`Coleções de ${gameName}`} collections={liveCollections(sealed, slug)} />
           <SealedFormatGuide title={`Qual selado de ${gameName} comprar?`} list={list} />
           <GuideLinks guides={guidesFor(slug)} title={`Guias de ${gameName}`} />
-          <FaqSection items={SEALED_GENERAL} />
+          <FaqSection items={SEALED_GENERAL.map((f) => (f === SEALED_SHIPPING ? sealedShipping(freeShippingMinBRL) : f))} />
         </Container>
       </>
     );
@@ -151,7 +151,7 @@ export default async function SeladoSlugPage({
           ])}
         />
       )}
-      <SealedDetailView item={item} />
+      <SealedDetailView item={item} freeShippingMinBRL={freeShippingMinBRL} />
       <Container className="pb-6">
         {collection && <SealedCollectionAbout collection={collection} item={item} siblings={siblings.length} />}
         {others.length > 0 && collection && (
@@ -165,7 +165,7 @@ export default async function SeladoSlugPage({
             <SealedGrid list={others} listId="selado_mesma_colecao" listName={`Mais produtos de ${collection.short}`} />
           </section>
         )}
-        <FaqSection items={productFaq(item, collection)} schema={live} />
+        <FaqSection items={productFaq(item, collection, freeShippingMinBRL)} schema={live} />
       </Container>
     </>
   );
