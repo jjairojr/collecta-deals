@@ -129,6 +129,7 @@ export default async function HomePage() {
             />
             <div className="animate-bob relative h-[300px] w-[300px] overflow-hidden rounded-full border-[6px] border-outline bg-royal-light">
               <Image
+                unoptimized
                 src="/mascot.png"
                 alt="Mascote da Collecta segurando cartas"
                 width={300}

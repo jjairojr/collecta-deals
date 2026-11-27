@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 type Hue = "brand" | "royal" | "soft";
@@ -34,6 +35,7 @@ export default function ArtPlaceholder({
   imageURL,
   alt = "",
   priority = false,
+  sizes = "(min-width: 1024px) 240px, (min-width: 640px) 30vw, 45vw",
 }: {
   hue?: Hue;
   angle?: Angle;
@@ -41,12 +43,28 @@ export default function ArtPlaceholder({
   imageURL?: string;
   alt?: string;
   priority?: boolean;
+  /** How wide the photo shows, for the optimizer to pick the file (next/image `sizes`). */
+  sizes?: string;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     setFailed(false);
   }, [imageURL]);
 
+  if (imageURL && !failed && isItemPhoto(imageURL)) {
+    return (
+      <Image
+        src={imageURL}
+        alt={alt}
+        width={500}
+        height={700}
+        sizes={sizes}
+        priority={priority}
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
   if (imageURL && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -75,4 +93,10 @@ export default function ArtPlaceholder({
       </div>
     </div>
   );
+}
+
+// Real photos uploaded to the backend are full-size JPGs: they go through the
+// image optimizer (next.config.mjs). Card art from /img stays as it is.
+function isItemPhoto(url: string): boolean {
+  return url.includes("/api/item-photos/");
 }
