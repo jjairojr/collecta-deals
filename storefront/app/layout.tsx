@@ -81,7 +81,7 @@ export default async function RootLayout({
         <AccountProvider>
         <CartProvider>
           <Scanlines />
-          <AnnouncementBar />
+          <AnnouncementBar freeShippingMinBRL={catalog.freeShippingMinBRL} />
           <Header />
           <TabBar games={games} showAccessories={showAccessories} />
           <main className="min-h-[60vh]">{children}</main>

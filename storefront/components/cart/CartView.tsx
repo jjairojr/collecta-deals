@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics";
 import { useAccount } from "@/lib/account";
 import { useCart } from "@/lib/cart";
+import { freeShippingMinLabel } from "@/lib/free-shipping";
 import { brl } from "@/lib/format";
 import { installmentsFor, shipsFromLabel, unitPriceFor } from "@/lib/payment";
 import type { CartLine } from "@/lib/types";
@@ -29,7 +30,7 @@ function handoffNotice(count: number, missing: number): string {
   return `${loaded} ${missing} ${missing === 1 ? "item esgotou" : "itens esgotaram"} e ficou de fora.`;
 }
 
-export default function CartView() {
+export default function CartView({ freeShippingMinBRL = 0 }: { freeShippingMinBRL?: number }) {
   const { lines, total, setQty, remove, clear, add } = useCart();
   const { refresh } = useAccount();
   const router = useRouter();
@@ -223,6 +224,8 @@ export default function CartView() {
         >
           <div className="font-pixel text-[11px] text-brand-soft">RESUMO</div>
 
+          <FreeShippingProgress minBRL={freeShippingMinBRL} pixCents={total} cardCents={cardTotal} />
+
           <dl className="mt-5 space-y-3 text-[15px]">
             <Row label="Subtotal" value={brl(total)} />
             <Row label="Frete" value="Calculado no checkout" />
@@ -276,3 +279,43 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+// The checkout makes PAC free when the products reach the minimum at the price of
+// the chosen payment (internal/api/orders.go, applyFreeShipping). The cart does
+// not know the payment yet, so it counts the Pix total, the lowest: what it says
+// is reached is reached in the checkout too.
+function FreeShippingProgress({ minBRL, pixCents, cardCents }: { minBRL: number; pixCents: number; cardCents: number }) {
+  if (minBRL <= 0) {
+    return null;
+  }
+  const minCents = Math.round(minBRL * 100);
+  const reached = pixCents >= minCents;
+  const pct = Math.min(100, Math.round((pixCents / minCents) * 100));
+  const missing = brl(minCents - pixCents);
+  return (
+    <div className="mt-4 rounded-[10px] border-2 border-brand bg-surface p-3" aria-live="polite">
+      <p className="text-[13px] text-white">
+        {reached
+          ? "Frete grátis no PAC liberado: no checkout, a opção PAC sai de graça."
+          : cardCents >= minCents
+            ? `No cartão o PAC já sai grátis. No Pix, faltam ${missing} para o frete grátis no PAC.`
+            : `Faltam ${missing} para o frete grátis no PAC.`}
+      </p>
+      <div
+        className="mt-2 h-2 overflow-hidden rounded-full bg-outline"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-label="Progresso para o frete grátis no PAC"
+      >
+        <div className="h-full bg-brand" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-2 text-[11px] text-muted">
+        Para todo o Brasil, em compras a partir de {freeShippingMinLabel(minBRL)} em produtos. As outras opções de
+        envio continuam pagas.
+      </p>
+    </div>
+  );
+}
+
