@@ -39,6 +39,7 @@ export default function Header() {
             style={{ ["--sh" as string]: "4px", height: 52, width: 52 }}
           >
             <Image
+              unoptimized
               src="/mascot.png"
               alt=""
               width={52}

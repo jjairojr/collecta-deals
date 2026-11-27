@@ -150,6 +150,7 @@ export default function LojaPage() {
           <div className="grid grid-cols-3 gap-3">
             {STORE_PHOTOS.map((photo) => (
               <Image
+                unoptimized
                 key={photo.src}
                 src={photo.src}
                 alt={photo.alt}

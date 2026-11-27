@@ -89,6 +89,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                 imageURL={item.imageURL}
                 alt={`${item.name} ${item.number} · ${item.set} · carta ${item.gameLabel}${item.variant ? ` ${item.variant}` : ""}`}
                 priority
+                sizes="(min-width: 1024px) 520px, 90vw"
               />
             </div>
           </div>
@@ -184,6 +185,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
             style={{ ["--sh" as string]: "6px" }}
           >
             <Image
+              unoptimized
               src="/mascot.png"
               alt=""
               width={48}
