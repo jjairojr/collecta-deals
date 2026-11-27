@@ -48,7 +48,8 @@ export interface VitrineHeroSlide {
   href?: string;
 }
 
-export type HeroStyle = "vitrine" | "destaque";
+/** Carousel colours: "rosa" (pink background, blue card) or "azul" (royal background, pink card). */
+export type HeroStyle = "rosa" | "azul";
 
 export interface VitrineLive {
   phrases: string[];
@@ -102,7 +103,7 @@ export async function loadVitrine(): Promise<VitrineLive> {
       barImage: data.barImage?.href ? withImage(base, data.barImage) : undefined,
       banner: banner ? { ...banner, image: banner.image && banner.href ? withImage(base, banner.image) : undefined } : undefined,
       popup: data.popup?.sku ? data.popup : undefined,
-      heroStyle: data.heroStyle === "destaque" ? "destaque" : "vitrine",
+      heroStyle: data.heroStyle === "azul" ? "azul" : "rosa",
       heroSlides,
     };
   } catch {

@@ -206,7 +206,7 @@ func TestVitrineLivePopupSkipsUnlisted(t *testing.T) {
 
 func TestVitrineHeroSlidesLiveDropUnlisted(t *testing.T) {
 	s, sku := vitrineServer(t)
-	c := vitrine.Config{Phrases: []vitrine.Phrase{}, HeroStyle: vitrine.HeroStyleSpotlight, HeroSlides: []vitrine.HeroSlide{
+	c := vitrine.Config{Phrases: []vitrine.Phrase{}, HeroStyle: vitrine.HeroStyleBlue, HeroSlides: []vitrine.HeroSlide{
 		{Enabled: true, Kind: vitrine.SlideProduct, SKU: sku, Badge: "Novo", Phrase: "Teach chegou"},
 		{Enabled: true, Kind: vitrine.SlideProduct, SKU: "single|onepiece|nao-existe||", Window: vitrine.Window{From: "2026-12-05"}},
 	}}
@@ -220,7 +220,7 @@ func TestVitrineHeroSlidesLiveDropUnlisted(t *testing.T) {
 	}
 	var live vitrine.Live
 	rec := vitrineDo(t, s, http.MethodGet, "/api/storefront/vitrine", "", nil)
-	if err := json.Unmarshal(rec.Body.Bytes(), &live); err != nil || len(live.HeroSlides) != 1 || live.HeroSlides[0].SKU != sku || live.HeroStyle != vitrine.HeroStyleSpotlight {
+	if err := json.Unmarshal(rec.Body.Bytes(), &live); err != nil || len(live.HeroSlides) != 1 || live.HeroSlides[0].SKU != sku || live.HeroStyle != vitrine.HeroStyleBlue {
 		t.Fatalf("01/12 = %s", rec.Body)
 	}
 	s.postSale.now = func() time.Time { return time.Date(2026, 12, 6, 15, 0, 0, 0, saoPaulo) }

@@ -2019,7 +2019,8 @@ export interface VitrineConfig {
   popups?: VitrinePopup[];
   /** Only in configs saved before the list of pop-ups; the server migrates it. */
   popup?: VitrinePopup;
-  heroStyle?: "vitrine" | "destaque";
+  /** Carousel colours: "rosa" (pink background, blue card) or "azul" (royal background, pink card). */
+  heroStyle?: "rosa" | "azul";
   heroSlides?: VitrineHeroSlide[];
   updatedAt?: string;
 }

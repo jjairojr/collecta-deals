@@ -37,6 +37,7 @@ export default function ArtPlaceholder({
   priority = false,
   sizes = "(min-width: 1024px) 240px, (min-width: 640px) 30vw, 45vw",
   fit = "cover",
+  blend = false,
 }: {
   hue?: Hue;
   angle?: Angle;
@@ -48,6 +49,8 @@ export default function ArtPlaceholder({
   sizes?: string;
   /** "contain" shows the whole product (boxes in the home carousel); default crops to fill. */
   fit?: "cover" | "contain";
+  /** Multiplies the photo over its tray, so a product shot on white loses the white box. */
+  blend?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -64,7 +67,7 @@ export default function ArtPlaceholder({
         sizes={sizes}
         priority={priority}
         onError={() => setFailed(true)}
-        className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
+        className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}${blend ? " mix-blend-multiply" : ""}`}
       />
     );
   }
@@ -80,7 +83,7 @@ export default function ArtPlaceholder({
         fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         onError={() => setFailed(true)}
-        className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
+        className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}${blend ? " mix-blend-multiply" : ""}`}
       />
     );
   }

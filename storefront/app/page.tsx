@@ -63,10 +63,9 @@ export default async function HomePage() {
   return (
     <>
       {slides.length > 0 ? (
-        <>
-          <HeroCarousel slides={slides} variant={vitrine.heroStyle ?? "vitrine"} />
-          {vitrine.banner && <HolidayBanner banner={vitrine.banner} />}
-        </>
+        // With a live carousel the home shows only the top bar and the carousel;
+        // the gift banner comes back only when there is no live slide.
+        <HeroCarousel slides={slides} variant={vitrine.heroStyle ?? "rosa"} />
       ) : (
         <>
           {vitrine.banner && <HolidayBanner banner={vitrine.banner} />}

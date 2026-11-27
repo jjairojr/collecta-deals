@@ -112,7 +112,7 @@ func TestStoreRoundTrip(t *testing.T) {
 }
 
 func TestHeroSlidesValidation(t *testing.T) {
-	ok := Config{HeroStyle: HeroStyleSpotlight, HeroSlides: []HeroSlide{
+	ok := Config{HeroStyle: HeroStyleBlue, HeroSlides: []HeroSlide{
 		{Enabled: true, Kind: SlideProduct, SKU: "sealed|pokemon|x|||", Badge: "Kit", Phrase: "Cada pacote sai mais barato no kit"},
 	}}
 	if err := Validate(ok); err != nil {
@@ -136,7 +136,7 @@ func TestHeroSlidesValidation(t *testing.T) {
 			t.Errorf("%s: devia recusar", name)
 		}
 	}
-	if err := Validate(Config{HeroStyle: "neon"}); err == nil {
+	if err := Validate(Config{HeroStyle: "destaque"}); err == nil {
 		t.Error("estilo desconhecido devia recusar")
 	}
 	many := make([]HeroSlide, MaxHeroSlides+1)
@@ -168,7 +168,7 @@ func TestHeroSlidesLiveKeepOrderAndDates(t *testing.T) {
 	if g := got("2026-12-02"); g != "b,c" {
 		t.Fatalf("02/12 = %q", g)
 	}
-	if live := c.LiveAt(at("2026-12-01")); live.HeroStyle != HeroStyleShowcase {
+	if live := c.LiveAt(at("2026-12-01")); live.HeroStyle != HeroStylePink {
 		t.Fatalf("estilo padrão = %q", live.HeroStyle)
 	}
 	if live := (Config{}).LiveAt(at("2026-12-01")); live.HeroStyle != "" || len(live.HeroSlides) != 0 {

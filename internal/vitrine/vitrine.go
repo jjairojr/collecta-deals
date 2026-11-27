@@ -113,8 +113,10 @@ const (
 	SlideProduct = "produto"
 	SlideImage   = "imagem"
 
-	HeroStyleShowcase  = "vitrine"
-	HeroStyleSpotlight = "destaque"
+	// Two colour variants of the same carousel, in the store's palette:
+	// "rosa" (pink background, blue card) and "azul" (royal blue background, pink card).
+	HeroStylePink = "rosa"
+	HeroStyleBlue = "azul"
 )
 
 type HeroSlide struct {
@@ -140,8 +142,8 @@ type Config struct {
 	// existed had a single Popup; reading it moves that one into Popups.
 	Popups []Popup `json:"popups,omitempty"`
 	Popup  *Popup  `json:"popup,omitempty"`
-	// HeroStyle picks the carousel look ("vitrine" or "destaque"); empty means
-	// "vitrine". With no live slide the home keeps its usual hero.
+	// HeroStyle picks the carousel colours ("rosa" or "azul"); empty means
+	// "rosa". With no live slide the home keeps its usual hero.
 	HeroStyle  string      `json:"heroStyle,omitempty"`
 	HeroSlides []HeroSlide `json:"heroSlides,omitempty"`
 	UpdatedAt  time.Time   `json:"updatedAt,omitempty"`
@@ -327,9 +329,9 @@ func Validate(c Config) error {
 
 func validateHero(c Config) error {
 	switch c.HeroStyle {
-	case "", HeroStyleShowcase, HeroStyleSpotlight:
+	case "", HeroStylePink, HeroStyleBlue:
 	default:
-		return fmt.Errorf("estilo do carrossel precisa ser %q ou %q", HeroStyleShowcase, HeroStyleSpotlight)
+		return fmt.Errorf("cor do carrossel precisa ser %q ou %q", HeroStylePink, HeroStyleBlue)
 	}
 	if len(c.HeroSlides) > MaxHeroSlides {
 		return fmt.Errorf("no máximo %d slides no carrossel", MaxHeroSlides)
@@ -391,7 +393,7 @@ func (c Config) HeroSlidesOn(now time.Time) []HeroSlide {
 // HeroStyleOrDefault is the style the site should use.
 func (c Config) HeroStyleOrDefault() string {
 	if c.HeroStyle == "" {
-		return HeroStyleShowcase
+		return HeroStylePink
 	}
 	return c.HeroStyle
 }

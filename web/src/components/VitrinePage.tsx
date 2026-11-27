@@ -91,7 +91,7 @@ function clean(c: VitrineConfig): VitrineConfig {
   const heroSlides = (c.heroSlides ?? [])
     .filter((s) => (s.kind === "produto" ? Boolean(s.sku?.trim()) : hasImage(s.image) || Boolean(s.href?.trim())))
     .map((s) => (s.kind === "produto" ? { ...s, image: undefined } : { ...s, sku: undefined }));
-  return { phrases, barImages, banner, popups, heroStyle: c.heroStyle ?? "vitrine", heroSlides };
+  return { phrases, barImages, banner, popups, heroStyle: c.heroStyle ?? "rosa", heroSlides };
 }
 
 // Puts what the server sent into the editing shape: an old single pop-up becomes
@@ -102,7 +102,7 @@ function editable(c: VitrineConfig): VitrineConfig {
     barImages: c.barImages ?? [],
     banner: c.banner ?? emptyBanner(),
     popups: c.popups ?? (c.popup ? [c.popup] : []),
-    heroStyle: c.heroStyle ?? "vitrine",
+    heroStyle: c.heroStyle ?? "rosa",
     heroSlides: c.heroSlides ?? [],
     updatedAt: c.updatedAt,
   };
@@ -192,11 +192,11 @@ export default function VitrinePage() {
         />
         <div className="flex flex-wrap gap-4 text-sm text-slate-300">
           {([
-            ["vitrine", "Vitrine: um produto por vez, grande, fundo limpo"],
-            ["destaque", "Destaque: cards com a cor do jogo, dois por vez no computador"],
+            ["rosa", "Rosa: fundo rosa da marca, cartão azul"],
+            ["azul", "Azul: fundo azul royal, cartão rosa"],
           ] as const).map(([value, label]) => (
             <label key={value} className="flex items-center gap-2">
-              <input type="radio" name="heroStyle" checked={(config.heroStyle ?? "vitrine") === value} onChange={() => setConfig({ ...config, heroStyle: value })} />
+              <input type="radio" name="heroStyle" checked={(config.heroStyle ?? "rosa") === value} onChange={() => setConfig({ ...config, heroStyle: value })} />
               {label}
             </label>
           ))}
