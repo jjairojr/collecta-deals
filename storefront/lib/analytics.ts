@@ -18,6 +18,7 @@ export interface GAItem {
   item_brand?: string;
   price: number;
   quantity: number;
+  item_list_name?: string;
 }
 
 type GAValue = string | number | boolean | GAItem[];
@@ -44,6 +45,10 @@ function pixelParams(params: GAParams): PixelParams {
   }
   if (typeof params.search_term === "string") {
     out.search_string = params.search_term;
+  }
+  // Where an add to cart came from (an offer, a list), so offers can be measured.
+  if (typeof params.item_list_name === "string") {
+    out.content_category = params.item_list_name;
   }
   if (items.length > 0) {
     out.content_type = "product";
@@ -153,11 +158,16 @@ export function trackSelectItem(item: GAItem, listName?: string): void {
   send("select_item", { item_list_name: listName, items: [item] });
 }
 
-export function trackAddToCart(item: GAItem): void {
+/**
+ * `listName` names where the add came from ("oferta_toast_acessorio",
+ * "carrinho_kit_30anos"…): GA4 item_list_name, Meta Pixel content_category.
+ */
+export function trackAddToCart(item: GAItem, listName?: string): void {
   send("add_to_cart", {
     currency: CURRENCY,
     value: itemsValue([item]),
-    items: [item],
+    item_list_name: listName,
+    items: [listName ? { ...item, item_list_name: listName } : item],
   });
 }
 

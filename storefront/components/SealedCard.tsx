@@ -5,6 +5,7 @@ import { sealedItem, trackSelectItem } from "@/lib/analytics";
 import { brl } from "@/lib/format";
 import { CARD_PRICED_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
 import ArtPlaceholder from "@/components/ui/ArtPlaceholder";
+import { stockLabel } from "@/lib/stock";
 import type { Accessory, Sealed } from "@/lib/types";
 
 // Grid item for a boxy product (sealed or accessory). Light-pink sticker with a
@@ -35,7 +36,7 @@ export default function SealedCard({ item }: { item: Sealed | Accessory }) {
         )}
         {!item.shipsFrom && (
           <span className="absolute bottom-2 right-2 bg-outline px-1.5 py-1 font-pixel text-[8px] text-white">
-            {item.qty} UN
+            {stockLabel(item.qty)}
           </span>
         )}
       </div>

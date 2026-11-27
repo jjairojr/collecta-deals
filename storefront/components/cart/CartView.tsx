@@ -18,6 +18,8 @@ import { freeShippingMinLabel } from "@/lib/free-shipping";
 import { brl } from "@/lib/format";
 import { installmentsFor, shipsFromLabel, unitPriceFor } from "@/lib/payment";
 import type { CartLine } from "@/lib/types";
+import type { BoosterKitOffer } from "@/lib/offers";
+import CartKitOffer from "@/components/cart/CartKitOffer";
 import { buildOrder, whatsappURL } from "@/lib/whatsapp";
 
 const HANDOFF_EXPIRED = "O link do app expirou. Volte ao app e toque em Pagar no site de novo.";
@@ -30,7 +32,10 @@ function handoffNotice(count: number, missing: number): string {
   return `${loaded} ${missing} ${missing === 1 ? "item esgotou" : "itens esgotaram"} e ficou de fora.`;
 }
 
-export default function CartView({ freeShippingMinBRL = 0 }: { freeShippingMinBRL?: number }) {
+export default function CartView({
+  kitOffer,
+  freeShippingMinBRL = 0,
+}: { kitOffer?: BoosterKitOffer; freeShippingMinBRL?: number } = {}) {
   const { lines, total, setQty, remove, clear, add } = useCart();
   const { refresh } = useAccount();
   const router = useRouter();
@@ -195,6 +200,8 @@ export default function CartView({ freeShippingMinBRL = 0 }: { freeShippingMinBR
               </div>
             </div>
           ))}
+
+          <CartKitOffer offer={kitOffer} />
 
           <div
             className="sticker flex items-center gap-4 rounded-[14px] bg-royal px-5 py-4"

@@ -1,19 +1,20 @@
 import { Suspense } from "react";
 import CartView from "@/components/cart/CartView";
 import { loadCatalog } from "@/lib/catalog";
-
-export const revalidate = 60;
+import { pickBoosterKit } from "@/lib/offers";
 
 export const metadata = {
   title: "Carrinho",
   robots: { index: false },
 };
 
+export const revalidate = 60;
+
 export default async function CarrinhoPage() {
-  const { freeShippingMinBRL } = await loadCatalog();
+  const { sealed, freeShippingMinBRL } = await loadCatalog();
   return (
     <Suspense>
-      <CartView freeShippingMinBRL={freeShippingMinBRL} />
+      <CartView kitOffer={pickBoosterKit(sealed)} freeShippingMinBRL={freeShippingMinBRL} />
     </Suspense>
   );
 }
