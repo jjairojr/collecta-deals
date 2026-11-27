@@ -44,6 +44,8 @@ export interface Single {
   condition: string;
   language: string;
   price: number;
+  /** Card price in cents (at least Pix ÷ 0,90); missing = same as Pix. */
+  cardPrice?: number;
   wasPrice?: number;
   qty: number;
   grade?: string;

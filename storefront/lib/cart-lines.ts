@@ -11,6 +11,7 @@ export function singleToCartLine(item: Single): Omit<CartLine, "qty"> {
     meta: [item.set, item.number, item.variant, item.condition].filter(Boolean).join(" · "),
     seller: STORE_SELLER,
     price: item.price,
+    cardPrice: item.cardPrice,
     stock: item.qty,
     imageURL: item.imageURL,
   };

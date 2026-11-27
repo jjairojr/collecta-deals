@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"opdeals/internal/pricing"
 	"os"
 	"path/filepath"
 	"sort"
@@ -46,10 +47,7 @@ func (k Kit) SKU() string {
 }
 
 func (k Kit) CardPrice() float64 {
-	if k.CardBRL > 0 {
-		return k.CardBRL
-	}
-	return k.AskBRL
+	return pricing.Card(k.AskBRL, k.CardBRL)
 }
 
 func Validate(k Kit) error {

@@ -68,9 +68,9 @@ func TestPickPriceDepthCountsNMTier(t *testing.T) {
 	listings := []listing{
 		mkq(120.00, 5, "Near Mint", false, "English", "OP12-030 JAPANESE"), // non-gold JP: ignored
 		mkq(134.99, 4, "Lightly Played", false, "English", ""),             // non-gold: ignored
-		mkq(141.74, 3, "Lightly Played", true, "English", ""),             // gold LP: not NM tier
-		mkq(140.99, 2, "Near Mint", true, "English", ""),                  // gold NM
-		mkq(143.99, 6, "Near Mint", true, "English", ""),                  // gold NM
+		mkq(141.74, 3, "Lightly Played", true, "English", ""),              // gold LP: not NM tier
+		mkq(140.99, 2, "Near Mint", true, "English", ""),                   // gold NM
+		mkq(143.99, 6, "Near Mint", true, "English", ""),                   // gold NM
 	}
 	got := pickPrice(listings)
 	if got.Price != 140.99 {
@@ -88,8 +88,8 @@ func TestPickPriceDepthCountsNMTier(t *testing.T) {
 // fallback price came from.
 func TestPickPriceDepthFallbackTier(t *testing.T) {
 	listings := []listing{
-		mkq(50.00, 9, "Lightly Played", false, "English", ""), // non-gold: ignored
-		mkq(60.00, 3, "Lightly Played", true, "English", ""),  // gold LP
+		mkq(50.00, 9, "Lightly Played", false, "English", ""),   // non-gold: ignored
+		mkq(60.00, 3, "Lightly Played", true, "English", ""),    // gold LP
 		mkq(70.00, 4, "Moderately Played", true, "English", ""), // gold MP
 	}
 	got := pickPrice(listings)

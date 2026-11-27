@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"opdeals/internal/pricing"
 	"sort"
 
 	"opdeals/internal/trades"
@@ -61,10 +62,7 @@ func CardUnitPrice(ts []trades.Trade) (float64, bool) {
 	price := 0.0
 	found := false
 	for _, t := range Eligible(ts) {
-		card := t.AskBRL
-		if t.CardBRL > 0 {
-			card = t.CardBRL
-		}
+		card := pricing.Card(t.AskBRL, t.CardBRL)
 		if !found || card < price {
 			price = card
 			found = true
@@ -82,7 +80,7 @@ func UnitPriceFor(ts []trades.Trade, method PaymentMethod) (float64, bool) {
 
 func HasCardPrice(ts []trades.Trade) bool {
 	for _, t := range Eligible(ts) {
-		if t.CardBRL > 0 {
+		if pricing.Card(t.AskBRL, t.CardBRL) > t.AskBRL {
 			return true
 		}
 	}

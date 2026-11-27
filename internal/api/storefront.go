@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"opdeals/internal/pricing"
 	"regexp"
 	"strconv"
 	"strings"
@@ -73,8 +74,8 @@ func storefrontKits(listed []kits.Kit, inStock []storefrontItem) []storefrontKit
 			continue
 		}
 		item := storefrontKit{SKU: k.SKU(), BaseSKU: k.BaseSKU, Units: k.Units, AskBRL: round2(k.AskBRL)}
-		if k.CardBRL > 0 {
-			item.CardBRL = round2(k.CardBRL)
+		if card := k.CardPrice(); card > 0 {
+			item.CardBRL = round2(card)
 		}
 		out = append(out, item)
 	}
@@ -235,8 +236,10 @@ func publicItem(t trades.Trade, gameID, gameLabel string, qty int, fx float64, l
 		ShipsFrom: t.ShipsFrom,
 		Featured:  t.Featured,
 	}
-	if t.CardBRL > 0 {
-		item.CardBRL = round2(t.CardBRL)
+	// The card price the checkout charges (pricing.Card): at least Pix ÷ 0,90,
+	// for every product, so the site never shows the card at the Pix price.
+	if card := pricing.Card(t.AskBRL, t.CardBRL); card > 0 {
+		item.CardBRL = round2(card)
 	}
 	if !t.CreatedAt.IsZero() {
 		item.AddedAt = t.CreatedAt.UTC().Format(time.RFC3339)

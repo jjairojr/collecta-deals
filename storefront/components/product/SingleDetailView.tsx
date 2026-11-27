@@ -49,6 +49,7 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
           .join(" · "),
         seller: item.seller.name,
         price: item.price,
+        cardPrice: item.cardPrice,
         stock: item.qty,
         imageURL: item.imageURL,
       },
@@ -141,9 +142,12 @@ export default function SingleDetailView({ item }: { item: SingleDetail }) {
                   </span>
                 )}
               </div>
-              {plan && INTEREST_FREE && (
+              {item.cardPrice !== undefined && (
                 <p className="mt-2 text-[13px] text-muted">
-                  ou {plan.count}x de {brl(plan.each)} sem juros no cartão
+                  no Pix · ou <strong className="text-white">{brl(item.cardPrice)}</strong> no cartão
+                  {plan && INTEREST_FREE
+                    ? `, em ${plan.count}x de ${brl(plan.each)} sem juros`
+                    : ` em até 6x${SEM_JUROS}`}
                 </p>
               )}
               {item.marketAvg && (
