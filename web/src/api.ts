@@ -1975,12 +1975,23 @@ export interface VitrineTier {
   href: string;
 }
 
+export interface VitrineImage {
+  desktop: string;
+  mobile: string;
+  alt: string;
+}
+
+export interface VitrineBarImage extends VitrineImage, VitrineWindow {
+  href: string;
+}
+
 export interface VitrineBanner extends VitrineWindow {
   title: string;
   text?: string;
   cta?: string;
   href?: string;
   tiers?: VitrineTier[];
+  image?: VitrineImage;
 }
 
 export interface VitrinePopup extends VitrineWindow {
@@ -1992,9 +2003,24 @@ export interface VitrinePopup extends VitrineWindow {
 
 export interface VitrineConfig {
   phrases: VitrinePhrase[];
+  barImages?: VitrineBarImage[];
   banner?: VitrineBanner;
+  popups?: VitrinePopup[];
+  /** Only in configs saved before the list of pop-ups; the server migrates it. */
   popup?: VitrinePopup;
   updatedAt?: string;
+}
+
+/** Uploads one art file and returns its URL (path on the server). */
+export async function uploadVitrineImage(file: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("file", file, "arte");
+  const res = await fetch(`${base}/vitrine/image`, { method: "POST", body: form });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(text.trim() || `upload falhou: ${res.status}`);
+  }
+  return (JSON.parse(text) as { url: string }).url;
 }
 
 export function getVitrine(): Promise<VitrineConfig> {
