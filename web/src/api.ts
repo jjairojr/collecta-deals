@@ -1957,3 +1957,83 @@ export function resolveArenaDuel(id: string, outcome: ArenaOutcome, reason: stri
 export function annulArenaDuel(id: string, reason: string): Promise<ArenaDuel> {
   return arenaPost<ArenaDuel>(`/duels/${arenaID(id)}/annul`, { reason });
 }
+
+// Vitrine: campaign content of the storefront (faixa, banner da home, pop-up de
+// saída), edited on the "Vitrine" screen. The site shows each piece only inside
+// its dates (Goiânia).
+export interface VitrineWindow {
+  from?: string;
+  until?: string;
+}
+
+export interface VitrinePhrase extends VitrineWindow {
+  text: string;
+}
+
+export interface VitrineTier {
+  label: string;
+  href: string;
+}
+
+export interface VitrineBanner extends VitrineWindow {
+  title: string;
+  text?: string;
+  cta?: string;
+  href?: string;
+  tiers?: VitrineTier[];
+}
+
+export interface VitrinePopup extends VitrineWindow {
+  enabled: boolean;
+  sku: string;
+  title: string;
+  text?: string;
+}
+
+export interface VitrineConfig {
+  phrases: VitrinePhrase[];
+  banner?: VitrineBanner;
+  popup?: VitrinePopup;
+  updatedAt?: string;
+}
+
+export function getVitrine(): Promise<VitrineConfig> {
+  return getJSON<VitrineConfig>(`${base}/vitrine`);
+}
+
+export function saveVitrine(c: VitrineConfig): Promise<VitrineConfig> {
+  return sendJSON<VitrineConfig>(`${base}/vitrine`, "PUT", c);
+}
+
+export interface VitrineProduct {
+  sku: string;
+  name: string;
+  detail: string;
+}
+
+// Products on sale now, for the pop-up picker: singles, sealed, accessories and kits.
+export async function listVitrineProducts(): Promise<VitrineProduct[]> {
+  const data = await getJSON<{
+    items: { sku: string; name: string; set?: string; number?: string; condition?: string; kind?: string; qty: number; askBRL: number }[];
+    kits?: { sku: string; baseSKU: string; units: number; askBRL: number }[];
+  }>(`${base}/storefront`);
+  const out: VitrineProduct[] = [];
+  const byBase = new Map<string, string>();
+  for (const it of data.items) {
+    if (it.qty <= 0) {
+      continue;
+    }
+    byBase.set(it.sku, it.name);
+    const detail = [it.kind === "sealed" ? "selado" : it.kind === "accessory" ? "acessório" : "carta", it.set, it.number, it.condition, `R$ ${it.askBRL.toFixed(2).replace(".", ",")}`]
+      .filter(Boolean)
+      .join(" · ");
+    out.push({ sku: it.sku, name: it.name, detail });
+  }
+  for (const k of data.kits ?? []) {
+    const name = byBase.get(k.baseSKU);
+    if (name) {
+      out.push({ sku: k.sku, name: `${name} · Kit ${k.units} un`, detail: `kit · R$ ${k.askBRL.toFixed(2).replace(".", ",")}` });
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
