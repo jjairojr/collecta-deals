@@ -7,7 +7,9 @@ import SingleCard from "@/components/SingleCard";
 import SealedCard from "@/components/SealedCard";
 import FaqSection from "@/components/ui/FaqSection";
 import TrackViewItemList from "@/components/analytics/TrackViewItemList";
+import HolidayBanner from "@/components/promo/HolidayBanner";
 import { loadCatalog } from "@/lib/catalog";
+import { loadVitrine } from "@/lib/vitrine";
 import { pixelText } from "@/lib/format";
 import { SEALED_PAYMENT, SEALED_SHIPPING } from "@/lib/sealed-faq";
 import type { FaqItem } from "@/lib/seo";
@@ -50,7 +52,7 @@ const heroLayers =
 
 export default async function HomePage() {
   // Real catalog; high-scores stay mock until the backend serves them.
-  const { singles, sealed, accessories, games } = await loadCatalog();
+  const [{ singles, sealed, accessories, games }, vitrine] = await Promise.all([loadCatalog(), loadVitrine()]);
   const featured = [...singles].sort((a, b) => b.price - a.price).slice(0, 8);
   const byFeatured = [...sealed].sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)));
   const pokemonSealed = byFeatured.filter((s) => s.game === "pokemon").slice(0, 8);
@@ -60,6 +62,7 @@ export default async function HomePage() {
     pickedAccessories.length > 0 ? pickedAccessories : accessories.slice(0, 4);
   return (
     <>
+      {vitrine.banner && <HolidayBanner banner={vitrine.banner} />}
       {/* Hero */}
       <section className="relative overflow-hidden border-b-[6px] border-outline bg-royal">
         <div

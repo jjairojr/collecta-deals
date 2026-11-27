@@ -8,6 +8,7 @@ import {
   HandCoins,
   LayoutGrid,
   LineChart,
+  Megaphone,
   MessageCircle,
   PiggyBank,
   RefreshCw,
@@ -45,6 +46,7 @@ export type View =
   | "ligaexport"
   | "sincronizar"
   | "cupons"
+  | "vitrine"
   | "arena";
 
 export type Icon = ComponentType<{ className?: string }>;
@@ -91,6 +93,7 @@ export const navGroups: NavGroup[] = [
       { key: "pedidos", label: "Pedidos", icon: Truck },
       { key: "conversas", label: "Conversas", icon: MessageCircle },
       { key: "cupons", label: "Cupons", icon: Ticket },
+      { key: "vitrine", label: "Vitrine", icon: Megaphone },
       { key: "arena", label: "Arena", icon: Trophy },
       { key: "compras", label: "Estoque e Compras", icon: ShoppingCart },
       { key: "sincronizar", label: "Sincronizar", icon: RefreshCw },

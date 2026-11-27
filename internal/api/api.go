@@ -32,6 +32,7 @@ import (
 	"opdeals/internal/syncqueue"
 	"opdeals/internal/tracking"
 	"opdeals/internal/trades"
+	"opdeals/internal/vitrine"
 )
 
 // GameStack bundles the per-game state. Every /api route selects a stack by
@@ -71,6 +72,7 @@ type Server struct {
 	postSale       postSaleState
 	SyncQueue      *syncqueue.Store
 	Kits           *kits.Store
+	Vitrine        *vitrine.Store
 	Packs          *packs.Store
 	Publish        *publishq.Store
 	AdTests        *adtestq.Store
@@ -244,6 +246,9 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.PostSaleEnabled() {
 		s.postSaleRoutes(mux)
+	}
+	if s.Vitrine != nil {
+		s.vitrineRoutes(mux)
 	}
 	if s.Publish != nil {
 		s.publishRoutes(mux)

@@ -8,13 +8,13 @@ const NOTES = [
   // "+18.400 CARTAS NO ESTOQUE",
 ];
 
-function NoteRow({ hidden }: { hidden?: boolean }) {
+function NoteRow({ notes, hidden }: { notes: string[]; hidden?: boolean }) {
   return (
     <span
       aria-hidden={hidden}
       className="flex shrink-0 items-center gap-5 pr-5 font-pixel text-[9px] leading-none"
     >
-      {NOTES.map((n) => (
+      {notes.map((n) => (
         <span key={n} className="flex items-center gap-2 whitespace-nowrap">
           <span
             className="inline-block h-2 w-2 rounded-full bg-brand-soft animate-blink"
@@ -27,12 +27,15 @@ function NoteRow({ hidden }: { hidden?: boolean }) {
   );
 }
 
-export default function AnnouncementBar() {
+// `extra` are the phrases from the dashboard's "Vitrine" screen that are live
+// today (Natal: prazo de 09/12, retirada de 16 a 24/12); they lead the bar.
+export default function AnnouncementBar({ extra = [] }: { extra?: string[] }) {
+  const notes = [...extra, ...NOTES];
   return (
     <div className="overflow-hidden border-b-4 border-outline bg-royal py-2 text-brand-soft">
       <div className="flex w-max animate-marquee sm:hidden">
-        <NoteRow />
-        <NoteRow hidden />
+        <NoteRow notes={notes} />
+        <NoteRow notes={notes} hidden />
       </div>
       <Container className="hidden items-center gap-5 sm:flex">
         <span className="flex items-center gap-x-5 whitespace-nowrap font-pixel text-[9px] leading-none">
@@ -41,10 +44,10 @@ export default function AnnouncementBar() {
               className="inline-block h-2 w-2 rounded-full bg-brand-soft animate-blink"
               aria-hidden
             />
-            {pixelText(NOTES[0])}
+            {pixelText(notes[0])}
           </span>
-          <span>{pixelText(NOTES[1])}</span>
-          <span className="hidden md:inline">{pixelText(NOTES[2])}</span>
+          <span>{pixelText(notes[1])}</span>
+          <span className="hidden md:inline">{pixelText(notes[2])}</span>
         </span>
         <span className="ml-auto hidden whitespace-nowrap font-pixel text-[9px] leading-none text-white sm:block">
           P1 · CONVIDADO
