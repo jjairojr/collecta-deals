@@ -71,6 +71,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
           description: guide.description,
           path: guidePath(guide),
           updated: guide.updated,
+          published: guide.published,
         })}
       />
       <Container narrow className="py-9">

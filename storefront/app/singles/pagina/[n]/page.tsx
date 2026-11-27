@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
+import { packSingles } from "@/lib/singles-pack";
+import ListPageJsonLd from "@/components/seo/ListPageJsonLd";
 import { loadCatalog } from "@/lib/catalog";
 import { pageCount } from "@/lib/paging";
 
@@ -44,6 +46,14 @@ export default async function SinglesPagePage({ params }: { params: Promise<{ n:
   const gameOpts = games.map((g) => ({ id: g.id, label: g.name }));
   const navOpts = navGames.map((g) => ({ id: g.id, label: g.name }));
   return (
-    <SinglesBrowse catalog={singles} games={gameOpts} navGames={navOpts} initialPage={page} basePath="/singles" />
+    <>
+      <ListPageJsonLd
+        name="Cartas avulsas de TCG"
+        crumbs={[{ name: "Collecta", path: "/" }, { name: "Singles", path: "/singles" }, { name: `Página ${page}` }]}
+        slugs={singles.map((s) => s.slug)}
+        page={page}
+      />
+    <SinglesBrowse catalog={packSingles(singles)} games={gameOpts} navGames={navOpts} initialPage={page} basePath="/singles" />
+    </>
   );
 }

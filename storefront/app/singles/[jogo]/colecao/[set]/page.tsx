@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import JsonLd from "@/components/seo/JsonLd";
 import { SetIntro, SetLinks } from "@/components/singles/CategoryExtras";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
+import { packSingles } from "@/lib/singles-pack";
 import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { brl } from "@/lib/format";
 import { GAME_NAMES } from "@/lib/games";
@@ -68,7 +69,7 @@ export default async function SetPage({ params }: { params: Promise<{ jogo: stri
         )}
       />
       <SinglesBrowse
-        catalog={scope.singles}
+        catalog={packSingles(scope.singles)}
         games={scope.games}
         navGames={scope.navGames}
         setLabels={scope.setLabels}

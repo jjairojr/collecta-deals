@@ -15,6 +15,7 @@ import {
 } from "@/lib/analytics";
 import { brl } from "@/lib/format";
 import { SINGLES_PAGE_SIZE } from "@/lib/paging";
+import { type PackedSingle, unpackSingles } from "@/lib/singles-pack";
 import type { Single } from "@/lib/types";
 
 const IDIOMA_OPTS = ["EN", "JP", "PT"];
@@ -56,7 +57,7 @@ function useUrlQuery() {
 }
 
 export default function SinglesBrowse({
-  catalog,
+  catalog: packed,
   games,
   navGames,
   initialGame = null,
@@ -70,7 +71,7 @@ export default function SinglesBrowse({
   footer,
   kindLabel = "Singles",
 }: {
-  catalog: Single[];
+  catalog: PackedSingle[];
   games: { id: string; label: string }[];
   navGames: { id: string; label: string }[];
   initialGame?: string | null;
@@ -85,6 +86,7 @@ export default function SinglesBrowse({
   /** What this list is, in the heading and the TIPO filter ("Singles", "Graduadas"). */
   kindLabel?: string;
 }) {
+  const catalog = useMemo(() => unpackSingles(packed), [packed]);
   const router = useRouter();
   const q = query.trim().toLowerCase();
 

@@ -25,6 +25,8 @@ export interface Guide {
   shelf?: GuideShelf;
   links: { label: string; href: string }[];
   updated: string;
+  /** First publication (AAAA-MM-DD), when known; the schema falls back to `updated`. */
+  published?: string;
 }
 
 const named = (re: RegExp) => (p: Product) => re.test(p.name);

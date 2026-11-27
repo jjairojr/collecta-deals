@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import JsonLd from "@/components/seo/JsonLd";
 import { CategoryIntro } from "@/components/singles/CategoryExtras";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
+import { packSingles } from "@/lib/singles-pack";
 import { loadCatalog, scopeToGraded } from "@/lib/catalog";
 import { GAME_IDS, GAME_NAMES } from "@/lib/games";
 import { SINGLES_PAGE_SIZE } from "@/lib/paging";
@@ -64,7 +65,7 @@ export default async function GradedGamePage({
         )}
       />
       <SinglesBrowse
-        catalog={scope.singles}
+        catalog={packSingles(scope.singles)}
         games={scope.games}
         navGames={scope.navGames}
         setLabels={scope.setLabels}

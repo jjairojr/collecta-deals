@@ -4,6 +4,7 @@ import JsonLd from "@/components/seo/JsonLd";
 import { GameFaq, GameIntro, SetLinks } from "@/components/singles/CategoryExtras";
 import ShippingFacts from "@/components/ui/ShippingFacts";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
+import { packSingles } from "@/lib/singles-pack";
 import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { GAME_IDS, GAME_NAMES } from "@/lib/games";
 import { SINGLES_PAGE_SIZE } from "@/lib/paging";
@@ -62,7 +63,7 @@ export default async function SinglesGamePage({
         )}
       />
       <SinglesBrowse
-        catalog={scope.singles}
+        catalog={packSingles(scope.singles)}
         games={scope.games}
         navGames={scope.navGames}
         setLabels={scope.setLabels}
