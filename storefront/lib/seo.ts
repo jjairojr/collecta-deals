@@ -237,7 +237,7 @@ export function sealedProductJsonLd(item: Sealed, freeShippingMinBRL = 0) {
 // total price; the single unit stays the first offer, the price the page leads with.
 function withKitOffers(
   unit: ReturnType<typeof offerJsonLd>,
-  item: { slug: string; kits?: KitOffer[]; soldOut?: boolean; shipsFrom?: string },
+  item: { slug: string; qty?: number; kits?: KitOffer[]; soldOut?: boolean; shipsFrom?: string },
   freeShippingMinBRL: number,
 ) {
   const kits = item.kits ?? [];
@@ -252,7 +252,8 @@ function withKitOffers(
         k.price,
         "https://schema.org/NewCondition",
         freeShippingMinBRL,
-        item.soldOut,
+        // A kit needs `units` in stock: with fewer left, only the single unit sells.
+        item.soldOut || (item.qty !== undefined && item.qty < k.units),
         item.shipsFrom,
       ),
       name: `Kit com ${k.units} unidades`,
