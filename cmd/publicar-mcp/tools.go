@@ -94,6 +94,10 @@ func (a *app) server() *mcp.Server {
 		Description: "Só para o Publicador Collecta. Lista as publicações aprovadas pelo dono que já chegaram no horário, com os arquivos copiados para a pasta de aprovados (os únicos que podem ser enviados no navegador) e a legenda exata.",
 	}, a.toolApproved)
 	mcp.AddTool(s, &mcp.Tool{
+		Name:        "reservar",
+		Description: "Só para o Publicador Collecta. Chame logo antes de abrir o Instagram ou o TikTok para cada item: reserva o item na fila. postar = false quer dizer que ele já foi publicado (por exemplo, à mão) ou outra pessoa está postando agora: não poste e siga para o próximo.",
+	}, a.toolReserve)
+	mcp.AddTool(s, &mcp.Tool{
 		Name:        "publicado",
 		Description: "Só para o Publicador Collecta. Registra que a publicação saiu, com o link do post no Instagram ou no TikTok, e avisa o dono.",
 	}, a.toolPublished)
@@ -441,11 +445,12 @@ type noInput struct{}
 const statusWindow = 7 * 24 * time.Hour
 
 var statusLabel = map[string]string{
-	publishq.StatusPending:   "esperando o dono",
-	publishq.StatusApproved:  "aprovada",
-	publishq.StatusRejected:  "rejeitada",
-	publishq.StatusPublished: "publicada",
-	publishq.StatusFailed:    "falhou",
+	publishq.StatusPending:    "esperando o dono",
+	publishq.StatusApproved:   "aprovada",
+	publishq.StatusPublishing: "sendo publicada agora",
+	publishq.StatusRejected:   "rejeitada",
+	publishq.StatusPublished:  "publicada",
+	publishq.StatusFailed:     "falhou",
 }
 
 type statusItem struct {
@@ -607,21 +612,50 @@ type publishedInput struct {
 	Link string `json:"link" jsonschema:"link do post publicado (https://www.instagram.com/p/... ou /reel/..., https://www.tiktok.com/@.../video/...)"`
 }
 
+type reserveInput struct {
+	ID string `json:"id" jsonschema:"id que veio de aprovados"`
+}
+
+type reserveOutput struct {
+	Postar bool   `json:"postar"`
+	Motivo string `json:"motivo,omitempty"`
+}
+
+// toolReserve claims the item on the dashboard right before posting. A 409 means
+// someone already published it or is posting it now (27/11: a manual post and
+// the Publicador posted the same Reels a minute apart).
+func (a *app) toolReserve(ctx context.Context, _ *mcp.CallToolRequest, in reserveInput) (*mcp.CallToolResult, reserveOutput, error) {
+	var it publishq.Item
+	err := a.call(ctx, http.MethodPost, "/api/publish/"+url.PathEscape(in.ID)+"/claim", map[string]string{}, &it)
+	if err != nil {
+		if strings.Contains(err.Error(), "respondeu 409") {
+			a.logLine(fmt.Sprintf("reserva recusada %s: já publicado ou sendo postado", in.ID))
+			return nil, reserveOutput{Postar: false, Motivo: "já foi publicado ou outra pessoa está postando agora: não poste, siga para o próximo"}, nil
+		}
+		return nil, reserveOutput{}, err
+	}
+	a.logLine(fmt.Sprintf("reservado %s %s %s", in.ID, it.Channel, it.Format))
+	return nil, reserveOutput{Postar: true}, nil
+}
+
 type okOutput struct {
 	OK     bool   `json:"ok"`
 	Status string `json:"status,omitempty"`
 }
 
 func (a *app) channelOf(ctx context.Context, id string) (string, error) {
-	var list struct {
-		Items []publishq.Item `json:"items"`
-	}
-	if err := a.call(ctx, http.MethodGet, "/api/publish?status="+publishq.StatusApproved, nil, &list); err != nil {
-		return "", err
-	}
-	for _, it := range list.Items {
-		if it.ID == id {
-			return it.Channel, nil
+	// An item being posted was reserved first (reservar), so it is "publishing".
+	for _, status := range []string{publishq.StatusPublishing, publishq.StatusApproved} {
+		var list struct {
+			Items []publishq.Item `json:"items"`
+		}
+		if err := a.call(ctx, http.MethodGet, "/api/publish?status="+status, nil, &list); err != nil {
+			return "", err
+		}
+		for _, it := range list.Items {
+			if it.ID == id {
+				return it.Channel, nil
+			}
 		}
 	}
 	return "", fmt.Errorf("publicação %s não está aprovada: confira o id em aprovados", id)

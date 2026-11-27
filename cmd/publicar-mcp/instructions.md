@@ -28,8 +28,9 @@ do servidor `collecta-publicar`. Não há terminal, arquivo nem outra skill.
 1. `inicio()`. Guarde `agora` e `versao_regras`.
 2. `aprovados()`. Lista vazia: responda só `[[no-update]]` e encerre. Se vier `recusados`, eles já foram avisados ao
    dono: não faça nada com eles.
-3. Para cada item, na ordem: publique (seções abaixo), confira e chame `publicado(id, link)`. Se não der,
-   `falhou(id, motivo, permanente)`.
+3. Para cada item, na ordem: chame `reservar(id)` antes de abrir a rede. Se vier `postar = false`, não poste
+   (já saiu ou alguém está postando) e siga para o próximo. Se vier `postar = true`, publique (seções abaixo),
+   confira e chame `publicado(id, link)`. Se não der, `falhou(id, motivo, permanente)`.
 4. No fim, uma linha por item: canal, formato, `publicado` ou `falhou`, e o link ou o motivo. Diga a `versao_regras`.
 
 ## Instagram (reels, post, carrossel)

@@ -64,6 +64,16 @@ func TestPublishFlow(t *testing.T) {
 	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), created.Token) || !strings.Contains(rec.Body.String(), created.ID) {
 		t.Fatalf("lista de aprovados errada: %d %s", rec.Code, rec.Body.String())
 	}
+
+	if rec := call(t, h, http.MethodPost, "/api/publish/"+created.ID+"/claim", "", false); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("reservar sem token = %d", rec.Code)
+	}
+	if rec := call(t, h, http.MethodPost, "/api/publish/"+created.ID+"/claim", "", true); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"publishing"`) {
+		t.Fatalf("reservar = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := call(t, h, http.MethodPost, "/api/publish/"+created.ID+"/claim", "", true); rec.Code != http.StatusConflict {
+		t.Fatalf("reservar de novo devia dar 409: %d", rec.Code)
+	}
 	if rec := call(t, h, http.MethodGet, "/api/publish", "", false); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("lista sem token devia dar 401: %d", rec.Code)
 	}

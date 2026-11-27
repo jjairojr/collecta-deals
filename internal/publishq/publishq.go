@@ -26,10 +26,18 @@ const (
 	StatusApproved  = "approved"
 	StatusRejected  = "rejected"
 	StatusPublished = "published"
-	StatusFailed    = "failed"
+	// StatusPublishing: someone reserved the item and is posting it now. Only one
+	// poster gets it (Claim is atomic), so a manual post and the Publicador cannot
+	// both post the same item. A reservation older than ClaimTTL lapses.
+	StatusPublishing = "publishing"
+	StatusFailed     = "failed"
 )
 
 const MaxAttempts = 3
+
+// ClaimTTL is how long a reservation holds: long enough to post a Reels, short
+// enough that an abandoned one (crashed round) frees the item again.
+const ClaimTTL = 30 * time.Minute
 
 type File struct {
 	Path   string `json:"path"`
@@ -53,6 +61,7 @@ type Item struct {
 	CreatedAt   time.Time `json:"createdAt"`
 	DecidedAt   time.Time `json:"decidedAt,omitzero"`
 	PublishedAt time.Time `json:"publishedAt,omitzero"`
+	ClaimedAt   time.Time `json:"claimedAt,omitzero"`
 }
 
 func (it Item) Public() Item {
@@ -155,7 +164,11 @@ func (s *Store) List(status string) ([]Item, error) {
 		return nil, err
 	}
 	out := make([]Item, 0, len(all))
+	now := s.now()
 	for _, it := range all {
+		if s.lapsed(it, now) {
+			it.Status = StatusApproved // abandoned reservation: back in line
+		}
 		if status == "" || it.Status == status {
 			out = append(out, it.Public())
 		}
@@ -203,9 +216,33 @@ func (s *Store) Decide(id, token string, approve bool) (Item, error) {
 	})
 }
 
+// lapsed reports a reservation older than ClaimTTL.
+func (s *Store) lapsed(it Item, now time.Time) bool {
+	return it.Status == StatusPublishing && now.Sub(it.ClaimedAt) > ClaimTTL
+}
+
+// Claim reserves an approved item for whoever is about to post it. It fails with
+// ErrNotApproved when the item was already published, reserved by someone else
+// (within ClaimTTL), rejected or failed: then nobody else may post it.
+func (s *Store) Claim(id string) (Item, error) {
+	now := s.now()
+	return s.update(id, func(it *Item) error {
+		if it.Status != StatusApproved && !s.lapsed(*it, now) {
+			return ErrNotApproved
+		}
+		it.Status = StatusPublishing
+		it.ClaimedAt = now
+		return nil
+	})
+}
+
+func postable(status string) bool {
+	return status == StatusApproved || status == StatusPublishing
+}
+
 func (s *Store) Published(id, link string) (Item, error) {
 	return s.update(id, func(it *Item) error {
-		if it.Status != StatusApproved {
+		if !postable(it.Status) {
 			return ErrNotApproved
 		}
 		it.Status = StatusPublished
@@ -218,11 +255,13 @@ func (s *Store) Published(id, link string) (Item, error) {
 
 func (s *Store) Failed(id, msg string, permanent bool) (Item, error) {
 	return s.update(id, func(it *Item) error {
-		if it.Status != StatusApproved {
+		if !postable(it.Status) {
 			return ErrNotApproved
 		}
 		it.Attempts++
 		it.Error = msg
+		it.Status = StatusApproved // a passing failure goes back in line
+		it.ClaimedAt = time.Time{}
 		if permanent || it.Attempts >= MaxAttempts {
 			it.Status = StatusFailed
 		}

@@ -98,6 +98,13 @@ func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 		if _, err := f.store.Decide(strings.TrimPrefix(r.URL.Path, "/api/aprovar/"), r.URL.Query().Get("t"), r.URL.Query().Get("acao") == "aprovar"); err != nil {
 			writeErr(err)
 		}
+	case strings.HasSuffix(r.URL.Path, "/claim"):
+		it, err := f.store.Claim(id)
+		if err != nil {
+			writeErr(err)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(it)
 	case strings.HasSuffix(r.URL.Path, "/published"):
 		var in struct {
 			Link string `json:"link"`
@@ -540,5 +547,31 @@ func TestStatusShowsRecentQueue(t *testing.T) {
 	f.now = f.now.Add(8 * 24 * time.Hour)
 	if out, _ = callTool[statusOutput](t, f, "situacao", nil); len(out.Itens) != 0 {
 		t.Fatalf("mais de 7 dias não devia aparecer: %+v", out)
+	}
+}
+
+// 27/11: um post à mão e o Publicador postaram o mesmo Reels com um minuto de
+// diferença. reservar só deixa postar quem reservou primeiro.
+func TestReserveStopsDuplicatePost(t *testing.T) {
+	f := newFixture(t)
+	video := f.file(t, "loja.mp4", "video")
+	created, _ := callTool[requestOutput](t, f, "pedir_aprovacao", reelsArgs(video))
+	approveAll(t, f)
+	f.now = time.Date(2026, 11, 6, 15, 5, 0, 0, saoPaulo)
+	callTool[approvedOutput](t, f, "aprovados", nil)
+
+	first, errText := callTool[reserveOutput](t, f, "reservar", map[string]any{"id": created.ID})
+	if errText != "" || !first.Postar {
+		t.Fatalf("primeira reserva devia liberar: %+v %s", first, errText)
+	}
+	second, errText := callTool[reserveOutput](t, f, "reservar", map[string]any{"id": created.ID})
+	if errText != "" || second.Postar || second.Motivo == "" {
+		t.Fatalf("segunda reserva devia recusar: %+v %s", second, errText)
+	}
+	if out, errText := callTool[okOutput](t, f, "publicado", map[string]any{"id": created.ID, "link": "https://www.instagram.com/reel/DAbc123/"}); errText != "" || out.Status != publishq.StatusPublished {
+		t.Fatalf("publicado depois de reservar: %+v %s", out, errText)
+	}
+	if again, _ := callTool[reserveOutput](t, f, "reservar", map[string]any{"id": created.ID}); again.Postar {
+		t.Fatal("item publicado não pode ser reservado de novo")
 	}
 }
