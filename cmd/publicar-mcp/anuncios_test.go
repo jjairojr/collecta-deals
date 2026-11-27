@@ -665,3 +665,44 @@ func TestExecutorTrialReelFailureRetries(t *testing.T) {
 		t.Fatalf("falha passageira devia voltar na próxima rodada: %+v", approved)
 	}
 }
+
+// "A Collecta compra cartas" (Jairo, 27/11): anúncio que abre conversa no
+// WhatsApp da loja e otimiza conversas iniciadas (Click to WhatsApp).
+func TestMessagesObjectiveOpensWhatsApp(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	args := proposeArgs(f.creatives(t), 100)
+	args["objetivo"] = "mensagens"
+	args["publico"] = "brasil"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+		t.Fatal(errText)
+	}
+	approveAds(t, f)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	campaigns := meta.find("act_1/campaigns")
+	if len(campaigns) != 1 || campaigns[0].form["objective"] != "OUTCOME_ENGAGEMENT" {
+		t.Fatalf("campanha = %+v", campaigns)
+	}
+	set := meta.find("act_1/adsets")[0].form
+	if set["destination_type"] != "WHATSAPP" || set["optimization_goal"] != "CONVERSATIONS" || set["billing_event"] != "IMPRESSIONS" || !strings.Contains(set["promoted_object"], `"page_id":"page"`) || !strings.Contains(set["targeting"], `"countries":["BR"]`) {
+		t.Fatalf("conjunto = %+v", set)
+	}
+	for i, c := range meta.find("act_1/adcreatives") {
+		spec := c.form["object_story_spec"]
+		if !strings.Contains(spec, `"type":"WHATSAPP_MESSAGE"`) || !strings.Contains(spec, `"app_destination":"WHATSAPP"`) {
+			t.Fatalf("criativo %d sem botão do WhatsApp: %s", i, spec)
+		}
+	}
+}
+
+func TestMessagesMeasuredByConversations(t *testing.T) {
+	var rows []insightRow
+	if err := json.Unmarshal([]byte(`[{"ad_id":"a","spend":"30","clicks":"40","actions":[{"action_type":"onsite_conversion.messaging_conversation_started_7d","value":"6"}]},{"ad_id":"b","spend":"30","clicks":"50"}]`), &rows); err != nil {
+		t.Fatal(err)
+	}
+	metric, count := measure("mensagens", rows)
+	if metric != "conversas iniciadas" || count(rows[0]) != 6 || count(rows[1]) != 0 {
+		t.Fatalf("métrica = %q %v %v", metric, count(rows[0]), count(rows[1]))
+	}
+}

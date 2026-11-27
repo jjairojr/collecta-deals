@@ -59,6 +59,10 @@ type metaConfig struct {
 	// e quem sai (compradores). IDs separados por vírgula no anuncios.env.
 	Remarketing []string
 	Buyers      []string
+	// WhatsApp is the store's WhatsApp number (digits, with country code), sent
+	// with the Page on "mensagens" ads. Optional: without it Meta uses the number
+	// linked to the Page.
+	WhatsApp    string
 	BaseURL     string
 	Cloudflared string
 	Trials      bool
@@ -89,6 +93,7 @@ func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
 		Trials:      getenv("META_REELS_TESTE") == "on",
 		Remarketing: idList(getenv("META_PUBLICO_REMARKETING")),
 		Buyers:      idList(getenv("META_PUBLICO_COMPRADORES")),
+		WhatsApp:    digitsOnly(getenv("META_WHATSAPP")),
 	}
 	for name, v := range map[string]string{"META_TOKEN": cfg.Token, "META_CONTA": cfg.Account, "META_PAGINA": cfg.PageID, "META_INSTAGRAM_ID": cfg.IGUserID} {
 		if v == "" {
@@ -323,9 +328,18 @@ func (e *executor) create(ctx context.Context, t adtestq.Test, meta *adtestq.Met
 	act := e.g.cfg.Account
 	objective, goal, destination := "OUTCOME_TRAFFIC", "PROFILE_VISIT", "INSTAGRAM_PROFILE"
 	promoted := map[string]string{"page_id": e.g.cfg.PageID}
-	if t.Objective == "vendas" {
+	switch t.Objective {
+	case "vendas":
 		objective, goal, destination = "OUTCOME_SALES", "OFFSITE_CONVERSIONS", "WEBSITE"
 		promoted = map[string]string{"pixel_id": e.g.cfg.PixelID, "custom_event_type": "PURCHASE"}
+	case "mensagens":
+		// Click to WhatsApp (Marketing API): engagement campaign, ad set sending to
+		// WhatsApp and optimizing conversations; the Page must have the store's
+		// WhatsApp number linked.
+		objective, goal, destination = "OUTCOME_ENGAGEMENT", "CONVERSATIONS", "WHATSAPP"
+		if e.g.cfg.WhatsApp != "" {
+			promoted["whatsapp_phone_number"] = e.g.cfg.WhatsApp
+		}
 	}
 	var created struct {
 		ID string `json:"id"`
@@ -488,9 +502,13 @@ func (e *executor) video(ctx context.Context, t adtestq.Test, index int, file st
 func (e *executor) creative(ctx context.Context, t adtestq.Test, index int, c adtestq.Creative) (string, error) {
 	cta := map[string]any{"type": "VIEW_INSTAGRAM_PROFILE", "value": map[string]string{"link": "https://www.instagram.com/" + e.g.cfg.IGUsername}}
 	link := "https://www.instagram.com/" + e.g.cfg.IGUsername
-	if t.Objective == "vendas" {
+	switch t.Objective {
+	case "vendas":
 		link = t.Link
 		cta = map[string]any{"type": "SHOP_NOW", "value": map[string]string{"link": link}}
+	case "mensagens":
+		link = "https://api.whatsapp.com/send"
+		cta = map[string]any{"type": "WHATSAPP_MESSAGE", "value": map[string]string{"app_destination": "WHATSAPP"}}
 	}
 	spec := map[string]any{"page_id": e.g.cfg.PageID, "instagram_user_id": e.g.cfg.IGUserID}
 	if c.Kind == "video" {
@@ -573,6 +591,17 @@ func measure(objective string, rows []insightRow) (string, func(insightRow) floa
 	clicks := func(r insightRow) float64 { return max(number(r.InlineLinkClicks), number(r.Clicks)) }
 	if objective == "seguidores" {
 		return "visitas ao perfil", clicks
+	}
+	if objective == "mensagens" {
+		conversations := func(r insightRow) float64 {
+			return r.action("onsite_conversion.messaging_conversation_started_7d")
+		}
+		for _, r := range rows {
+			if conversations(r) > 0 {
+				return "conversas iniciadas", conversations
+			}
+		}
+		return "cliques", clicks
 	}
 	purchases := func(r insightRow) float64 { return r.action("omni_purchase", "offsite_conversion.fb_pixel_purchase") }
 	pages := func(r insightRow) float64 { return r.action("landing_page_view") }
@@ -715,6 +744,16 @@ func summarize(t adtestq.Test, meta adtestq.Meta, results []adResult, metric str
 		fmt.Fprintf(&b, "\nVencedor: %d. %s.", winner+1, t.Creatives[meta.Ads[winner].Creative].Hook)
 	} else {
 		b.WriteString("\nSem vencedor: nenhum criativo trouxe resultado.")
+	}
+	return b.String()
+}
+
+func digitsOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
 	}
 	return b.String()
 }

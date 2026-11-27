@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	objectives = map[string]bool{"seguidores": true, "vendas": true}
+	objectives = map[string]bool{"seguidores": true, "vendas": true, "mensagens": true}
 	audiences  = map[string]bool{"goiania": true, "brasil": true, "remarketing": true}
 	kinds      = map[string]bool{"video": true, "imagem": true}
 )
