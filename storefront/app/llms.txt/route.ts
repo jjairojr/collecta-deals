@@ -7,10 +7,12 @@ import { GAME_HUBS } from "@/lib/game-hubs";
 import { GUIDES, guidePath } from "@/lib/guides";
 import { collectionPath, liveCollections, liveShelves, shelfPath } from "@/lib/sealed-guide";
 import { absoluteURL } from "@/lib/site";
-import { STORE, STORE_ADDRESS_LINE, STORE_PROFILES } from "@/lib/store";
+import { freeShippingMinLabel } from "@/lib/free-shipping";
+import { SHIPPING, STORE, STORE_ADDRESS_LINE, STORE_PROFILES } from "@/lib/store";
 import type { Accessory, Sealed } from "@/lib/types";
 
-export const revalidate = 3600;
+// Curto para refletir logo o limite do frete grátis que vem do servidor.
+export const revalidate = 300;
 
 function link(label: string, path: string, note?: string): string {
   return `- [${label}](${absoluteURL(path)})${note ? `: ${note}` : ""}`;
@@ -27,7 +29,8 @@ function productLine(p: Sealed | Accessory, base: string): string {
 }
 
 export async function GET(): Promise<Response> {
-  const { sealed, accessories, games } = await loadCatalog();
+  const { sealed, accessories, games, freeShippingMinBRL } = await loadCatalog();
+  const handling = `${SHIPPING.handlingDays[1]} ${SHIPPING.handlingDays[1] === 1 ? "dia útil" : "dias úteis"}`;
   const sealedGames = [...new Set(sealed.map((s) => s.game))].filter(isGameId);
   const lines = [
     "# Collecta TCG",
@@ -40,7 +43,7 @@ export async function GET(): Promise<Response> {
     `- WhatsApp: ${STORE.phone}`,
     `- Empresa: ${STORE.legalName}, CNPJ ${STORE.cnpj}`,
     `- Pagamento: Pix ou cartão pelo Mercado Pago, no checkout do site`,
-    `- Entrega: Correios para todo o Brasil com rastreio, frete calculado pelo CEP no checkout; retirada grátis na loja`,
+    `- Entrega: Correios para todo o Brasil com rastreio, frete calculado pelo CEP no checkout (a partir de uns ${brl(SHIPPING.minBRL * 100)})${freeShippingMinBRL > 0 ? `; PAC grátis a partir de ${freeShippingMinLabel(freeShippingMinBRL)} em produtos` : ""}; postagem em até ${handling} e transporte de ${SHIPPING.transitDays[0]} a ${SHIPPING.transitDays[1]} dias úteis; retirada grátis na loja em Goiânia`,
     "- Torneios: toda semana na loja, com torneios com premiação, torneios gratuitos e encontros 4fun; mesas para jogar todos os dias",
     `- Perfis: ${STORE_PROFILES.join(", ")}`,
     "",

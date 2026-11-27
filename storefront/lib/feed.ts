@@ -21,6 +21,10 @@ export interface FeedItem {
   condition: "new" | "used";
   brand: string;
   gtin?: string;
+  // Ships free by PAC on its own: the price (Pix, the lowest) reaches the
+  // checkout's freeShippingMinBRL. Other items carry no shipping in the feed and
+  // Merchant Center uses the account's shipping settings.
+  freeShipping?: boolean;
   productType: string;
   googleCategory: string;
   labels: string[];
@@ -178,15 +182,18 @@ async function accessoryRow(a: Accessory): Promise<FeedItem | null> {
 // mock catalog. The routes turn that into a 503 so Merchant Center and Meta keep
 // the last good fetch instead of ingesting demo products or wiping the catalog.
 export async function buildFeed(): Promise<FeedItem[] | null> {
-  const { singles, sealed, accessories, live } = await loadCatalog();
+  const { singles, sealed, accessories, live, freeShippingMinBRL } = await loadCatalog();
   if (!live) {
     return null;
   }
+  const freeCents = freeShippingMinBRL > 0 ? Math.round(freeShippingMinBRL * 100) : 0;
+  const ships = (it: FeedItem | null, cents: number): FeedItem | null =>
+    it && freeCents > 0 && cents >= freeCents ? { ...it, freeShipping: true } : it;
   const boxed = await Promise.all([
-    ...sealed.map(sealedRow),
-    ...accessories.map(accessoryRow),
+    ...sealed.map(async (s) => ships(await sealedRow(s), s.price)),
+    ...accessories.map(async (a) => ships(await accessoryRow(a), a.price)),
   ]);
-  return [...singles.map(singleRow), ...boxed].flatMap((it) =>
+  return [...singles.map((s) => ships(singleRow(s), s.price)), ...boxed].flatMap((it) =>
     it ? [it] : [],
   );
 }

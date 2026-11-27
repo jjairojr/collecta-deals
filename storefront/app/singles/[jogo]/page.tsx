@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import JsonLd from "@/components/seo/JsonLd";
 import { GameFaq, GameIntro, SetLinks } from "@/components/singles/CategoryExtras";
+import ShippingFacts from "@/components/ui/ShippingFacts";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
 import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { GAME_IDS, GAME_NAMES } from "@/lib/games";
@@ -44,7 +45,8 @@ export default async function SinglesGamePage({
   if (!name) {
     notFound();
   }
-  const scope = scopeToGame(await loadCatalog(), jogo);
+  const catalog = await loadCatalog();
+  const scope = scopeToGame(catalog, jogo);
   return (
     <>
       <JsonLd
@@ -66,7 +68,12 @@ export default async function SinglesGamePage({
         setLabels={scope.setLabels}
         initialGame={jogo}
         basePath={`/singles/${jogo}`}
-        intro={<GameIntro game={jogo} name={name} count={scope.singles.length} />}
+        intro={
+          <>
+            <GameIntro game={jogo} name={name} count={scope.singles.length} />
+            <ShippingFacts freeShippingMinBRL={catalog.freeShippingMinBRL} />
+          </>
+        }
         footer={
           <>
             <SetLinks game={jogo} name={name} sets={scope.sets} />

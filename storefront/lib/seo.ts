@@ -98,12 +98,22 @@ function days(range: readonly [number, number]) {
   return { "@type": "QuantitativeValue", minValue: range[0], maxValue: range[1], unitCode: "DAY" };
 }
 
-function shippingDetails() {
+// The checkout makes PAC free for the whole of Brazil once the products reach
+// freeShippingMinBRL (internal/api/orders.go, applyFreeShipping), and the offer
+// price here is the Pix one, the lowest: an offer at or above it ships free on
+// its own. Below it the freight depends on the buyer's CEP (from about R$ 25 to
+// R$ 40+), so no single rate is true: the offer leaves shippingDetails out and
+// Google falls back to the Merchant Center shipping settings.
+export function shippingDetails(priceCents: number, freeShippingMinBRL: number) {
+  if (freeShippingMinBRL <= 0 || priceCents < Math.round(freeShippingMinBRL * 100)) {
+    return undefined;
+  }
   return {
     "@type": "OfferShippingDetails",
+    shippingLabel: "PAC grátis",
     shippingRate: {
       "@type": "MonetaryAmount",
-      value: SHIPPING.minBRL,
+      value: 0,
       currency: "BRL",
     },
     shippingDestination: { "@type": "DefinedRegion", addressCountry: "BR" },
@@ -122,7 +132,14 @@ function availability(soldOut?: boolean, shipsFrom?: string): string {
   return shipsFrom ? "https://schema.org/PreOrder" : "https://schema.org/InStock";
 }
 
-function offerJsonLd(path: string, priceCents: number, itemCondition: string, soldOut?: boolean, shipsFrom?: string) {
+function offerJsonLd(
+  path: string,
+  priceCents: number,
+  itemCondition: string,
+  freeShippingMinBRL: number,
+  soldOut?: boolean,
+  shipsFrom?: string,
+) {
   return {
     "@type": "Offer",
     url: absoluteURL(path),
@@ -132,7 +149,7 @@ function offerJsonLd(path: string, priceCents: number, itemCondition: string, so
     availabilityStarts: shipsFrom,
     itemCondition,
     seller: { "@id": ORGANIZATION_ID },
-    shippingDetails: shippingDetails(),
+    shippingDetails: shippingDetails(priceCents, freeShippingMinBRL),
     hasMerchantReturnPolicy: returnPolicy(),
   };
 }
@@ -147,7 +164,7 @@ export function productOpenGraph(path: string, imageURL?: string) {
   };
 }
 
-export function singleProductJsonLd(item: Single) {
+export function singleProductJsonLd(item: Single, freeShippingMinBRL = 0) {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -161,6 +178,7 @@ export function singleProductJsonLd(item: Single) {
       `/carta/${item.slug}`,
       item.price,
       "https://schema.org/UsedCondition",
+      freeShippingMinBRL,
       item.soldOut,
     ),
   };
@@ -170,7 +188,7 @@ function property(name: string, value: string | undefined) {
   return value ? [{ "@type": "PropertyValue", name, value }] : [];
 }
 
-export function sealedProductJsonLd(item: Sealed) {
+export function sealedProductJsonLd(item: Sealed, freeShippingMinBRL = 0) {
   const collection = collectionOf(item);
   const contents = contentsOf(item);
   return {
@@ -199,13 +217,14 @@ export function sealedProductJsonLd(item: Sealed) {
       `/selado/${item.slug}`,
       item.price,
       "https://schema.org/NewCondition",
+      freeShippingMinBRL,
       item.soldOut,
       item.shipsFrom,
     ),
   };
 }
 
-export function accessoryProductJsonLd(item: Accessory) {
+export function accessoryProductJsonLd(item: Accessory, freeShippingMinBRL = 0) {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -220,6 +239,7 @@ export function accessoryProductJsonLd(item: Accessory) {
       `/acessorio/${item.slug}`,
       item.price,
       "https://schema.org/NewCondition",
+      freeShippingMinBRL,
       item.soldOut,
       item.shipsFrom,
     ),

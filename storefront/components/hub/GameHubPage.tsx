@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import ShippingFacts from "@/components/ui/ShippingFacts";
 import Container from "@/components/ui/Container";
 import DocSection from "@/components/ui/DocSection";
 import FaqSection from "@/components/ui/FaqSection";
@@ -49,7 +50,7 @@ export async function hubMetadata(hub: GameHub): Promise<Metadata> {
 }
 
 export default async function GameHubPage({ hub }: { hub: GameHub }) {
-  const { sealed, boxes, cards, sets } = await shelfOf(hub);
+  const [{ sealed, boxes, cards, sets }, { freeShippingMinBRL }] = await Promise.all([shelfOf(hub), loadCatalog()]);
   const gameName = GAME_NAMES[hub.game];
   const shown = [...boxes].sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured))).slice(0, 8);
   const chip = "arcade-press sticker rounded-[10px] bg-royal px-4 py-2.5 font-pixel text-[10px] text-white [--sh:4px]";
@@ -64,6 +65,7 @@ export default async function GameHubPage({ hub }: { hub: GameHub }) {
         <CategoryIntro>
           {hub.lead} {stockLine(boxes, cards)} Pague por Pix ou cartão e receba em casa ou retire na loja.
         </CategoryIntro>
+        <ShippingFacts freeShippingMinBRL={freeShippingMinBRL} />
         <div className="mt-5 flex flex-wrap gap-3">
           {boxes.length > 0 && (
             <Link href={`/selado/${hub.game}`} className={chip}>

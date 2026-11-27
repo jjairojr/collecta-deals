@@ -27,6 +27,15 @@ function itemXML(it: FeedItem): string {
     ...(it.inStock && it.shipsFrom ? [tag("g:availability_date", `${it.shipsFrom}T00:00-03:00`)] : []),
     tag("g:price", it.price),
     tag("g:condition", it.condition),
+    ...(it.freeShipping
+      ? [
+          "    <g:shipping>",
+          `  ${tag("g:country", "BR")}`,
+          `  ${tag("g:service", "PAC")}`,
+          `  ${tag("g:price", "0.00 BRL")}`,
+          "    </g:shipping>",
+        ]
+      : []),
     tag("g:brand", it.brand),
     // Trading cards carry no GTIN or MPN. Without this Merchant Center rejects
     // every item for a missing unique identifier.
