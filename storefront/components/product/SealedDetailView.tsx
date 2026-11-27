@@ -187,7 +187,7 @@ export default function SealedDetailView({
               </div>
               {cardPrice !== undefined && (
                 <p className="mt-2 text-sm text-muted">
-                  ou <strong className="text-white">{brl(cardPrice)}</strong> em até {installments}x no
+                  ou <strong className="text-white">{brl(cardPrice)}</strong> em até {installments}x sem juros no
                   cartão
                 </p>
               )}
@@ -267,14 +267,14 @@ export default function SealedDetailView({
                 {item.name} é um produto selado de {item.gameLabel}
                 {item.language ? ` em ${item.language.toLowerCase()}` : ""}, com
                 lacre original de fábrica conferido antes do envio. Pague por
-                Pix ou cartão em até {installments}x no checkout do site e receba em todo o
+                Pix ou cartão em até {installments}x sem juros no checkout do site e receba em todo o
                 Brasil, ou retire na loja em Goiânia.
               </>
             ) : (
               <>
                 {item.name} é um acessório para TCG, novo e conferido antes do
                 envio — serve para qualquer jogo da loja. Pague por Pix ou cartão
-                em até {installments}x no checkout do site e receba em todo o Brasil, ou
+                em até {installments}x sem juros no checkout do site e receba em todo o Brasil, ou
                 retire na loja em Goiânia.
               </>
             )}

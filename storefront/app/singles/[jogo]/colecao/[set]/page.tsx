@@ -34,7 +34,7 @@ export async function generateMetadata({
   }
   return {
     title: `Cartas ${found.label} de ${name} — singles e preços`,
-    description: `${found.count} cartas da coleção ${found.label} de ${name} em estoque na Collecta, a partir de ${brl(found.minPrice)}. Conferidas uma a uma, Pix ou cartão em até 12x e envio para todo o Brasil.`,
+    description: `${found.count} cartas da coleção ${found.label} de ${name} em estoque na Collecta, a partir de ${brl(found.minPrice)}. Conferidas uma a uma, Pix ou cartão em até 6x sem juros e envio para todo o Brasil.`,
     alternates: { canonical: `/singles/${jogo}/colecao/${found.slug}` },
     robots: live ? undefined : { index: false },
   };

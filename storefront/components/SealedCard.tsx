@@ -55,7 +55,7 @@ export default function SealedCard({ item }: { item: Sealed | Accessory }) {
         </span>
         {item.cardPrice !== undefined && (
           <span className="text-xs text-on-soft">
-            ou {brl(item.cardPrice)} em até {CARD_PRICED_INSTALLMENTS}x no cartão
+            ou {brl(item.cardPrice)} em até {CARD_PRICED_INSTALLMENTS}x sem juros no cartão
           </span>
         )}
         {bestSaving > 0 && (

@@ -248,8 +248,8 @@ export default function CartView({
           </div>
           <p className="mt-2 text-xs text-muted">
             {cardTotal !== total
-              ? `sem o frete · no Pix · ${brl(cardTotal)} no cartão em até ${installments}x`
-              : `sem o frete · Pix ou cartão em até ${installments}x`}
+              ? `sem o frete · no Pix · ${brl(cardTotal)} no cartão em até ${installments}x sem juros`
+              : `sem o frete · Pix ou cartão em até ${installments}x sem juros`}
           </p>
 
           <Link

@@ -1,5 +1,5 @@
 import { brl } from "@/lib/format";
-import { CARD_PRICED_INSTALLMENTS, MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
+import { MAX_INSTALLMENTS, shipsFromLabel } from "@/lib/payment";
 import { contentsOf, releaseLabel, type SealedCollection, type SealedShelf } from "@/lib/sealed-guide";
 import type { FaqItem } from "@/lib/seo";
 import type { Sealed } from "@/lib/types";
@@ -26,7 +26,7 @@ export const SEALED_SHIPPING: FaqItem = {
 
 export const SEALED_PAYMENT: FaqItem = {
   q: "Como pagar?",
-  a: `Pix ou cartão pelo Mercado Pago, direto no checkout do site. Produtos com preço próprio no cartão parcelam em até ${CARD_PRICED_INSTALLMENTS}x; os demais, em até ${MAX_INSTALLMENTS}x.`,
+  a: `Pix ou cartão pelo Mercado Pago, direto no checkout do site. No cartão, em até ${MAX_INSTALLMENTS}x sem juros, sempre sobre o preço no cartão.`,
 };
 
 export const SEALED_GENERAL: FaqItem[] = [SEALED_ORIGINAL, SEALED_LANGUAGES, SEALED_SHIPPING, SEALED_PAYMENT];

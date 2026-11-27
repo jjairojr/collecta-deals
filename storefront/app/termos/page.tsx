@@ -40,7 +40,7 @@ export default function TermosPage() {
         </Section>
         <Section title="Pagamento">
           <p>
-            Pix ou cartão em até 12x, processados pelo Mercado Pago. O pedido é confirmado quando o Mercado Pago aprova
+            Pix ou cartão em até 6x sem juros, processados pelo Mercado Pago. O pedido é confirmado quando o Mercado Pago aprova
             o pagamento.
           </p>
         </Section>
