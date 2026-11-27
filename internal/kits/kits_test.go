@@ -44,7 +44,7 @@ func TestUpdateKeepsIdentityAndDeleteRemoves(t *testing.T) {
 	}
 	got, err := st.Update(k.ID, func(e *Kit) {
 		e.AskBRL = 65
-		e.CardBRL = 72
+		e.CardBRL = 80
 		e.Listed = true
 		e.Units = 9
 		e.BaseSKU = "other"
@@ -52,7 +52,7 @@ func TestUpdateKeepsIdentityAndDeleteRemoves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Units != 3 || got.BaseSKU != packSKU || got.AskBRL != 65 || got.CardPrice() != 72 || !got.Listed {
+	if got.Units != 3 || got.BaseSKU != packSKU || got.AskBRL != 65 || got.CardPrice() != 80 || !got.Listed {
 		t.Fatalf("update = %+v", got)
 	}
 	if _, err := st.Update(k.ID, func(e *Kit) { e.AskBRL = 0 }); !errors.Is(err, ErrInvalid) {

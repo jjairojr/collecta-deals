@@ -13,7 +13,7 @@ import (
 func cardPricedServer(t *testing.T) *checkoutFixture {
 	t.Helper()
 	f := checkoutServer(t)
-	card := 270.0
+	card := 320.0 // a unidade de R$ 260 no Pix tem piso R$ 299 (×1,15): é o cartão cobrado
 	ships := "2026-11-06"
 	if _, err := f.store.SetListings(map[string]trades.Listing{
 		f.newer.ID: {AskBRL: 250, Listed: true, CardBRL: &card, ShipsFrom: &ships},
@@ -54,15 +54,15 @@ func (f *checkoutFixture) createWith(t *testing.T, body map[string]interface{}) 
 
 func TestCardOrderChargesCardPriceInSixInstallments(t *testing.T) {
 	f := cardPricedServer(t)
-	o := f.createWith(t, methodOrderBody("card", 25000, 26000))
-	if o.PaymentMethod != orders.PaymentCard || o.Lines[0].UnitBRL != 260 || o.Totals.TotalBRL != 272 {
+	o := f.createWith(t, methodOrderBody("card", 25000, 29900))
+	if o.PaymentMethod != orders.PaymentCard || o.Lines[0].UnitBRL != 299 || o.Totals.TotalBRL != 311 {
 		t.Fatalf("order = %+v lines %+v", o.Totals, o.Lines)
 	}
 	if !o.Lines[0].CardPriced || o.Lines[0].ShipsFrom != "2026-11-06" {
 		t.Fatalf("line = %+v", o.Lines[0])
 	}
 	pref := f.gw.prefs[0]
-	if pref.Method != "card" || pref.Installments != cardPricedInstallments || pref.Items[0].UnitBRL != 260 {
+	if pref.Method != "card" || pref.Installments != cardPricedInstallments || pref.Items[0].UnitBRL != 299 {
 		t.Fatalf("pref = %+v", pref)
 	}
 	pub := publicView(o, o.CreatedAt, nil)
@@ -73,7 +73,7 @@ func TestCardOrderChargesCardPriceInSixInstallments(t *testing.T) {
 
 func TestPixOrderChargesPixPriceInOneInstallment(t *testing.T) {
 	f := cardPricedServer(t)
-	o := f.createWith(t, methodOrderBody("pix", 25000, 26000))
+	o := f.createWith(t, methodOrderBody("pix", 25000, 29900))
 	if o.PaymentMethod != orders.PaymentPix || o.Lines[0].UnitBRL != 250 || o.Totals.TotalBRL != 262 {
 		t.Fatalf("order = %+v lines %+v", o.Totals, o.Lines)
 	}
@@ -89,9 +89,11 @@ func TestLegacyOrderWithoutMethod(t *testing.T) {
 		t.Fatalf("card-priced legacy order must fall back to pix: %+v %+v", o, f.gw.prefs[0])
 	}
 
+	// Every product now has a card price (at least Pix × 1,15), so a legacy order
+	// without a method is priced and charged as Pix too.
 	plain := checkoutServer(t)
 	o = plain.createWith(t, methodOrderBody("", 25000, 0))
-	if o.PaymentMethod != orders.PaymentAny || o.Lines[0].CardPriced || plain.gw.prefs[0].Installments != maxInstallments {
+	if o.PaymentMethod != orders.PaymentPix || !o.Lines[0].CardPriced || plain.gw.prefs[0].Installments != 1 {
 		t.Fatalf("plain legacy order = %+v %+v", o, plain.gw.prefs[0])
 	}
 }
@@ -99,10 +101,10 @@ func TestLegacyOrderWithoutMethod(t *testing.T) {
 func TestCardPriceChangeAndBadMethodRejected(t *testing.T) {
 	f := cardPricedServer(t)
 	rec := f.do(t, http.MethodPost, "/api/orders", methodOrderBody("card", 25000, 25000), storefrontHeaders())
-	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"cardCents":26000`) {
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"cardCents":29900`) {
 		t.Fatalf("card price diff: %d %s", rec.Code, rec.Body.String())
 	}
-	rec = f.do(t, http.MethodPost, "/api/orders", methodOrderBody("boleto", 25000, 26000), storefrontHeaders())
+	rec = f.do(t, http.MethodPost, "/api/orders", methodOrderBody("boleto", 25000, 29900), storefrontHeaders())
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad method: %d %s", rec.Code, rec.Body.String())
 	}
@@ -125,7 +127,7 @@ func TestListingsKeepCardPriceWhenOmitted(t *testing.T) {
 	for _, it := range resp.Items {
 		if it.AskBRL == 240 {
 			found = true
-			if it.CardBRL != 270 || it.ShipsFrom != "2026-11-06" {
+			if it.CardBRL != 320 || it.ShipsFrom != "2026-11-06" {
 				t.Fatalf("item = %+v", it)
 			}
 		}
@@ -146,5 +148,19 @@ func TestPublicOrderPhotoGetsAPIBase(t *testing.T) {
 	got := withPhotoBase(o, "https://api.test")
 	if got.Lines[0].ImageURL != "https://api.test"+itemPhotosPath+"a.jpg" || got.Lines[1].ImageURL != "https://cdn.test/b.jpg" || got.Lines[2].ImageURL != "/img?x=1" {
 		t.Fatalf("lines = %+v", got.Lines)
+	}
+}
+
+// Sem preço no cartão cadastrado, a cobrança no cartão é o piso Pix × 1,15, e a
+// vitrine mostra esse mesmo valor.
+func TestCardFloorWithoutRegisteredCardPrice(t *testing.T) {
+	f := checkoutServer(t)
+	o := f.createWith(t, methodOrderBody("card", 25000, 28750))
+	if o.Lines[0].UnitBRL != 287.5 || o.PaymentMethod != orders.PaymentCard {
+		t.Fatalf("cartão sem cardBRL devia cobrar 250 × 1,15 = 287,50: %+v", o.Lines[0])
+	}
+	rec := f.do(t, http.MethodGet, "/api/storefront", nil, nil)
+	if !strings.Contains(rec.Body.String(), `"askBRL":250,"cardBRL":287.5`) {
+		t.Fatalf("vitrine devia mostrar cardBRL 287.5: %s", rec.Body.String()[:min(400, rec.Body.Len())])
 	}
 }

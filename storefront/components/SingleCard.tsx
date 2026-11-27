@@ -72,11 +72,16 @@ export default function SingleCard({
         <div className="mt-auto flex flex-col gap-2 pt-1">
           <span className="truncate font-pixel text-[10px] leading-relaxed text-brand sm:text-[12px]">
             {brl(item.price)}
+            {item.cardPrice !== undefined && <span className="ml-1 text-[7px] sm:text-[8px]">PIX</span>}
           </span>
-          {plan && INTEREST_FREE && (
+          {plan && INTEREST_FREE ? (
             <span className="-mt-1 truncate text-[11px] text-muted">
               ou {plan.count}x de {brl(plan.each)} sem juros
             </span>
+          ) : (
+            item.cardPrice !== undefined && (
+              <span className="-mt-1 truncate text-[11px] text-muted">ou {brl(item.cardPrice)} no cartão</span>
+            )
           )}
           <button
             type="button"

@@ -112,7 +112,7 @@ func (e skuEntry) prices() (float64, float64) {
 
 func (e skuEntry) cardPriced() bool {
 	if e.kit != nil {
-		return e.kit.CardBRL > 0
+		return e.kit.CardPrice() > e.kit.AskBRL
 	}
 	return orders.HasCardPrice(e.trades)
 }

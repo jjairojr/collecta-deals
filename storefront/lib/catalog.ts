@@ -188,6 +188,8 @@ function mapItem(it: RawItem, version: string): Single {
     condition,
     language: "", // backend has no language field yet
     price: Math.round(it.askBRL * 100),
+    // The backend sends the card price the checkout charges (at least Pix ÷ 0,90).
+    cardPrice: it.cardBRL ? Math.round(it.cardBRL * 100) : undefined,
     qty: Math.max(it.qty, 0),
     grade: isGradedCondition(condition) ? condition : undefined,
     imageURL: resolveImage(it, version),
