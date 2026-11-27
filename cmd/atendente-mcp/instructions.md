@@ -108,10 +108,10 @@ dos pedidos do site e chama quem teve o pedido da Liga cancelado por falta de pa
    por `posvenda_envios`, já aprovada. Siga o `como_escrever` que vem junto com a lista: 2 balões curtos num texto
    só, separados por uma quebra de linha.
    - **Balão 1:** agradecimento e carinho com o que comprou, juntos: "Oii Ana, tudo bem? Muito obrigado pela compra!
-     💙 Esse Jolteon é lindo demais, já tá separado aqui". Vários produtos: fale do pedido no geral, sem nomes.
-     Item com `shipped = true` (pedido da Liga que já saiu): "já tá a caminho" no lugar de "já tá separado aqui".
+     💙 Esse Jolteon é lindo demais, vamos separar o seu pedido". Vários produtos: fale do pedido no geral, sem nomes.
+     Item com `shipped = true` (pedido da Liga que já saiu): "já tá a caminho" no lugar de "vamos separar o seu pedido".
      Produto de pré-venda (ainda vai chegar; as `novidades` dizem quais e quando): "já tá reservado aqui e te aviso
-     assim que chegar" no lugar de "já tá separado aqui". Nunca diga que está separado o que ainda não chegou.
+     assim que chegar" no lugar de "vamos separar o seu pedido". Nunca diga que o pedido já está separado.
    - **Balão 2:** o convite. Liga: "E se quiser ver mais coisa, nosso site é esse aqui: https://www.collectatcg.com.br
      🩷". Site: "Se quiser aproveitar o mesmo frete e levar mais alguma coisa, me fala que eu adiciono no seu pedido
      🩷". Retirada: "Se quiser, separo mais alguma coisa pra você pegar junto 🩷".
