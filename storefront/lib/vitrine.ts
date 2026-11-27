@@ -11,12 +11,25 @@ export interface VitrineTier {
   href: string;
 }
 
+/** Art uploaded on the Vitrine screen; URLs here are already absolute. */
+export interface VitrineImage {
+  desktop: string;
+  mobile: string;
+  alt: string;
+}
+
+/** Image that replaces the text bar at the top while it is live. */
+export interface VitrineBarImage extends VitrineImage {
+  href: string;
+}
+
 export interface VitrineBanner {
   title: string;
   text?: string;
   cta?: string;
   href?: string;
   tiers?: VitrineTier[];
+  image?: VitrineImage;
 }
 
 export interface VitrinePopup {
@@ -27,11 +40,25 @@ export interface VitrinePopup {
 
 export interface VitrineLive {
   phrases: string[];
+  barImage?: VitrineBarImage;
   banner?: VitrineBanner;
   popup?: VitrinePopup;
 }
 
 const EMPTY: VitrineLive = { phrases: [] };
+
+// The backend stores the art and answers with paths under its own
+// /api/storefront/vitrine/img/; the browser loads them from the backend's domain.
+// Only those paths are accepted: a piece with any other image is dropped.
+const IMAGE_PATH = /^\/api\/storefront\/vitrine\/img\/[0-9a-f]{16}\.(webp|jpg|png)$/;
+
+function withImage<T extends VitrineImage>(base: string, im: T): T | undefined {
+  if (!IMAGE_PATH.test(im.desktop) || !IMAGE_PATH.test(im.mobile) || !im.alt?.trim()) {
+    return undefined;
+  }
+  const root = base.replace(/\/$/, "");
+  return { ...im, desktop: `${root}${im.desktop}`, mobile: `${root}${im.mobile}` };
+}
 
 /** Live campaign content; empty (nothing new on the site) when the backend has none or is down. */
 export async function loadVitrine(): Promise<VitrineLive> {
@@ -45,9 +72,11 @@ export async function loadVitrine(): Promise<VitrineLive> {
       return EMPTY;
     }
     const data = (await res.json()) as Partial<VitrineLive>;
+    const banner = data.banner?.title ? data.banner : undefined;
     return {
       phrases: Array.isArray(data.phrases) ? data.phrases.filter((p) => typeof p === "string" && p.trim()) : [],
-      banner: data.banner?.title ? data.banner : undefined,
+      barImage: data.barImage?.href ? withImage(base, data.barImage) : undefined,
+      banner: banner ? { ...banner, image: banner.image && banner.href ? withImage(base, banner.image) : undefined } : undefined,
       popup: data.popup?.sku ? data.popup : undefined,
     };
   } catch {

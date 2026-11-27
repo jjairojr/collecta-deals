@@ -9,6 +9,7 @@ import { loadVitrine, popupProduct } from "@/lib/vitrine";
 import { organizationJsonLd, storeJsonLd, webSiteJsonLd } from "@/lib/seo";
 import { siteURL } from "@/lib/site";
 import AnnouncementBar from "@/components/chrome/AnnouncementBar";
+import PromoImage from "@/components/promo/PromoImage";
 import ExitPopup from "@/components/promo/ExitPopup";
 import Header from "@/components/chrome/Header";
 import TabBar from "@/components/chrome/TabBar";
@@ -91,7 +92,19 @@ export default async function RootLayout({
         <AccountProvider>
         <CartProvider>
           <Scanlines />
-          <AnnouncementBar extra={vitrine.phrases} freeShippingMinBRL={catalog.freeShippingMinBRL} />
+          {vitrine.barImage ? (
+            <div className="overflow-hidden border-b-4 border-outline bg-royal">
+              <PromoImage
+                image={vitrine.barImage}
+                href={vitrine.barImage.href}
+                slot="faixa_topo"
+                priority
+                imgClassName="h-auto sm:h-[60px] sm:object-cover sm:object-center"
+              />
+            </div>
+          ) : (
+            <AnnouncementBar extra={vitrine.phrases} freeShippingMinBRL={catalog.freeShippingMinBRL} />
+          )}
           <Header />
           <TabBar games={games} showAccessories={showAccessories} />
           <main className="min-h-[60vh]">{children}</main>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import Container from "@/components/ui/Container";
 import { pixelText } from "@/lib/format";
+import PromoImage from "@/components/promo/PromoImage";
 import { trackSelectPromotion, trackViewPromotion, type Promotion } from "@/lib/promo-analytics";
 import type { VitrineBanner } from "@/lib/vitrine";
 
@@ -37,6 +38,35 @@ export default function HolidayBanner({ banner }: { banner: VitrineBanner }) {
   }, [banner.title]);
 
   const tiers = banner.tiers ?? [];
+  if (banner.image && banner.href) {
+    return (
+      <section aria-label={banner.title} className="border-b-[6px] border-outline bg-brand">
+        <Container className="py-5">
+          <PromoImage
+            image={banner.image}
+            href={banner.href}
+            slot="banner_home"
+            priority
+            className="overflow-hidden rounded-[16px]"
+          />
+          {tiers.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-3">
+              {tiers.map((t) => (
+                <Link
+                  key={`${t.label}-${t.href}`}
+                  href={t.href}
+                  onClick={() => trackSelectPromotion({ ...promo, slot: `home_topo:${t.label}` })}
+                  className="arcade-press sticker rounded-[10px] bg-surface px-4 py-3 font-pixel text-[10px] text-white [--sh:4px]"
+                >
+                  {pixelText(t.label)}
+                </Link>
+              ))}
+            </div>
+          )}
+        </Container>
+      </section>
+    );
+  }
   return (
     <section ref={ref} aria-label={banner.title} className="border-b-[6px] border-outline bg-brand">
       <Container className="flex flex-col gap-4 py-6 lg:flex-row lg:items-center lg:justify-between">

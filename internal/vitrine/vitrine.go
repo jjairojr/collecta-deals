@@ -22,6 +22,9 @@ var ErrInvalid = errors.New("vitrine inválida")
 
 const (
 	MaxPhrases   = 6
+	MaxBarImages = 6
+	MaxPopups    = 8
+	maxAltLen    = 120
 	MaxTiers     = 4
 	maxPhraseLen = 70
 	maxTitleLen  = 60
@@ -61,12 +64,32 @@ type Tier struct {
 	Href  string `json:"href"`
 }
 
+// Image is a piece of art uploaded on the Vitrine screen: one file for desktop
+// and one for the phone, both stored by this package (ImageURL), plus the text
+// read aloud and shown when the image does not load.
+type Image struct {
+	Desktop string `json:"desktop"`
+	Mobile  string `json:"mobile"`
+	Alt     string `json:"alt"`
+}
+
+// BarImage replaces the text bar at the top of every page while it is live: the
+// whole image is one link. Art sizes: desktop 2880x120 (24:1), phone 1170x180.
+type BarImage struct {
+	Image
+	Href string `json:"href"`
+	Window
+}
+
 type Banner struct {
 	Title string `json:"title"`
 	Text  string `json:"text,omitempty"`
 	CTA   string `json:"cta,omitempty"`
 	Href  string `json:"href,omitempty"`
 	Tiers []Tier `json:"tiers,omitempty"`
+	// Image, when set, is shown instead of the title and text, as a link to Href
+	// (required then). Art sizes: desktop 2720x800 (3,4:1), phone 1080x1080.
+	Image *Image `json:"image,omitempty"`
 	Window
 }
 
@@ -80,8 +103,13 @@ type Popup struct {
 }
 
 type Config struct {
-	Phrases   []Phrase  `json:"phrases"`
-	Banner    *Banner   `json:"banner,omitempty"`
+	Phrases   []Phrase   `json:"phrases"`
+	BarImages []BarImage `json:"barImages,omitempty"`
+	Banner    *Banner    `json:"banner,omitempty"`
+	// Popups are tried in order: the site shows the first one switched on, inside
+	// its dates and with its product on sale. A config saved before the list
+	// existed had a single Popup; reading it moves that one into Popups.
+	Popups    []Popup   `json:"popups,omitempty"`
 	Popup     *Popup    `json:"popup,omitempty"`
 	UpdatedAt time.Time `json:"updatedAt,omitempty"`
 }
@@ -89,9 +117,10 @@ type Config struct {
 // Live is what the storefront shows right now: only the pieces inside their
 // window, already filtered, so the site needs no date logic of its own.
 type Live struct {
-	Phrases []string `json:"phrases"`
-	Banner  *Banner  `json:"banner,omitempty"`
-	Popup   *Popup   `json:"popup,omitempty"`
+	Phrases  []string  `json:"phrases"`
+	BarImage *BarImage `json:"barImage,omitempty"`
+	Banner   *Banner   `json:"banner,omitempty"`
+	Popup    *Popup    `json:"popup,omitempty"`
 }
 
 // Example is the Natal content proposed on 27/11/2026. It is never written by
@@ -177,9 +206,32 @@ func Validate(c Config) error {
 			return err
 		}
 	}
+	if len(c.BarImages) > MaxBarImages {
+		return fmt.Errorf("no máximo %d imagens na faixa", MaxBarImages)
+	}
+	for i, bi := range c.BarImages {
+		field := fmt.Sprintf("imagem %d da faixa", i+1)
+		if err := checkImage(field, bi.Image); err != nil {
+			return err
+		}
+		if err := checkHref(field, bi.Href, true); err != nil {
+			return err
+		}
+		if err := checkWindow(field, bi.Window); err != nil {
+			return err
+		}
+	}
 	if b := c.Banner; b != nil {
 		if err := checkText("título do banner", b.Title, 3, maxTitleLen); err != nil {
 			return err
+		}
+		if b.Image != nil {
+			if err := checkImage("imagem do banner", *b.Image); err != nil {
+				return err
+			}
+			if err := checkHref("imagem do banner", b.Href, true); err != nil {
+				return err
+			}
 		}
 		if err := checkText("texto do banner", b.Text, 0, maxTextLen); err != nil {
 			return err
@@ -206,23 +258,42 @@ func Validate(c Config) error {
 			return err
 		}
 	}
-	if p := c.Popup; p != nil {
+	popups := c.popupList()
+	if len(popups) > MaxPopups {
+		return fmt.Errorf("no máximo %d pop-ups", MaxPopups)
+	}
+	for i, p := range popups {
+		field := fmt.Sprintf("pop-up %d", i+1)
 		if p.Enabled && strings.TrimSpace(p.SKU) == "" {
-			return errors.New("pop-up ligado precisa do SKU do produto")
+			return fmt.Errorf("%s ligado precisa do SKU do produto", field)
 		}
 		if p.Enabled || p.Title != "" {
-			if err := checkText("título do pop-up", p.Title, 3, maxTitleLen); err != nil {
+			if err := checkText("título do "+field, p.Title, 3, maxTitleLen); err != nil {
 				return err
 			}
 		}
-		if err := checkText("texto do pop-up", p.Text, 0, maxTextLen); err != nil {
+		if err := checkText("texto do "+field, p.Text, 0, maxTextLen); err != nil {
 			return err
 		}
-		if err := checkWindow("pop-up", p.Window); err != nil {
+		if err := checkWindow(field, p.Window); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// checkImage: both files are required and must be ones uploaded here (never a
+// link to another site), with a short description.
+func checkImage(field string, im Image) error {
+	if im.Desktop == "" || im.Mobile == "" {
+		return fmt.Errorf("%s: envie as duas imagens, a do computador e a do celular", field)
+	}
+	for _, u := range []string{im.Desktop, im.Mobile} {
+		if !IsImageURL(u) {
+			return fmt.Errorf("%s: a imagem precisa ser enviada pela tela Vitrine", field)
+		}
+	}
+	return checkText("descrição da "+field, im.Alt, 3, maxAltLen)
 }
 
 func (w Window) activeOn(day string) bool {
@@ -238,13 +309,41 @@ func (c Config) LiveAt(now time.Time) Live {
 			out.Phrases = append(out.Phrases, strings.TrimSpace(p.Text))
 		}
 	}
+	for _, bi := range c.BarImages {
+		if bi.activeOn(day) {
+			cp := bi
+			out.BarImage = &cp
+			break
+		}
+	}
 	if b := c.Banner; b != nil && b.activeOn(day) {
 		cp := *b
 		out.Banner = &cp
 	}
-	if p := c.Popup; p != nil && p.Enabled && p.activeOn(day) {
-		cp := *p
+	if ps := c.PopupsOn(now); len(ps) > 0 {
+		cp := ps[0]
 		out.Popup = &cp
+	}
+	return out
+}
+
+// popupList is Popups, or the single Popup of a config saved before the list.
+func (c Config) popupList() []Popup {
+	if len(c.Popups) == 0 && c.Popup != nil {
+		return []Popup{*c.Popup}
+	}
+	return c.Popups
+}
+
+// PopupsOn lists, in order, the pop-ups switched on and inside their dates on
+// now's day; the caller shows the first whose product is on sale.
+func (c Config) PopupsOn(now time.Time) []Popup {
+	day := now.In(goiania).Format(dateLayout)
+	var out []Popup
+	for _, p := range c.popupList() {
+		if p.Enabled && p.activeOn(day) {
+			out = append(out, p)
+		}
 	}
 	return out
 }
@@ -257,7 +356,13 @@ func normalize(c Config) Config {
 		c.Phrases[i].Text = strings.TrimSpace(c.Phrases[i].Text)
 	}
 	if c.Popup != nil {
-		c.Popup.SKU = strings.TrimSpace(c.Popup.SKU)
+		if len(c.Popups) == 0 {
+			c.Popups = []Popup{*c.Popup}
+		}
+		c.Popup = nil
+	}
+	for i := range c.Popups {
+		c.Popups[i].SKU = strings.TrimSpace(c.Popups[i].SKU)
 	}
 	return c
 }
