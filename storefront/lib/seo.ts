@@ -2,7 +2,7 @@ import { absoluteURL, siteURL } from "@/lib/site";
 import { feedID, maker } from "@/lib/product-id";
 import { collectionOf, contentsOf } from "@/lib/sealed-guide";
 import { SHIPPING, STORE, STORE_MAPS_URL, STORE_PHOTOS, STORE_PROFILES } from "@/lib/store";
-import type { Accessory, Sealed, Single } from "@/lib/types";
+import type { Accessory, KitOffer, Sealed, Single } from "@/lib/types";
 
 const ORGANIZATION_ID = `${siteURL}/#organization`;
 const STORE_ID = `${siteURL}/#loja`;
@@ -174,6 +174,9 @@ export function singleProductJsonLd(item: Single, freeShippingMinBRL = 0) {
     image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
     brand: { "@type": "Brand", name: maker(item.game, item.gameLabel) },
     category: "Trading Card Game",
+    // A slab carries its grade (grader + note) as a property; the condition stays
+    // UsedCondition like every single, since the card itself is not new stock.
+    additionalProperty: item.grade ? property("Graduação", item.grade) : undefined,
     offers: offerJsonLd(
       `/carta/${item.slug}`,
       item.price,
@@ -213,15 +216,59 @@ export function sealedProductJsonLd(item: Sealed, freeShippingMinBRL = 0) {
     image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
     brand: { "@type": "Brand", name: maker(item.game, item.gameLabel) },
     category: "Trading Card Game",
-    offers: offerJsonLd(
-      `/selado/${item.slug}`,
-      item.price,
-      "https://schema.org/NewCondition",
+    offers: withKitOffers(
+      offerJsonLd(
+        `/selado/${item.slug}`,
+        item.price,
+        "https://schema.org/NewCondition",
+        freeShippingMinBRL,
+        item.soldOut,
+        item.shipsFrom,
+      ),
+      item,
       freeShippingMinBRL,
-      item.soldOut,
-      item.shipsFrom,
     ),
   };
+}
+
+// Kits (N units of the same product, with their own price) are extra offers on
+// the same page. Google documents ProductGroup variants only for size, colour and
+// the like, not quantity, so each kit is an Offer with eligibleQuantity and its
+// total price; the single unit stays the first offer, the price the page leads with.
+function withKitOffers(
+  unit: ReturnType<typeof offerJsonLd>,
+  item: { slug: string; kits?: KitOffer[]; soldOut?: boolean; shipsFrom?: string },
+  freeShippingMinBRL: number,
+) {
+  const kits = item.kits ?? [];
+  if (kits.length === 0) {
+    return unit;
+  }
+  return [
+    unit,
+    ...kits.map((k) => ({
+      ...offerJsonLd(
+        `/selado/${item.slug}`,
+        k.price,
+        "https://schema.org/NewCondition",
+        freeShippingMinBRL,
+        item.soldOut,
+        item.shipsFrom,
+      ),
+      name: `Kit com ${k.units} unidades`,
+      sku: feedID(`${item.slug}-kit${k.units}`),
+      eligibleQuantity: { "@type": "QuantitativeValue", value: k.units, unitCode: "C62" },
+    })),
+  ];
+}
+
+// Accessory makers, matched at the start of the product name. Unknown maker: no
+// brand at all, rather than naming the store as the brand of a third-party product.
+const ACCESSORY_BRANDS = ["Central", "The One", "Ultra Pro", "Dragon Shield", "KMC", "Gamegenic", "Ultimate Guard", "BCW", "Katana"];
+
+export function accessoryBrand(name: string): string | undefined {
+  const n = name.trim().toLowerCase();
+  return ACCESSORY_BRANDS.find((b) => n.startsWith(b.toLowerCase() + " ") || n === b.toLowerCase());
 }
 
 export function accessoryProductJsonLd(item: Accessory, freeShippingMinBRL = 0) {
@@ -233,7 +280,7 @@ export function accessoryProductJsonLd(item: Accessory, freeShippingMinBRL = 0) 
     gtin: item.gtin,
     description: `${item.name} — acessório para TCG, produto novo, serve para qualquer jogo.`,
     image: item.imageURL ? absoluteURL(item.imageURL) : undefined,
-    brand: { "@type": "Brand", name: item.set || "Collecta" },
+    brand: accessoryBrand(item.name) ? { "@type": "Brand", name: accessoryBrand(item.name) } : undefined,
     category: "Trading Card Game",
     offers: offerJsonLd(
       `/acessorio/${item.slug}`,
@@ -259,30 +306,41 @@ export function breadcrumbJsonLd(items: { name: string; path?: string }[]) {
   };
 }
 
-export function itemListJsonLd(name: string, paths: string[]) {
+export function itemListJsonLd(name: string, paths: string[], start = 1) {
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
     name,
     itemListElement: paths.map((path, i) => ({
       "@type": "ListItem",
-      position: i + 1,
+      position: start + i,
       url: absoluteURL(path),
     })),
   };
 }
 
-export function articleJsonLd(a: { title: string; description: string; path: string; updated: string }) {
+export function articleJsonLd(a: {
+  title: string;
+  description: string;
+  path: string;
+  updated: string;
+  published?: string;
+}) {
+  const org = { "@type": "Organization", "@id": ORGANIZATION_ID, name: "Collecta", url: siteURL };
   return {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: a.title,
     description: a.description,
     inLanguage: "pt-BR",
+    // Guides record only their last update; with no separate publication date the
+    // first known date is the update itself, never an invented earlier one.
+    datePublished: a.published ?? a.updated,
     dateModified: a.updated,
     mainEntityOfPage: absoluteURL(a.path),
-    author: { "@id": ORGANIZATION_ID },
-    publisher: { "@id": ORGANIZATION_ID },
+    image: absoluteURL("/opengraph-image"),
+    author: org,
+    publisher: { ...org, logo: { "@type": "ImageObject", url: absoluteURL("/mascot.png") } },
   };
 }
 

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SinglesBrowse from "@/components/singles/SinglesBrowse";
+import { packSingles } from "@/lib/singles-pack";
+import ListPageJsonLd from "@/components/seo/ListPageJsonLd";
 import { loadCatalog, scopeToGame } from "@/lib/catalog";
 import { GAME_NAMES } from "@/lib/games";
 import { pageCount } from "@/lib/paging";
@@ -62,8 +64,20 @@ export default async function SetPagePage({
     notFound();
   }
   return (
+    <>
+      <ListPageJsonLd
+        name={`Cartas ${found.label} de ${GAME_NAMES[jogo]}`}
+        crumbs={[
+          { name: "Collecta", path: "/" },
+          { name: `Cartas ${GAME_NAMES[jogo]}`, path: `/singles/${jogo}` },
+          { name: found.label, path: `/singles/${jogo}/colecao/${found.slug}` },
+          { name: `Página ${page}` },
+        ]}
+        slugs={scope.singles.filter((s) => s.set === found.code).map((s) => s.slug)}
+        page={page}
+      />
     <SinglesBrowse
-      catalog={scope.singles}
+      catalog={packSingles(scope.singles)}
       games={scope.games}
       navGames={scope.navGames}
       setLabels={scope.setLabels}
@@ -72,5 +86,6 @@ export default async function SetPagePage({
       initialPage={page}
       basePath={`/singles/${jogo}/colecao/${found.slug}`}
     />
+    </>
   );
 }
