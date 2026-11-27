@@ -12,6 +12,7 @@ import (
 func (s *Server) publishRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/publish", s.handlePublishCreate)
 	mux.HandleFunc("GET /api/publish", s.handlePublishList)
+	mux.HandleFunc("POST /api/publish/{id}/claim", s.handlePublishClaim)
 	mux.HandleFunc("POST /api/publish/{id}/published", s.handlePublishDone)
 	mux.HandleFunc("POST /api/publish/{id}/failed", s.handlePublishFailed)
 	mux.HandleFunc("POST /api/aprovar/{id}", s.handlePublishDecide)
@@ -53,6 +54,17 @@ func (s *Server) handlePublishList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string][]publishq.Item{"items": all})
+}
+
+// handlePublishClaim reserves an approved item right before posting it; 409 means
+// it is already published or being posted, so the caller must not post it.
+func (s *Server) handlePublishClaim(w http.ResponseWriter, r *http.Request) {
+	it, err := s.Publish.Claim(r.PathValue("id"))
+	if err != nil {
+		publishError(w, err)
+		return
+	}
+	writeJSON(w, it)
 }
 
 func (s *Server) handlePublishDone(w http.ResponseWriter, r *http.Request) {

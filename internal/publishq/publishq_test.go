@@ -129,3 +129,40 @@ func TestTikTokPhotoFormat(t *testing.T) {
 		t.Fatal("foto do tiktok sai aprovada e pelo Publicador, não pela API")
 	}
 }
+
+func TestClaimOnlyOnceAndLapses(t *testing.T) {
+	now := time.Date(2026, 11, 27, 20, 0, 0, 0, time.UTC)
+	s := NewStoreWithClock(filepath.Join(t.TempDir(), "publishq.json"), func() time.Time { return now })
+	it, _ := s.Add(sample())
+	if _, err := s.Claim(it.ID); !errors.Is(err, ErrNotApproved) {
+		t.Fatalf("pendente não pode ser reservado: %v", err)
+	}
+	s.Decide(it.ID, it.Token, true)
+	got, err := s.Claim(it.ID)
+	if err != nil || got.Status != StatusPublishing || got.ClaimedAt.IsZero() {
+		t.Fatalf("reserva: %+v %v", got, err)
+	}
+	if _, err := s.Claim(it.ID); !errors.Is(err, ErrNotApproved) {
+		t.Fatalf("segunda reserva devia falhar: %v", err)
+	}
+	if list, _ := s.List(StatusApproved); len(list) != 0 {
+		t.Fatalf("reservado não aparece em aprovados: %+v", list)
+	}
+	now = now.Add(ClaimTTL + time.Minute)
+	if list, _ := s.List(StatusApproved); len(list) != 1 {
+		t.Fatalf("reserva vencida volta para aprovados: %+v", list)
+	}
+	if _, err := s.Claim(it.ID); err != nil {
+		t.Fatalf("reserva vencida pode ser refeita: %v", err)
+	}
+	if got, err := s.Failed(it.ID, "rede caiu", false); err != nil || got.Status != StatusApproved || !got.ClaimedAt.IsZero() {
+		t.Fatalf("falha passageira volta para aprovado: %+v %v", got, err)
+	}
+	s.Claim(it.ID)
+	if got, err := s.Published(it.ID, "https://www.instagram.com/reel/x"); err != nil || got.Status != StatusPublished {
+		t.Fatalf("publicar reservado: %+v %v", got, err)
+	}
+	if _, err := s.Claim(it.ID); !errors.Is(err, ErrNotApproved) {
+		t.Fatalf("publicado não pode ser reservado: %v", err)
+	}
+}
