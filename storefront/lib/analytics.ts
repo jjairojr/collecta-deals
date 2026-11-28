@@ -63,10 +63,10 @@ function pixelParams(params: GAParams): PixelParams {
   return out;
 }
 
-function send(name: string, params: GAParams): void {
+function send(name: string, params: GAParams, eventID?: string): void {
   const pixelEvent = PIXEL_EVENTS[name];
   if (pixelEvent) {
-    pixelTrack(pixelEvent, pixelParams(params));
+    pixelTrack(pixelEvent, pixelParams(params), eventID);
   }
   if (!GA_ID) {
     return;
@@ -255,6 +255,7 @@ export function trackPurchase(
   totalBRL: number,
   shippingBRL: number,
 ): void {
+  // Same id as the server's Purchase (Conversions API): "pedido-<order id>".
   send("purchase", {
     transaction_id: orderId,
     currency: CURRENCY,
@@ -268,7 +269,7 @@ export function trackPurchase(
       price: l.unitBRL,
       quantity: l.qty,
     })),
-  });
+  }, `pedido-${orderId}`);
 }
 
 export function trackSearch(term: string): void {

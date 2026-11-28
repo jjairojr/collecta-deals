@@ -91,10 +91,23 @@ func runAds() error {
 	a := newApp(cfg, client, time.Now)
 	ctx, cancel := context.WithTimeout(context.Background(), adsRunTimeout)
 	defer cancel()
-	return newExecutor(a, mc, client).run(ctx)
+	err = newExecutor(a, mc, client).run(ctx)
+	if getenv("META_CAPI") == "on" {
+		// As compras vão ao Meta na mesma rodada; uma falha aqui não para os anúncios.
+		if _, cerr := sendConversions(ctx, a, &graph{cfg: mc, client: client}, getenv("META_CAPI_TESTE")); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}
+	return err
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "clientes-meta" {
+		if err := runCustomers(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "anuncios" {
 		if err := runAds(); err != nil {
 			log.Fatal(err)
