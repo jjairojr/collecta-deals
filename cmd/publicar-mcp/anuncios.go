@@ -66,6 +66,7 @@ type proposeInput struct {
 type proposeOutput struct {
 	ID          string `json:"id"`
 	Codigo      string `json:"codigo,omitempty"`
+	PeloLote    bool   `json:"aprovado_pelo_lote,omitempty"`
 	Verba       string `json:"verba"`
 	SobraSemana string `json:"sobra_na_semana"`
 	Proximo     string `json:"proximo"`
@@ -161,17 +162,29 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 	}
 	a.adLog(fmt.Sprintf("proposto %s %s %s %s %d dias %d criativos", created.ID, t.Objective, t.Audience, reais(t.BudgetCents), t.Days, len(creatives)))
 	if _, chat := a.chatApprovers(); chat {
-		if err := a.saveTicket(a.ticketForAd(created, available-t.BudgetCents)); err != nil {
+		ticket := a.ticketForAd(created, available-t.BudgetCents)
+		if err := a.saveTicket(ticket); err != nil {
 			return nil, proposeOutput{}, fmt.Errorf("teste %s criado, mas não guardei o código de aprovação: %v", created.ID, err)
 		}
 		code := codeOf(created.ID)
-		return nil, proposeOutput{
+		out := proposeOutput{
 			ID:          created.ID,
 			Codigo:      code,
 			Verba:       fmt.Sprintf("%s em %d dias", reais(t.BudgetCents), t.Days),
 			SobraSemana: reais(available - t.BudgetCents),
 			Proximo:     "o Jairo decide pelo chat do CEO Collecta, nada vai ao celular, e a frase dele precisa ter o valor. Leve na hora o código " + code + ", a verba e os dias a quem mostra ao Jairo (o CEO Collecta, direto ou pela sua coordenação). Anote o id e o código na seção Meta Ads do seu arquivo do dia e acompanhe com testes_anuncio.",
-		}, nil
+		}
+		byLote, why, err := a.approveByLote(ctx, created, &ticket, available-t.BudgetCents)
+		if err != nil {
+			return nil, proposeOutput{}, fmt.Errorf("teste %s criado com o código %s, mas o lote da semana falhou: %v", created.ID, code, err)
+		}
+		if byLote {
+			out.PeloLote = true
+			out.Proximo = "aprovado pelo lote da semana, sem código: sobe na próxima rodada dos anúncios. Avise o CEO Collecta (id, verba e dias) e anote na seção Meta Ads do seu arquivo do dia; acompanhe com testes_anuncio."
+		} else if why != "" {
+			out.Proximo = "fora do lote da semana (" + why + "), então pede código: " + out.Proximo
+		}
+		return nil, out, nil
 	}
 	if err := a.askAdApproval(ctx, created, available-t.BudgetCents); err != nil {
 		return nil, proposeOutput{}, fmt.Errorf("teste %s criado, mas o aviso não chegou ao dono: %v", created.ID, err)

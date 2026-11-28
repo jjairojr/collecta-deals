@@ -67,6 +67,8 @@ type chatTicket struct {
 	MessageID   string    `json:"mensagem,omitempty"`
 	Phrase      string    `json:"frase,omitempty"`
 	DecidedAt   time.Time `json:"decidido_em,omitzero"`
+	// Lote é a semana (id do lote) que aprovou este teste sem código.
+	Lote string `json:"lote,omitempty"`
 }
 
 func codeOf(id string) string {
@@ -386,10 +388,12 @@ type waitingItem struct {
 }
 
 type waitingOutput struct {
-	Ligado  bool          `json:"aprovacao_pelo_chat"`
-	Chats   []string      `json:"chats_que_valem"`
-	Itens   []waitingItem `json:"itens"`
-	Proximo string        `json:"proximo"`
+	Ligado   bool          `json:"aprovacao_pelo_chat"`
+	Chats    []string      `json:"chats_que_valem"`
+	Itens    []waitingItem `json:"itens"`
+	Lote     *loteStatus   `json:"lote_da_semana,omitempty"`
+	PeloLote []waitingItem `json:"aprovados_pelo_lote,omitempty"`
+	Proximo  string        `json:"proximo"`
 }
 
 func (a *app) addChatTools(s *mcp.Server) {
@@ -401,6 +405,7 @@ func (a *app) addChatTools(s *mcp.Server) {
 		Name:        "aprovar_pelo_chat",
 		Description: "Para o CEO Collecta. Aprova ou rejeita um pedido pelo código, só se o Jairo escreveu a decisão no chat logo depois da mensagem em que você mostrou o pedido com o código (ou citando o código). A ferramenta confere a frase dele no OpenBot; mensagem de agente, de rotina ou repassada não vale. Anúncio exige o valor da verba na frase dele.",
 	}, a.toolChatDecide)
+	a.addLoteTool(s)
 }
 
 func (a *app) pendingTickets(ctx context.Context) ([]chatTicket, error) {
@@ -449,6 +454,20 @@ func (a *app) toolWaiting(ctx context.Context, _ *mcp.CallToolRequest, _ noInput
 	}
 	for _, t := range pending {
 		out.Itens = append(out.Itens, waitingItem{Codigo: t.Code, ID: t.ID, Tipo: t.Kind, Resumo: t.Summary, Arquivos: t.Files, Pedido: t.CreatedAt.In(saoPaulo).Format("02/01 15:04")})
+	}
+	if out.Lote, err = a.loteNow(); err != nil {
+		return nil, waitingOutput{}, err
+	}
+	if l, _ := a.currentLote(); l != nil {
+		all, err := a.loadTickets()
+		if err != nil {
+			return nil, waitingOutput{}, err
+		}
+		for _, t := range all {
+			if t.Lote == l.ID {
+				out.PeloLote = append(out.PeloLote, waitingItem{Codigo: t.Code, ID: t.ID, Tipo: t.Kind, Resumo: t.Summary, Arquivos: t.Files, Pedido: t.CreatedAt.In(saoPaulo).Format("02/01 15:04")})
+			}
+		}
 	}
 	out.Proximo = "mostre cada item ao Jairo com o código escrito na mesma mensagem e as prévias; quando ele responder, chame aprovar_pelo_chat com o código. Anúncio: peça que ele diga o valor."
 	return nil, out, nil
