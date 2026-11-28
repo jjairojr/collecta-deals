@@ -49,9 +49,12 @@ const (
 
 var (
 	objectives = map[string]bool{"seguidores": true, "vendas": true, "mensagens": true}
-	audiences  = map[string]bool{"goiania": true, "brasil": true, "remarketing": true, "semelhante": true, "clientes": true}
+	audiences  = map[string]bool{"goiania": true, "brasil": true, "remarketing": true, "semelhante": true, "clientes": true, "aberto": true}
 	kinds      = map[string]bool{"video": true, "imagem": true, "post": true}
 )
+
+// SalesEvents are the site events a vendas test can optimize for.
+var SalesEvents = map[string]bool{"compra": true, "checkout": true, "carrinho": true}
 
 type Creative struct {
 	Path     string `json:"path"`
@@ -98,10 +101,12 @@ type Meta struct {
 }
 
 type Test struct {
-	ID          string     `json:"id"`
-	Objective   string     `json:"objective"`
-	Audience    string     `json:"audience"`
-	Link        string     `json:"link,omitempty"`
+	ID        string `json:"id"`
+	Objective string `json:"objective"`
+	Audience  string `json:"audience"`
+	Link      string `json:"link,omitempty"`
+	// Event is what a vendas test optimizes for: compra (default), checkout or carrinho.
+	Event       string     `json:"event,omitempty"`
 	Creatives   []Creative `json:"creatives"`
 	BudgetCents int64      `json:"budgetCents"`
 	Days        int        `json:"days"`
@@ -131,6 +136,9 @@ func Valid(t Test) bool {
 		return false
 	}
 	if t.Objective == "vendas" && t.Link == "" {
+		return false
+	}
+	if t.Event != "" && (t.Objective != "vendas" || !SalesEvents[t.Event]) {
 		return false
 	}
 	for _, c := range t.Creatives {

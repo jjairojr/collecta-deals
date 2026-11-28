@@ -182,3 +182,26 @@ func TestValidExistingPost(t *testing.T) {
 		t.Fatal("post sem id da mídia passou")
 	}
 }
+
+func TestValidSalesEventAndOpenAudience(t *testing.T) {
+	base := Test{Objective: "vendas", Audience: "aberto", Link: "https://x", BudgetCents: MinBudgetCents, Days: MinDays, Creatives: []Creative{
+		{Kind: "imagem", Path: "a.png", SHA256: "x", Text: "t"}, {Kind: "imagem", Path: "b.png", SHA256: "y", Text: "t"},
+	}}
+	for _, ev := range []string{"", "compra", "checkout", "carrinho"} {
+		tt := base
+		tt.Event = ev
+		if !Valid(tt) {
+			t.Fatalf("evento %q devia valer", ev)
+		}
+	}
+	bad := base
+	bad.Event = "lead"
+	if Valid(bad) {
+		t.Fatal("evento desconhecido passou")
+	}
+	follow := base
+	follow.Objective, follow.Link, follow.Event = "seguidores", "", "checkout"
+	if Valid(follow) {
+		t.Fatal("evento fora de vendas passou")
+	}
+}
