@@ -180,7 +180,7 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		}
 		if byLote {
 			out.PeloLote = true
-			out.Proximo = "aprovado pelo lote da semana, sem código: sobe na próxima rodada dos anúncios. Avise o CEO Collecta (id, verba e dias) e anote na seção Meta Ads do seu arquivo do dia; acompanhe com testes_anuncio."
+			out.Proximo = "aprovado pelo lote da semana, sem código: sobe na próxima rodada dos anúncios. Avise a Coordenação Tráfego Collecta (id, verba e dias), que avisa o CEO Collecta; anote na seção Meta Ads do seu arquivo do dia e acompanhe com testes_anuncio."
 		} else if why != "" {
 			out.Proximo = "fora do lote da semana (" + why + "), então pede código: " + out.Proximo
 		}
