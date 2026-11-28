@@ -5,7 +5,7 @@ package main
 // as mesmas peças aprovadas para o Instagram?": "pod ser".
 //
 // A trava: pedir_aprovacao com canal tiktok exige do_instagram, o código de um post do Instagram
-// (post ou carrossel) aprovado pelo chat (aprovar_pelo_chat). A ferramenta confere que os arquivos
+// (post, carrossel ou Reels) aprovado pelo chat (aprovar_pelo_chat). A ferramenta confere que os arquivos
 // do post não mudaram, monta o vídeo do TikTok só com eles (scripts/tiktok.mjs: as imagens no
 // fundo azul da marca), usa a legenda aprovada sem mudar nada e manda uma vez só. Peça nova que
 // iria só ao TikTok não tem como passar.
@@ -20,9 +20,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"opdeals/internal/publishq"
 )
+
+// Reels (vídeo gravado pelo Jairo, liberado em 28/11/2026: "vou fazer videos grabados reais"): o
+// mesmo .mp4 do Reels aprovado vai ao TikTok como vídeo, com a mesma legenda, conferido pelo hash.
 
 type slideshowFunc func(ctx context.Context, output string, images []string) error
 
@@ -86,8 +90,8 @@ func (a *app) tiktokFromInstagram(ctx context.Context, in requestInput) (request
 	if err != nil {
 		return requestOutput{}, err
 	}
-	if post.Channel != "instagram" || (post.Format != "post" && post.Format != "carrossel") {
-		return requestOutput{}, fmt.Errorf("só post ou carrossel do Instagram vai ao TikTok; %s é %s %s", code, post.Channel, post.Format)
+	if post.Channel != "instagram" || (post.Format != "post" && post.Format != "carrossel" && post.Format != "reels") {
+		return requestOutput{}, fmt.Errorf("só post, carrossel ou Reels do Instagram vai ao TikTok; %s é %s %s", code, post.Channel, post.Format)
 	}
 	images := make([]string, 0, len(post.Files))
 	for _, f := range post.Files {
@@ -105,6 +109,9 @@ func (a *app) tiktokFromInstagram(ctx context.Context, in requestInput) (request
 		return requestOutput{}, err
 	}
 	note := fmt.Sprintf("mesma peça do Instagram %s, aprovada pelo Jairo no chat", code)
+	if post.Format == "reels" {
+		return a.tiktokFromReels(ctx, ticket, post, images, when, note)
+	}
 	// Modo foto (decisão do Jairo de 25/11/2026): as mesmas imagens, como post de fotos do TikTok.
 	// Se o painel ainda não aceitar o formato foto, cai para o vídeo montado com as mesmas imagens.
 	var created publishq.Item
@@ -147,5 +154,33 @@ func (a *app) tiktokFromInstagram(ctx context.Context, in requestInput) (request
 	return requestOutput{
 		ID: created.ID, Quando: when.In(saoPaulo).Format("02/01 15:04"), Arquivos: len(item.Files),
 		Proximo: "TikTok na fila, já aprovado porque é a mesma peça que o Jairo aprovou para o Instagram: o Publicador posta no horário. Anote o id na seção Peças do seu arquivo do dia e não mande de novo.",
+	}, nil
+}
+
+// tiktokFromReels manda ao TikTok o mesmo vídeo do Reels aprovado, como vídeo e com a mesma legenda.
+func (a *app) tiktokFromReels(ctx context.Context, ticket *chatTicket, post publishq.Item, videos []string, when time.Time, note string) (requestOutput, error) {
+	if len(videos) != 1 || !videoExt[strings.ToLower(filepath.Ext(videos[0]))] {
+		return requestOutput{}, fmt.Errorf("o Reels %s não tem um vídeo só: não vai ao TikTok", ticket.Code)
+	}
+	files, err := a.checkFiles("video", videos)
+	if err != nil {
+		return requestOutput{}, err
+	}
+	item := publishq.Item{Channel: "tiktok", Format: "video", Files: files, Caption: post.Caption, PostAt: when, Note: note}
+	var created publishq.Item
+	if err := a.call(ctx, http.MethodPost, "/api/publish", item, &created); err != nil {
+		return requestOutput{}, err
+	}
+	if err := a.selfApprove(ctx, created); err != nil {
+		return requestOutput{}, fmt.Errorf("pedido %s criado, mas não foi aprovado sozinho: %v", created.ID, err)
+	}
+	ticket.TikTok = created.ID
+	if err := a.saveTicket(*ticket); err != nil {
+		return requestOutput{}, fmt.Errorf("TikTok %s na fila, mas não gravei no registro do Reels %s: %v", created.ID, ticket.Code, err)
+	}
+	a.logLine(fmt.Sprintf("tiktok video %s do reels do instagram %s (%s), aprovado no chat: %q", created.ID, ticket.Code, post.ID, ticket.Phrase))
+	return requestOutput{
+		ID: created.ID, Quando: when.In(saoPaulo).Format("02/01 15:04"), Arquivos: len(item.Files),
+		Proximo: "TikTok na fila com o mesmo vídeo do Reels, já aprovado porque o Jairo aprovou o Reels: o Publicador posta no horário. Anote o id na seção Peças do seu arquivo do dia e não mande de novo.",
 	}, nil
 }
