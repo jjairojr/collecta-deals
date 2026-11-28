@@ -799,3 +799,94 @@ func TestCreativeLinkRefused(t *testing.T) {
 		t.Fatal("criou o teste mesmo recusando")
 	}
 }
+
+func TestLookalikeAndBuyersAudiences(t *testing.T) {
+	_, _, ex := newAdFixture(t)
+	for audience, env := range map[string]string{"semelhante": "META_PUBLICO_SEMELHANTE", "clientes": "META_PUBLICO_COMPRADORES"} {
+		if _, err := ex.targeting(context.Background(), audience); err == nil || !strings.Contains(err.Error(), env) {
+			t.Fatalf("%s sem id devia falhar citando %s: %v", audience, env, err)
+		}
+	}
+	ex.g.cfg.Lookalike = []string{"555"}
+	ex.g.cfg.Buyers = []string{"999"}
+	cases := map[string][]string{
+		"semelhante": {`"custom_audiences":[{"id":"555"}]`, `"excluded_custom_audiences":[{"id":"999"}]`},
+		"clientes":   {`"custom_audiences":[{"id":"999"}]`},
+	}
+	for audience, wants := range cases {
+		tg, err := ex.targeting(context.Background(), audience)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := json.Marshal(tg)
+		s := string(data)
+		for _, want := range append(wants, `"countries":["BR"]`, `"age_min":18`, `"age_max":65`, `"advantage_audience":0`, `"publisher_platforms":["facebook","instagram"]`) {
+			if !strings.Contains(s, want) {
+				t.Errorf("%s: falta %s em %s", audience, want, s)
+			}
+		}
+		if strings.Contains(s, "flexible_spec") {
+			t.Errorf("%s não leva interesse: %s", audience, s)
+		}
+		if audience == "clientes" && strings.Contains(s, "excluded_custom_audiences") {
+			t.Errorf("clientes não exclui ninguém: %s", s)
+		}
+	}
+}
+
+// Sem o id do público no anuncios.env, a propor_teste recusa antes de criar o
+// teste: nada vai para a fila, nada é pedido ao dono, nada é gasto.
+func TestProposeRefusesMissingCustomAudience(t *testing.T) {
+	f, _, _ := newAdFixture(t)
+	env := filepath.Join(t.TempDir(), "anuncios.env")
+	if err := os.WriteFile(env, []byte("META_TOKEN=x\nMETA_PUBLICO_REMARKETING=\nMETA_PUBLICO_COMPRADORES=999\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.app.cfg.AdsEnv = env
+	for audience, key := range map[string]string{"semelhante": "META_PUBLICO_SEMELHANTE", "remarketing": "META_PUBLICO_REMARKETING"} {
+		args := proposeArgs(f.creatives(t), 100)
+		args["publico"] = audience
+		if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); !strings.Contains(errText, key) || !strings.Contains(errText, "Nada foi criado") {
+			t.Fatalf("%s devia recusar citando %s: %q", audience, key, errText)
+		}
+	}
+	if list, _ := f.ads.List(""); len(list) != 0 || len(f.pushed()) != 0 {
+		t.Fatalf("não devia criar teste nem avisar: %d testes, %d avisos", len(list), len(f.pushed()))
+	}
+	args := proposeArgs(f.creatives(t), 100)
+	args["publico"] = "clientes"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+		t.Fatalf("clientes com META_PUBLICO_COMPRADORES devia passar: %s", errText)
+	}
+	list, _ := f.ads.List("")
+	if len(list) != 1 || list[0].Audience != "clientes" {
+		t.Fatalf("fila = %+v", list)
+	}
+}
+
+func TestProposeLookalikeGoesLive(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	env := filepath.Join(t.TempDir(), "anuncios.env")
+	if err := os.WriteFile(env, []byte("META_PUBLICO_SEMELHANTE=555\nMETA_PUBLICO_COMPRADORES=999\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f.app.cfg.AdsEnv = env
+	ex.g.cfg.Lookalike = []string{"555"}
+	ex.g.cfg.Buyers = []string{"999"}
+	args := proposeArgs(f.creatives(t), 100)
+	args["publico"] = "semelhante"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+		t.Fatal(errText)
+	}
+	if p := f.pushed(); len(p) != 1 || !strings.Contains(p[0].message, "Semelhante aos clientes") {
+		t.Fatalf("aviso = %+v", p)
+	}
+	approveAds(t, f)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	set := meta.find("act_1/adsets")
+	if len(set) != 1 || !strings.Contains(set[0].form["targeting"], `"custom_audiences":[{"id":"555"}]`) || !strings.Contains(set[0].form["targeting"], `"excluded_custom_audiences":[{"id":"999"}]`) {
+		t.Fatalf("conjunto = %+v", set)
+	}
+}

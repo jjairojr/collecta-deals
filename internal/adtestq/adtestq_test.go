@@ -155,3 +155,17 @@ func TestMessagesBudgetIsSeparateWeeklyAndMonthly(t *testing.T) {
 		t.Fatalf("mês novo libera a verba: %v", err)
 	}
 }
+
+func TestValidAcceptsLookalikeAndBuyers(t *testing.T) {
+	for _, audience := range []string{"semelhante", "clientes"} {
+		tt := Test{Objective: "seguidores", Audience: audience, BudgetCents: MinBudgetCents, Days: MinDays, Creatives: []Creative{
+			{Kind: "imagem", Path: "a.png", SHA256: "x", Text: "t"}, {Kind: "imagem", Path: "b.png", SHA256: "y", Text: "t"},
+		}}
+		if !Valid(tt) {
+			t.Fatalf("%s devia ser válido", audience)
+		}
+	}
+	if Valid(Test{Objective: "seguidores", Audience: "lookalike", BudgetCents: MinBudgetCents, Days: MinDays}) {
+		t.Fatal("público desconhecido passou")
+	}
+}
