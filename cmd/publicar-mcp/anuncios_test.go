@@ -99,9 +99,17 @@ type fakeMeta struct {
 	failOn   string
 	insights []insightRow
 	inFeed   bool
+	// media are the Instagram posts the fake account has, by id; failMedia makes
+	// the creative of that post fail like Meta refusing licensed music.
+	media     map[string]map[string]any
+	failMedia string
 }
 
 func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/cdn/") {
+		_, _ = w.Write([]byte("jpg " + r.URL.Path))
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/v27.0/")
 	form := map[string]string{}
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
@@ -118,6 +126,14 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 	n := m.next
 	fail := m.failOn != "" && strings.HasSuffix(path, m.failOn)
 	insights := m.insights
+	media := m.media[path]
+	var list []map[string]any
+	if r.Method == http.MethodGet && strings.HasSuffix(path, "/media") {
+		for id, x := range m.media {
+			list = append(list, map[string]any{"id": id, "permalink": x["permalink"]})
+		}
+	}
+	refuse := m.failMedia != "" && form["source_instagram_media_id"] == m.failMedia
 	m.mu.Unlock()
 	if form["access_token"] != "token-meta" {
 		http.Error(w, `{"error":{"message":"token"}}`, http.StatusUnauthorized)
@@ -128,6 +144,12 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case refuse:
+		http.Error(w, `{"error":{"message":"Invalid parameter","error_user_msg":"A música deste post tem licença e não pode virar anúncio","code":100,"error_subcode":2490427}}`, http.StatusBadRequest)
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/media"):
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": list})
+	case r.Method == http.MethodGet && media != nil:
+		_ = json.NewEncoder(w).Encode(media)
 	case strings.HasSuffix(path, "/adimages"):
 		_ = json.NewEncoder(w).Encode(map[string]any{"images": map[string]any{"x.png": map[string]string{"hash": fmt.Sprintf("hash%d", n)}}})
 	case strings.HasSuffix(path, "/insights"):

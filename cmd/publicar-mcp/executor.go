@@ -307,12 +307,20 @@ func (e *executor) launch(ctx context.Context, t adtestq.Test) error {
 		return err
 	}
 	e.app.adLog(fmt.Sprintf("no ar %s campanha %s conjunto %s %d anúncios até %s", t.ID, meta.CampaignID, meta.AdSetID, len(meta.Ads), endsAt.In(saoPaulo).Format("02/01 15:04")))
-	e.notify(ctx, "Teste de anúncio no ar", "default", "rocket", fmt.Sprintf("%s, %s, %d criativos, %s até %s.", objectiveLabel[t.Objective], audienceLabel[t.Audience], len(meta.Ads), reais(t.BudgetCents), endsAt.In(saoPaulo).Format("02/01 15:04")))
+	live := fmt.Sprintf("%s, %s, %d criativos, %s até %s.", objectiveLabel[t.Objective], audienceLabel[t.Audience], len(meta.Ads), reais(t.BudgetCents), endsAt.In(saoPaulo).Format("02/01 15:04"))
+	for _, r := range meta.Refused {
+		live += "\nFicou de fora, o Meta recusou: " + refusedLine(t, r)
+		e.app.adLog(fmt.Sprintf("recusado %s: %s", t.ID, refusedLine(t, r)))
+	}
+	e.notify(ctx, "Teste de anúncio no ar", "default", "rocket", live)
 	return nil
 }
 
 func (e *executor) create(ctx context.Context, t adtestq.Test, meta *adtestq.Meta) (time.Time, error) {
 	for _, c := range t.Creatives {
+		if c.Kind == "post" {
+			continue // the post lives on Instagram; it is checked again when its ad is made
+		}
 		got, err := hashFile(c.Path)
 		if err != nil {
 			return time.Time{}, err
@@ -370,16 +378,29 @@ func (e *executor) create(ctx context.Context, t adtestq.Test, meta *adtestq.Met
 	meta.AdSetID = created.ID
 	for i, c := range t.Creatives {
 		creativeID, err := e.creative(ctx, t, i, c)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("criativo %d: %w", i+1, err)
+		if err == nil {
+			err = e.g.post(ctx, act+"/ads", url.Values{
+				"name": {fmt.Sprintf("%s %d %s", t.ID, i+1, c.Hook)}, "adset_id": {meta.AdSetID},
+				"creative": {jsonParam(map[string]string{"creative_id": creativeID})}, "status": {"PAUSED"},
+			}, &created)
 		}
-		if err := e.g.post(ctx, act+"/ads", url.Values{
-			"name": {fmt.Sprintf("%s %d %s", t.ID, i+1, c.Hook)}, "adset_id": {meta.AdSetID},
-			"creative": {jsonParam(map[string]string{"creative_id": creativeID})}, "status": {"PAUSED"},
-		}, &created); err != nil {
-			return time.Time{}, fmt.Errorf("criativo %d: %w", i+1, err)
+		if err != nil {
+			if c.Kind != "post" {
+				return time.Time{}, fmt.Errorf("criativo %d: %w", i+1, err)
+			}
+			// A post Meta will not run (licensed music, a filter, a deleted post)
+			// is left out; the test still goes live if enough creatives remain.
+			meta.Refused = append(meta.Refused, adtestq.Refused{Creative: i, Reason: err.Error()})
+			continue
 		}
 		meta.Ads = append(meta.Ads, adtestq.MetaAd{ID: created.ID, Creative: i})
+	}
+	if len(meta.Refused) > 0 && len(meta.Ads) < adtestq.MinCreatives {
+		lines := make([]string, len(meta.Refused))
+		for i, r := range meta.Refused {
+			lines[i] = refusedLine(t, r)
+		}
+		return time.Time{}, fmt.Errorf("o Meta recusou %s; sobraram %d criativos e o mínimo é %d, então o teste não subiu", strings.Join(lines, "; "), len(meta.Ads), adtestq.MinCreatives)
 	}
 	ids := make([]string, 0, len(meta.Ads)+2)
 	for _, ad := range meta.Ads {
@@ -539,6 +560,9 @@ func (e *executor) creative(ctx context.Context, t adtestq.Test, index int, c ad
 		link = "https://api.whatsapp.com/send"
 		cta = map[string]any{"type": "WHATSAPP_MESSAGE", "value": map[string]string{"app_destination": "WHATSAPP"}}
 	}
+	if c.Kind == "post" {
+		return e.postCreative(ctx, t, index, c, cta)
+	}
 	spec := map[string]any{"page_id": e.g.cfg.PageID, "instagram_user_id": e.g.cfg.IGUserID}
 	if c.Kind == "video" {
 		hash, err := e.imageHash(ctx, c.Thumb)
@@ -671,11 +695,22 @@ func (e *executor) review(ctx context.Context, t adtestq.Test) error {
 	}
 	meta := *t.Meta
 	meta.Ads = append([]adtestq.MetaAd(nil), t.Meta.Ads...)
+	changed := meta.Metric != metric
+	meta.Metric = metric
+	for i, r := range results {
+		if meta.Ads[i].Spend != r.spend || meta.Ads[i].Results != r.results {
+			meta.Ads[i].Spend, meta.Ads[i].Results = r.spend, r.results
+			changed = true
+		}
+	}
 	paused := e.pauseLosers(ctx, &meta, results, metric)
-	if len(paused) > 0 {
+	if changed || len(paused) > 0 {
+		// Keeps each ad's numbers on the panel, so testes_anuncio shows them per post.
 		if err := e.app.call(ctx, http.MethodPost, "/api/adtests/"+url.PathEscape(t.ID)+"/meta", meta, nil); err != nil {
 			return err
 		}
+	}
+	if len(paused) > 0 {
 		for _, line := range paused {
 			e.app.adLog(fmt.Sprintf("pausado %s: %s", t.ID, line))
 		}
@@ -767,7 +802,13 @@ func summarize(t adtestq.Test, meta adtestq.Meta, results []adResult, metric str
 		if r.results > 0 {
 			cost = fmt.Sprintf("R$ %.2f cada", r.cost())
 		}
+		if c.Permalink != "" {
+			state = " (" + c.Permalink + ")" + state
+		}
 		fmt.Fprintf(&b, "\n%d. %s%s: R$ %.2f, %.0f %s, %s", i+1, c.Hook, state, r.spend, r.results, metric, cost)
+	}
+	for _, r := range meta.Refused {
+		fmt.Fprintf(&b, "\nFicou de fora, o Meta recusou: %s", refusedLine(t, r))
 	}
 	if winner >= 0 {
 		fmt.Fprintf(&b, "\nVencedor: %d. %s.", winner+1, t.Creatives[meta.Ads[winner].Creative].Hook)

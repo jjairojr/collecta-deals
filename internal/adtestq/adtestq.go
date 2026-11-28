@@ -50,7 +50,7 @@ const (
 var (
 	objectives = map[string]bool{"seguidores": true, "vendas": true, "mensagens": true}
 	audiences  = map[string]bool{"goiania": true, "brasil": true, "remarketing": true, "semelhante": true, "clientes": true}
-	kinds      = map[string]bool{"video": true, "imagem": true}
+	kinds      = map[string]bool{"video": true, "imagem": true, "post": true}
 )
 
 type Creative struct {
@@ -65,6 +65,11 @@ type Creative struct {
 	// Link is this creative's own page on the site (vendas only); empty = the
 	// test's link. Lets one test send each ad to its own product.
 	Link string `json:"link,omitempty"`
+	// MediaID is the Instagram media boosted by a "post" creative (an existing
+	// post, reel or carousel of the store's account); Permalink is its address.
+	// For a post, Path is only the preview image and Text the caption excerpt.
+	MediaID   string `json:"mediaId,omitempty"`
+	Permalink string `json:"permalink,omitempty"`
 }
 
 type MetaAd struct {
@@ -72,12 +77,24 @@ type MetaAd struct {
 	Creative int    `json:"creative"`
 	Paused   bool   `json:"paused,omitempty"`
 	Reason   string `json:"reason,omitempty"`
+	// Spend and Results are this ad's numbers at the last review, measured in Meta.Metric.
+	Spend   float64 `json:"spend,omitempty"`
+	Results float64 `json:"results,omitempty"`
+}
+
+// Refused is a creative Meta would not run (for a post: licensed music, a
+// filter, a deleted post); the test went live without it.
+type Refused struct {
+	Creative int    `json:"creative"`
+	Reason   string `json:"reason"`
 }
 
 type Meta struct {
-	CampaignID string   `json:"campaignId"`
-	AdSetID    string   `json:"adSetId"`
-	Ads        []MetaAd `json:"ads"`
+	CampaignID string    `json:"campaignId"`
+	AdSetID    string    `json:"adSetId"`
+	Ads        []MetaAd  `json:"ads"`
+	Metric     string    `json:"metric,omitempty"`
+	Refused    []Refused `json:"refused,omitempty"`
 }
 
 type Test struct {
@@ -117,6 +134,12 @@ func Valid(t Test) bool {
 		return false
 	}
 	for _, c := range t.Creatives {
+		if c.Kind == "post" {
+			if c.MediaID == "" {
+				return false
+			}
+			continue
+		}
 		if !kinds[c.Kind] || c.Path == "" || c.SHA256 == "" || c.Text == "" || (c.Kind == "video" && c.Thumb == "") {
 			return false
 		}
