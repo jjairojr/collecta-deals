@@ -44,8 +44,9 @@ func (a *app) addAdTools(s *mcp.Server) {
 }
 
 type adCreativeInput struct {
-	Arquivo string `json:"arquivo" jsonschema:"caminho completo do vídeo (.mp4 gerado pelo criar_peca, que tem a prévia ao lado) ou da imagem (.png ou .jpg)"`
-	Texto   string `json:"texto" jsonschema:"texto principal do anúncio, até 400 letras, sem travessão, com os preços do site"`
+	Arquivo string `json:"arquivo,omitempty" jsonschema:"caminho completo do vídeo (.mp4 gerado pelo criar_peca, que tem a prévia ao lado) ou da imagem (.png ou .jpg); vazio quando usar post"`
+	Post    string `json:"post,omitempty" jsonschema:"no lugar de arquivo: um post, reel ou carrossel que já está no @tcgcollecta, pelo link (https://www.instagram.com/p/... ou /reel/...) ou pelo id da mídia. O anúncio usa a legenda do post, então deixe texto e titulo vazios. Story não vale. Se o Meta não deixar impulsionar (ex.: música com licença), a ferramenta recusa e diz o motivo"`
+	Texto   string `json:"texto,omitempty" jsonschema:"texto principal do anúncio, até 400 letras, sem travessão, com os preços do site; obrigatório com arquivo, vazio com post"`
 	Titulo  string `json:"titulo,omitempty" jsonschema:"título curto, até 40 letras (aparece embaixo da imagem no Facebook)"`
 	Gancho  string `json:"gancho" jsonschema:"o que este criativo testa, até 40 letras (ex.: preço no Pix, contagem, carta rara)"`
 	Link    string `json:"link,omitempty" jsonschema:"só em vendas, opcional: página do site deste criativo (ex.: a caixa do Gem Pack Vol.2); sem ele, vale o link do teste"`
@@ -131,7 +132,7 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, proposeOutput{}, fmt.Errorf("cabem só %s %s: proponha um teste menor ou espere", reais(available), pool)
 	}
 	stage := filepath.Join(a.cfg.DataDir, "anuncios", randomID())
-	creatives, err := a.stageCreatives(stage, in.Criativos)
+	creatives, err := a.stageCreatives(ctx, stage, in.Criativos)
 	if err != nil {
 		_ = os.RemoveAll(stage)
 		return nil, proposeOutput{}, err
@@ -215,15 +216,38 @@ func (a *app) adBudgetLeft(ctx context.Context, objective string) (int64, error)
 	return list.AvailableCents, nil
 }
 
-func (a *app) stageCreatives(stage string, in []adCreativeInput) ([]adtestq.Creative, error) {
+func (a *app) stageCreatives(ctx context.Context, stage string, in []adCreativeInput) ([]adtestq.Creative, error) {
 	if err := os.MkdirAll(stage, 0o755); err != nil {
 		return nil, err
 	}
 	out := make([]adtestq.Creative, 0, len(in))
+	var g *graph
+	posts := map[string]int{}
 	for i, c := range in {
 		text := strings.TrimSpace(c.Texto)
 		title := cleanLine(c.Titulo)
 		hook := cleanLine(c.Gancho)
+		if strings.TrimSpace(c.Post) != "" {
+			if err := (textLimit{"gancho", hook, 1, adHookMax}).check(); err != nil {
+				return nil, fmt.Errorf("criativo %d: %v", i+1, err)
+			}
+			if g == nil {
+				var err error
+				if g, err = a.metaGraph(); err != nil {
+					return nil, fmt.Errorf("criativo %d: %v", i+1, err)
+				}
+			}
+			cr, err := a.stagePost(ctx, g, stage, i, c, hook)
+			if err != nil {
+				return nil, fmt.Errorf("criativo %d: %v", i+1, err)
+			}
+			if prev, dup := posts[cr.MediaID]; dup {
+				return nil, fmt.Errorf("criativo %d: é o mesmo post do criativo %d", i+1, prev)
+			}
+			posts[cr.MediaID] = i + 1
+			out = append(out, cr)
+			continue
+		}
 		limits := []textLimit{{"texto", text, 1, adTextMax}, {"gancho", hook, 1, adHookMax}}
 		if title != "" {
 			limits = append(limits, textLimit{"titulo", title, 1, adTitleMax})
@@ -330,9 +354,12 @@ func (a *app) askAdApproval(ctx context.Context, t adtestq.Test, left int64) err
 }
 
 type adStatusAd struct {
-	Gancho  string `json:"gancho"`
-	Pausado bool   `json:"pausado,omitempty"`
-	Motivo  string `json:"motivo,omitempty"`
+	Gancho    string `json:"gancho"`
+	Post      string `json:"post,omitempty"`
+	Gasto     string `json:"gasto,omitempty"`
+	Resultado string `json:"resultado,omitempty"`
+	Pausado   bool   `json:"pausado,omitempty"`
+	Motivo    string `json:"motivo,omitempty"`
 }
 
 type adStatusItem struct {
@@ -344,8 +371,10 @@ type adStatusItem struct {
 	Motivo   string       `json:"motivo,omitempty"`
 	Termina  string       `json:"termina,omitempty"`
 	Anuncios []adStatusAd `json:"anuncios,omitempty"`
-	Resumo   string       `json:"resumo,omitempty"`
-	Erro     string       `json:"erro,omitempty"`
+	// Recusados are the creatives Meta would not run; the test went live without them.
+	Recusados []string `json:"recusados,omitempty"`
+	Resumo    string   `json:"resumo,omitempty"`
+	Erro      string   `json:"erro,omitempty"`
 }
 
 type adStatusOutput struct {
@@ -379,11 +408,22 @@ func (a *app) toolAdTests(ctx context.Context, _ *mcp.CallToolRequest, _ noInput
 		}
 		if t.Meta != nil {
 			for _, ad := range t.Meta.Ads {
-				hook := ""
+				row := adStatusAd{Pausado: ad.Paused, Motivo: ad.Reason}
 				if ad.Creative >= 0 && ad.Creative < len(t.Creatives) {
-					hook = t.Creatives[ad.Creative].Hook
+					row.Gancho = t.Creatives[ad.Creative].Hook
+					row.Post = t.Creatives[ad.Creative].Permalink
 				}
-				item.Anuncios = append(item.Anuncios, adStatusAd{Gancho: hook, Pausado: ad.Paused, Motivo: ad.Reason})
+				if t.Meta.Metric != "" {
+					row.Gasto = fmt.Sprintf("R$ %.2f", ad.Spend)
+					row.Resultado = fmt.Sprintf("%.0f %s", ad.Results, t.Meta.Metric)
+					if ad.Results > 0 {
+						row.Resultado += fmt.Sprintf(", R$ %.2f cada", ad.Spend/ad.Results)
+					}
+				}
+				item.Anuncios = append(item.Anuncios, row)
+			}
+			for _, r := range t.Meta.Refused {
+				item.Recusados = append(item.Recusados, refusedLine(t, r))
 			}
 		}
 		out.Testes = append(out.Testes, item)

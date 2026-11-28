@@ -169,3 +169,16 @@ func TestValidAcceptsLookalikeAndBuyers(t *testing.T) {
 		t.Fatal("público desconhecido passou")
 	}
 }
+
+func TestValidExistingPost(t *testing.T) {
+	post := Test{Objective: "seguidores", Audience: "brasil", BudgetCents: MinBudgetCents, Days: MinDays, Creatives: []Creative{
+		{Kind: "post", MediaID: "1790", Hook: "a"}, {Kind: "post", MediaID: "1791", Hook: "b"},
+	}}
+	if !Valid(post) {
+		t.Fatal("post existente sem arquivo nem texto devia ser válido")
+	}
+	post.Creatives[1].MediaID = ""
+	if Valid(post) {
+		t.Fatal("post sem id da mídia passou")
+	}
+}
