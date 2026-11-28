@@ -238,10 +238,13 @@ type executor struct {
 	pollEvery time.Duration
 	pollMax   time.Duration
 	host      videoHost
+	// startedWait é a espera entre as tentativas de registrar no painel um teste
+	// que já subiu no Meta.
+	startedWait time.Duration
 }
 
 func newExecutor(a *app, mc metaConfig, client *http.Client) *executor {
-	return &executor{app: a, g: &graph{cfg: mc, client: client}, pollEvery: videoPollEvery, pollMax: videoPollMax, host: tunnelHost{binary: mc.Cloudflared}}
+	return &executor{app: a, g: &graph{cfg: mc, client: client}, pollEvery: videoPollEvery, pollMax: videoPollMax, host: tunnelHost{binary: mc.Cloudflared}, startedWait: 10 * time.Second}
 }
 
 func (e *executor) list(ctx context.Context, status string) ([]adtestq.Test, error) {
@@ -284,6 +287,29 @@ func (e *executor) notify(ctx context.Context, title, priority, tags, text strin
 }
 
 func (e *executor) launch(ctx context.Context, t adtestq.Test) error {
+	// Antes de criar: o teste pode já ter subido numa rodada em que o painel não
+	// registrou. Sem conseguir conferir, não cria (melhor esperar que duplicar).
+	found, foundEnd, leftovers, err := e.recoverLaunched(ctx, t)
+	if err != nil {
+		return err
+	}
+	for _, id := range leftovers {
+		if err := e.g.post(ctx, id, url.Values{"status": {"PAUSED"}}, nil); err != nil {
+			return fmt.Errorf("sobra %s de uma subida anterior não pausou: %w", id, err)
+		}
+		e.app.adLog(fmt.Sprintf("sobra pausada %s: campanha %s de uma subida anterior que não terminou", t.ID, id))
+	}
+	if found != nil {
+		if err := e.setStatus(ctx, *found, "ACTIVE"); err != nil {
+			return err
+		}
+		e.app.adLog(fmt.Sprintf("reaproveitada %s: campanha %s já estava no Meta, sem registro no painel", t.ID, found.CampaignID))
+		if err := e.markStarted(ctx, t, *found, foundEnd); err != nil {
+			return err
+		}
+		e.app.adLog(fmt.Sprintf("no ar %s campanha %s conjunto %s %d anúncios até %s", t.ID, found.CampaignID, found.AdSetID, len(found.Ads), foundEnd.In(saoPaulo).Format("02/01 15:04")))
+		return nil
+	}
 	meta := adtestq.Meta{}
 	endsAt, err := e.create(ctx, t, &meta)
 	if err != nil {
@@ -303,7 +329,7 @@ func (e *executor) launch(ctx context.Context, t adtestq.Test) error {
 		e.notify(ctx, "Teste de anúncio não subiu", "high", "warning", fmt.Sprintf("%s %s: %v. Nada foi gasto além do que o Meta mostrar na campanha.", objectiveLabel[t.Objective], reais(t.BudgetCents), err))
 		return err
 	}
-	if err := e.app.call(ctx, http.MethodPost, "/api/adtests/"+url.PathEscape(t.ID)+"/started", map[string]any{"meta": meta, "endsAt": endsAt}, nil); err != nil {
+	if err := e.markStarted(ctx, t, meta, endsAt); err != nil {
 		return err
 	}
 	e.app.adLog(fmt.Sprintf("no ar %s campanha %s conjunto %s %d anúncios até %s", t.ID, meta.CampaignID, meta.AdSetID, len(meta.Ads), endsAt.In(saoPaulo).Format("02/01 15:04")))
@@ -355,7 +381,7 @@ func (e *executor) create(ctx context.Context, t adtestq.Test, meta *adtestq.Met
 	var created struct {
 		ID string `json:"id"`
 	}
-	name := fmt.Sprintf("Collecta teste %s %s", t.ID, t.Objective)
+	name := campaignName(t)
 	if err := e.g.post(ctx, act+"/campaigns", url.Values{
 		"name": {name}, "objective": {objective}, "status": {"PAUSED"},
 		"special_ad_categories": {"[]"}, "is_adset_budget_sharing_enabled": {"false"},

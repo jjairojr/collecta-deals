@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,6 +104,48 @@ type fakeMeta struct {
 	// the creative of that post fail like Meta refusing licensed music.
 	media     map[string]map[string]any
 	failMedia string
+	// objects são as campanhas, conjuntos e anúncios criados, para a busca por
+	// nome da subida idempotente; o status acompanha os POST de status.
+	objects []*fakeObject
+}
+
+type fakeObject struct {
+	id, kind, name, parent, status, end string
+}
+
+func (m *fakeMeta) object(id string) *fakeObject {
+	for _, o := range m.objects {
+		if o.id == id {
+			return o
+		}
+	}
+	return nil
+}
+
+// listing é a resposta das leituras de lista (campanhas por nome, conjuntos da
+// campanha, anúncios do conjunto), ou nil se o caminho não é uma delas.
+func (m *fakeMeta) listing(path string, q url.Values) []map[string]string {
+	parent, edge, ok := strings.Cut(path, "/")
+	if !ok || (edge != "campaigns" && edge != "adsets" && edge != "ads") {
+		return nil
+	}
+	kind := map[string]string{"campaigns": "campaign", "adsets": "adset", "ads": "ad"}[edge]
+	want := ""
+	if f := q.Get("filtering"); f != "" {
+		var rules []map[string]string
+		_ = json.Unmarshal([]byte(f), &rules)
+		if len(rules) > 0 {
+			want = rules[0]["value"]
+		}
+	}
+	out := []map[string]string{}
+	for _, o := range m.objects {
+		if o.kind != kind || (kind != "campaign" && o.parent != parent) || (want != "" && !strings.Contains(o.name, want)) {
+			continue
+		}
+		out = append(out, map[string]string{"id": o.id, "name": o.name, "effective_status": o.status, "end_time": o.end})
+	}
+	return out
 }
 
 func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
@@ -126,6 +169,28 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 	n := m.next
 	fail := m.failOn != "" && strings.HasSuffix(path, m.failOn)
 	insights := m.insights
+	var listed []map[string]string
+	if r.Method == http.MethodGet {
+		listed = m.listing(path, r.URL.Query())
+	}
+	if r.Method == http.MethodPost {
+		if o := m.object(path); o != nil && form["status"] != "" {
+			o.status = form["status"]
+		}
+		created := fmt.Sprintf("id%d", n)
+		switch {
+		case path == "act_1/campaigns":
+			m.objects = append(m.objects, &fakeObject{id: created, kind: "campaign", name: form["name"], status: form["status"]})
+		case path == "act_1/adsets":
+			end := ""
+			if t, err := time.Parse(time.RFC3339, form["end_time"]); err == nil {
+				end = t.Format("2006-01-02T15:04:05-0700")
+			}
+			m.objects = append(m.objects, &fakeObject{id: created, kind: "adset", name: form["name"], parent: form["campaign_id"], status: form["status"], end: end})
+		case path == "act_1/ads":
+			m.objects = append(m.objects, &fakeObject{id: created, kind: "ad", name: form["name"], parent: form["adset_id"], status: form["status"]})
+		}
+	}
 	media := m.media[path]
 	var list []map[string]any
 	if r.Method == http.MethodGet && strings.HasSuffix(path, "/media") {
@@ -144,6 +209,8 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case listed != nil:
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": listed})
 	case refuse:
 		http.Error(w, `{"error":{"message":"Invalid parameter","error_user_msg":"A música deste post tem licença e não pode virar anúncio","code":100,"error_subcode":2490427}}`, http.StatusBadRequest)
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/media"):
@@ -169,11 +236,16 @@ func (m *fakeMeta) serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// find devolve as chamadas que terminam em suffix, menos as leituras de lista
+// (GET de campanhas, conjuntos ou anúncios), que não criam nada.
 func (m *fakeMeta) find(suffix string) []metaCall {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []metaCall
 	for _, c := range m.calls {
+		if c.method == http.MethodGet && (strings.HasSuffix(c.path, "/campaigns") || strings.HasSuffix(c.path, "/adsets") || strings.HasSuffix(c.path, "/ads")) {
+			continue
+		}
 		if strings.HasSuffix(c.path, suffix) {
 			out = append(out, c)
 		}
