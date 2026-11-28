@@ -42,6 +42,8 @@ type fixture struct {
 	pushes     []ntfyCall
 	refuse     bool
 	refuseFoto bool
+	// failStarted faz o painel responder 502 a tantos POST /started (Railway reiniciando).
+	failStarted int
 }
 
 func decodeHeader(v string) string {
@@ -56,6 +58,18 @@ func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("X-Admin-Token") != "segredo" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/started") {
+		f.mu.Lock()
+		fail := f.failStarted > 0
+		if fail {
+			f.failStarted--
+		}
+		f.mu.Unlock()
+		if fail {
+			http.Error(w, `{"status":"error","code":502,"message":"Application failed to respond"}`, http.StatusBadGateway)
+			return
+		}
 	}
 	if r.URL.Path == "/api/storefront" {
 		_, _ = w.Write([]byte(`{"items":[{"slug":"reinado-box","cardBRL":410},{"slug":"luffy","cardBRL":0}]}`))
