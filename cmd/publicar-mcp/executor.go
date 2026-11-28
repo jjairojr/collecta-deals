@@ -505,6 +505,9 @@ func (e *executor) creative(ctx context.Context, t adtestq.Test, index int, c ad
 	switch t.Objective {
 	case "vendas":
 		link = t.Link
+		if c.Link != "" {
+			link = c.Link // this ad's own product page
+		}
 		cta = map[string]any{"type": "SHOP_NOW", "value": map[string]string{"link": link}}
 	case "mensagens":
 		link = "https://api.whatsapp.com/send"

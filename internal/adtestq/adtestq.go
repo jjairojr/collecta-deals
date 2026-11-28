@@ -62,6 +62,9 @@ type Creative struct {
 	Text     string `json:"text"`
 	Headline string `json:"headline,omitempty"`
 	Hook     string `json:"hook"`
+	// Link is this creative's own page on the site (vendas only); empty = the
+	// test's link. Lets one test send each ad to its own product.
+	Link string `json:"link,omitempty"`
 }
 
 type MetaAd struct {
