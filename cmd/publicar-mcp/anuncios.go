@@ -35,7 +35,7 @@ var adStatusLabel = map[string]string{
 func (a *app) addAdTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "propor_teste",
-		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 620 por semana somando todos os testes.",
+		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 950 por semana somando vendas, seguidores e remarketing (mensagens tem verba à parte: R$ 250 por semana e R$ 1.000 por mês) em todos os testes.",
 	}, a.toolProposeAdTest)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "testes_anuncio",
@@ -48,6 +48,7 @@ type adCreativeInput struct {
 	Texto   string `json:"texto" jsonschema:"texto principal do anúncio, até 400 letras, sem travessão, com os preços do site"`
 	Titulo  string `json:"titulo,omitempty" jsonschema:"título curto, até 40 letras (aparece embaixo da imagem no Facebook)"`
 	Gancho  string `json:"gancho" jsonschema:"o que este criativo testa, até 40 letras (ex.: preço no Pix, contagem, carta rara)"`
+	Link    string `json:"link,omitempty" jsonschema:"só em vendas, opcional: página do site deste criativo (ex.: a caixa do Gem Pack Vol.2); sem ele, vale o link do teste"`
 }
 
 type proposeInput struct {
@@ -93,12 +94,27 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 	case t.Note == "":
 		return nil, proposeOutput{}, errors.New("motivo vazio")
 	}
+	creativeLinks := make([]string, len(in.Criativos))
 	if t.Objective == "vendas" {
-		link, err := siteLink(in.Link)
+		link, err := a.checkedSiteLink(ctx, in.Link)
 		if err != nil {
 			return nil, proposeOutput{}, err
 		}
 		t.Link = link
+		for i, c := range in.Criativos {
+			if strings.TrimSpace(c.Link) == "" {
+				continue
+			}
+			if creativeLinks[i], err = a.checkedSiteLink(ctx, c.Link); err != nil {
+				return nil, proposeOutput{}, fmt.Errorf("criativo %d: %v", i+1, err)
+			}
+		}
+	} else {
+		for i, c := range in.Criativos {
+			if strings.TrimSpace(c.Link) != "" {
+				return nil, proposeOutput{}, fmt.Errorf("criativo %d: link por criativo só existe em vendas", i+1)
+			}
+		}
 	}
 	available, err := a.adBudgetLeft(ctx, t.Objective)
 	if err != nil {
@@ -117,6 +133,9 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		_ = os.RemoveAll(stage)
 		return nil, proposeOutput{}, err
 	}
+	for i := range creatives {
+		creatives[i].Link = creativeLinks[i]
+	}
 	t.Creatives = creatives
 	var created adtestq.Test
 	if err := a.call(ctx, http.MethodPost, "/api/adtests", t, &created); err != nil {
@@ -133,6 +152,37 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		SobraSemana: reais(available - t.BudgetCents),
 		Proximo:     "o dono decide pelo celular. Anote o id na seção Meta Ads do seu arquivo do dia e acompanhe com testes_anuncio.",
 	}, nil
+}
+
+// checkSitePage confirms an ad link opens a real page of the store (not a 404),
+// so an ad never sends people to a page that does not exist. Tests replace it.
+var checkSitePage = func(ctx context.Context, client *http.Client, link string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Collecta/1.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("não consegui abrir %s: %v", link, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("a página %s respondeu %d: confira o endereço do produto", link, resp.StatusCode)
+	}
+	return nil
+}
+
+// checkedSiteLink normalizes a link to the store's site and checks the page exists.
+func (a *app) checkedSiteLink(ctx context.Context, raw string) (string, error) {
+	link, err := siteLink(raw)
+	if err != nil {
+		return "", err
+	}
+	if err := checkSitePage(ctx, a.client, link); err != nil {
+		return "", err
+	}
+	return link, nil
 }
 
 func siteLink(raw string) (string, error) {
@@ -242,6 +292,9 @@ func (a *app) askAdApproval(ctx context.Context, t adtestq.Test, left int64) err
 			text = append(text[:160], '…')
 		}
 		fmt.Fprintf(&b, "\n%d. %s (%s): %s", i+1, c.Hook, c.Kind, string(text))
+		if c.Link != "" {
+			fmt.Fprintf(&b, "\n   leva para: %s", c.Link)
+		}
 	}
 	actions := fmt.Sprintf("http, Aprovar, %s, method=POST, clear=true; http, Rejeitar, %s, method=POST, clear=true", a.adDecideURL(t, "aprovar"), a.adDecideURL(t, "rejeitar"))
 	headers := map[string]string{"Title": "Aprovar teste de anúncio", "Actions": actions, "Tags": "moneybag", "Priority": "high"}

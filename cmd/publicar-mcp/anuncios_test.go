@@ -261,7 +261,7 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if errText != "" {
 		t.Fatal(errText)
 	}
-	if out.ID == "" || out.SobraSemana != "R$ 320,00" {
+	if out.ID == "" || out.SobraSemana != "R$ 650,00" {
 		t.Fatalf("saída = %+v", out)
 	}
 	pushes := f.pushed()
@@ -278,10 +278,12 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if _, err := os.Stat(list[0].Creatives[0].Thumb); err != nil {
 		t.Fatal(err)
 	}
-	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 300)); errText != "" {
-		t.Fatal(errText)
+	for i := 0; i < 2; i++ { // 3 testes de R$ 300 ao mesmo tempo
+		if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 300)); errText != "" {
+			t.Fatal(errText)
+		}
 	}
-	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 30)); !strings.Contains(errText, "cabem só R$ 20,00") {
+	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 60)); !strings.Contains(errText, "cabem só R$ 50,00") {
 		t.Fatalf("teto: %q", errText)
 	}
 }
@@ -712,13 +714,12 @@ func TestMessagesMeasuredByConversations(t *testing.T) {
 // mensagens passa mesmo com a semana de vendas cheia.
 func TestMessagesUseOwnBudget(t *testing.T) {
 	f, _, _ := newAdFixture(t)
-	for i := 0; i < 2; i++ {
-		args := proposeArgs(f.creatives(t), 300)
-		if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+	for _, b := range []int{300, 300, 300, 50} { // vendas cheia: R$ 950
+		if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), b)); errText != "" {
 			t.Fatal(errText)
 		}
 	}
-	if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 50)); !strings.Contains(errText, "na semana") {
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 30)); !strings.Contains(errText, "na semana") {
 		t.Fatalf("vendas devia estar cheia: %q", errText)
 	}
 	msg := proposeArgs(f.creatives(t), 150)
@@ -734,5 +735,67 @@ func TestMessagesUseOwnBudget(t *testing.T) {
 	status, _ := callTool[adStatusOutput](t, f, "testes_anuncio", nil)
 	if status.SobraMensagens != "R$ 100,00" {
 		t.Fatalf("sobra de compra de cartas = %q", status.SobraMensagens)
+	}
+}
+
+func init() {
+	// Sem rede nos testes: "nao-existe" no endereço faz de conta que a página dá 404.
+	checkSitePage = func(_ context.Context, _ *http.Client, link string) error {
+		if strings.Contains(link, "nao-existe") {
+			return fmt.Errorf("a página %s respondeu 404: confira o endereço do produto", link)
+		}
+		return nil
+	}
+}
+
+// Teste do Gem Pack (02 a 08/12): um anúncio do Vol.2 e um do Vol.3, cada um
+// levando à página da sua caixa; o criativo sem link usa o link do teste.
+func TestSalesLinkPerCreative(t *testing.T) {
+	f, meta, ex := newAdFixture(t)
+	args := proposeArgs(f.creatives(t), 100)
+	args["objetivo"] = "vendas"
+	args["link"] = "https://www.collectatcg.com.br/selado/pokemon"
+	cs := args["criativos"].([]map[string]any)
+	cs[0]["link"] = "https://www.collectatcg.com.br/selado/pokemon-gem-pack-vol-02"
+	cs[1]["link"] = "https://collectatcg.com.br/selado/pokemon-gem-pack-vol-03?utm=x"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+		t.Fatal(errText)
+	}
+	list, _ := f.ads.List("")
+	if len(list) != 1 || list[0].Creatives[0].Link != "https://www.collectatcg.com.br/selado/pokemon-gem-pack-vol-02" || list[0].Creatives[1].Link != "https://www.collectatcg.com.br/selado/pokemon-gem-pack-vol-03" || list[0].Creatives[2].Link != "" {
+		t.Fatalf("links guardados = %+v", list[0].Creatives)
+	}
+	if push := f.pushed()[len(f.pushed())-1]; !strings.Contains(push.message, "leva para: https://www.collectatcg.com.br/selado/pokemon-gem-pack-vol-02") {
+		t.Fatalf("o dono devia ver o link de cada criativo: %q", push.message)
+	}
+	approveAds(t, f)
+	if err := ex.run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	cr := meta.find("act_1/adcreatives")
+	want := []string{"pokemon-gem-pack-vol-02", "pokemon-gem-pack-vol-03", "/selado/pokemon\""}
+	for i, w := range want {
+		if spec := cr[i].form["object_story_spec"]; !strings.Contains(spec, w) || !strings.Contains(spec, "SHOP_NOW") {
+			t.Fatalf("criativo %d devia levar a %s: %s", i, w, spec)
+		}
+	}
+}
+
+func TestCreativeLinkRefused(t *testing.T) {
+	f, _, _ := newAdFixture(t)
+	args := proposeArgs(f.creatives(t), 100)
+	args["criativos"].([]map[string]any)[0]["link"] = "https://www.collectatcg.com.br/selado/pokemon"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); !strings.Contains(errText, "só existe em vendas") {
+		t.Fatalf("seguidores com link por criativo: %q", errText)
+	}
+	args = proposeArgs(f.creatives(t), 100)
+	args["objetivo"] = "vendas"
+	args["link"] = "https://www.collectatcg.com.br/selado/pokemon"
+	args["criativos"].([]map[string]any)[1]["link"] = "https://www.collectatcg.com.br/selado/nao-existe"
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); !strings.Contains(errText, "criativo 2") || !strings.Contains(errText, "404") {
+		t.Fatalf("página que não existe devia ser recusada: %q", errText)
+	}
+	if list, _ := f.ads.List(""); len(list) != 0 {
+		t.Fatal("criou o teste mesmo recusando")
 	}
 }

@@ -29,8 +29,10 @@ func TestAdTestFlow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if rec := call(t, h, http.MethodPost, "/api/adtests", adTestBody, true); rec.Code != http.StatusOK {
-		t.Fatalf("segundo teste = %d %s", rec.Code, rec.Body)
+	for i := 2; i <= 3; i++ { // 3 testes de R$ 300 cabem no teto de R$ 950
+		if rec := call(t, h, http.MethodPost, "/api/adtests", adTestBody, true); rec.Code != http.StatusOK {
+			t.Fatalf("teste %d = %d %s", i, rec.Code, rec.Body)
+		}
 	}
 	if rec := call(t, h, http.MethodPost, "/api/adtests", adTestBody, true); rec.Code != http.StatusConflict {
 		t.Fatalf("teto = %d", rec.Code)
@@ -49,7 +51,7 @@ func TestAdTestFlow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err)
 	}
-	if len(list.Items) != 1 || list.Items[0].Token != "" || list.AvailableCents != adtestq.WeeklyCapCents-60000 {
+	if len(list.Items) != 1 || list.Items[0].Token != "" || list.AvailableCents != adtestq.WeeklyCapCents-90000 {
 		t.Fatalf("lista = %+v", list)
 	}
 	started := `{"meta":{"campaignId":"c","adSetId":"s","ads":[{"id":"a1"}]},"endsAt":"2026-11-10T23:59:00-03:00"}`

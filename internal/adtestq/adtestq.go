@@ -32,7 +32,7 @@ const (
 )
 
 const (
-	WeeklyCapCents = 62000
+	WeeklyCapCents = 95000 // vendas, seguidores e remarketing (Jairo, 27/11: dezembro até R$ 900/semana)
 	// Mensagens (compra de cartas, clique para WhatsApp) has its own budget,
 	// outside the sales one (Jairo, 27/11: "até R$ 1.000/mês"): R$ 250 a week
 	// (rolling 7 days) and R$ 1.000 a calendar month in Goiânia.
@@ -62,6 +62,9 @@ type Creative struct {
 	Text     string `json:"text"`
 	Headline string `json:"headline,omitempty"`
 	Hook     string `json:"hook"`
+	// Link is this creative's own page on the site (vendas only); empty = the
+	// test's link. Lets one test send each ad to its own product.
+	Link string `json:"link,omitempty"`
 }
 
 type MetaAd struct {
