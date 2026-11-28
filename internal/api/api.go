@@ -228,6 +228,7 @@ func (s *Server) Handler() http.Handler {
 	if s.adminToken != "" {
 		mux.HandleFunc("POST /api/admin/reload", s.handleAdminReload)
 	}
+	s.registerMetaRoutes(mux)
 	if s.Checkout.Orders != nil {
 		mux.HandleFunc("POST /api/shipping/quote", s.handleShippingQuote)
 		mux.HandleFunc("POST /api/orders", s.handleOrderCreate)

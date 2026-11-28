@@ -2,6 +2,18 @@ import { checkoutFetch } from "@/lib/backend";
 import { sessionUser } from "@/lib/session";
 import { siteURL } from "@/lib/site";
 
+/** The Meta Pixel cookie (_fbp or _fbc) from the request, or "". */
+function metaCookie(req: Request, name: string): string {
+  const raw = req.headers.get("cookie") ?? "";
+  for (const part of raw.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) {
+      return decodeURIComponent(v.join("="));
+    }
+  }
+  return "";
+}
+
 export async function POST(req: Request): Promise<Response> {
   let payload: Record<string, unknown>;
   try {
@@ -25,6 +37,13 @@ export async function POST(req: Request): Promise<Response> {
       collectaUserId: session?.user.id ?? "",
       couponIds,
       promoCode,
+      // For the purchase to reach Meta from the server (Conversions API) and match
+      // the browser Pixel: the browser and the Pixel cookies, nothing else.
+      ads: {
+        userAgent: req.headers.get("user-agent") ?? "",
+        fbp: metaCookie(req, "_fbp"),
+        fbc: metaCookie(req, "_fbc"),
+      },
     }),
   });
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -92,6 +93,37 @@ type Buyer struct {
 	CPF   string `json:"cpf"`
 }
 
+// AdsContext é o que o Meta pede, sem hash, para uma compra do site enviada pelo
+// servidor: o navegador (user agent) e os cookies _fbp e _fbc do Pixel.
+type AdsContext struct {
+	UserAgent string `json:"userAgent,omitempty"`
+	FBP       string `json:"fbp,omitempty"`
+	FBC       string `json:"fbc,omitempty"`
+}
+
+// Clean corta tamanhos e descarta cookie fora do formato do Meta (fb.N.N.x);
+// devolve nil quando não sobra nada.
+func (a *AdsContext) Clean() *AdsContext {
+	if a == nil {
+		return nil
+	}
+	cookie := func(v string) string {
+		v = strings.TrimSpace(v)
+		if len(v) > 256 || !strings.HasPrefix(v, "fb.") || strings.Count(v, ".") < 3 {
+			return ""
+		}
+		return v
+	}
+	out := AdsContext{UserAgent: strings.TrimSpace(a.UserAgent), FBP: cookie(a.FBP), FBC: cookie(a.FBC)}
+	if len(out.UserAgent) > 512 {
+		out.UserAgent = out.UserAgent[:512]
+	}
+	if out == (AdsContext{}) {
+		return nil
+	}
+	return &out
+}
+
 type Address struct {
 	CEP        string `json:"cep"`
 	Street     string `json:"street"`
@@ -163,6 +195,10 @@ type Order struct {
 	Promo             *Promo    `json:"promo,omitempty"`
 
 	MarketingOptIn bool `json:"marketingOptIn,omitempty"`
+
+	// Ads é o navegador e os cookies do Meta de quem fez o pedido, para a compra
+	// chegar ao Meta pelo servidor (Conversions API) e casar com o Pixel.
+	Ads *AdsContext `json:"ads,omitempty"`
 
 	TrackingCode       string    `json:"trackingCode,omitempty"`
 	TrackingNotified   string    `json:"trackingNotified,omitempty"`

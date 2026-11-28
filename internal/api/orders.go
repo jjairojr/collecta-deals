@@ -85,6 +85,8 @@ type orderCreateInput struct {
 	PromoCode      string   `json:"promoCode"`
 	MarketingOptIn bool     `json:"marketingOptIn"`
 	PaymentMethod  string   `json:"paymentMethod"`
+	// Ads vem do site (navegador e cookies do Pixel), para a Conversions API.
+	Ads *orders.AdsContext `json:"ads"`
 }
 
 type skuEntry struct {
@@ -698,6 +700,7 @@ func (s *Server) handleOrderCreate(w http.ResponseWriter, r *http.Request) {
 			Totals:         orders.Totals{ItemsBRL: items, ShippingBRL: ship.PriceBRL, TotalBRL: round2(items + ship.PriceBRL)},
 			CollectaUserID: in.CollectaUserID,
 			MarketingOptIn: in.MarketingOptIn,
+			Ads:            in.Ads.Clean(),
 			PaymentMethod:  method,
 		}
 		if in.PromoCode == "" {
