@@ -261,7 +261,7 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if errText != "" {
 		t.Fatal(errText)
 	}
-	if out.ID == "" || out.SobraSemana != "R$ 320,00" {
+	if out.ID == "" || out.SobraSemana != "R$ 650,00" {
 		t.Fatalf("saída = %+v", out)
 	}
 	pushes := f.pushed()
@@ -278,10 +278,12 @@ func TestProposeAdTestAsksOwner(t *testing.T) {
 	if _, err := os.Stat(list[0].Creatives[0].Thumb); err != nil {
 		t.Fatal(err)
 	}
-	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 300)); errText != "" {
-		t.Fatal(errText)
+	for i := 0; i < 2; i++ { // 3 testes de R$ 300 ao mesmo tempo
+		if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 300)); errText != "" {
+			t.Fatal(errText)
+		}
 	}
-	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 30)); !strings.Contains(errText, "cabem só R$ 20,00") {
+	if _, errText = callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 60)); !strings.Contains(errText, "cabem só R$ 50,00") {
 		t.Fatalf("teto: %q", errText)
 	}
 }
@@ -712,13 +714,12 @@ func TestMessagesMeasuredByConversations(t *testing.T) {
 // mensagens passa mesmo com a semana de vendas cheia.
 func TestMessagesUseOwnBudget(t *testing.T) {
 	f, _, _ := newAdFixture(t)
-	for i := 0; i < 2; i++ {
-		args := proposeArgs(f.creatives(t), 300)
-		if _, errText := callTool[proposeOutput](t, f, "propor_teste", args); errText != "" {
+	for _, b := range []int{300, 300, 300, 50} { // vendas cheia: R$ 950
+		if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), b)); errText != "" {
 			t.Fatal(errText)
 		}
 	}
-	if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 50)); !strings.Contains(errText, "na semana") {
+	if _, errText := callTool[proposeOutput](t, f, "propor_teste", proposeArgs(f.creatives(t), 30)); !strings.Contains(errText, "na semana") {
 		t.Fatalf("vendas devia estar cheia: %q", errText)
 	}
 	msg := proposeArgs(f.creatives(t), 150)
