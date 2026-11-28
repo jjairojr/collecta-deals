@@ -342,7 +342,7 @@ func (e *executor) create(ctx context.Context, t adtestq.Test, meta *adtestq.Met
 	switch t.Objective {
 	case "vendas":
 		objective, goal, destination = "OUTCOME_SALES", "OFFSITE_CONVERSIONS", "WEBSITE"
-		promoted = map[string]string{"pixel_id": e.g.cfg.PixelID, "custom_event_type": "PURCHASE"}
+		promoted = map[string]string{"pixel_id": e.g.cfg.PixelID, "custom_event_type": pixelEventType[t.Event]}
 	case "mensagens":
 		// Click to WhatsApp (Marketing API): engagement campaign, ad set sending to
 		// WhatsApp and optimizing conversations; the Page must have the store's
@@ -431,6 +431,13 @@ func (e *executor) targeting(ctx context.Context, audience string) (map[string]a
 			base["excluded_custom_audiences"] = audienceRefs(exclude)
 		}
 		base["targeting_automation"] = map[string]int{"advantage_audience": 0}
+		return base, nil
+	}
+	if audience == "aberto" {
+		// Público aberto: Brasil inteiro, sem interesse, e o Meta escolhe quem vê
+		// (Advantage+ público); idade e posicionamentos seguem os da base.
+		base["geo_locations"] = map[string]any{"countries": []string{"BR"}}
+		base["targeting_automation"] = map[string]int{"advantage_audience": 1}
 		return base, nil
 	}
 	if audience == "goiania" {
@@ -601,9 +608,35 @@ func (e *executor) creative(ctx context.Context, t adtestq.Test, index int, c ad
 }
 
 type adResult struct {
-	index   int
-	spend   float64
-	results float64
+	index     int
+	spend     float64
+	results   float64
+	purchases float64
+}
+
+// pixelEventType is the Pixel event a vendas test optimizes for.
+var pixelEventType = map[string]string{"": "PURCHASE", "compra": "PURCHASE", "checkout": "INITIATED_CHECKOUT", "carrinho": "ADD_TO_CART"}
+
+func purchasesOf(r insightRow) float64 {
+	return r.action("omni_purchase", "offsite_conversion.fb_pixel_purchase")
+}
+
+// measureTest is measure, but a vendas test optimizing for checkout or cart is
+// judged by that event (purchases are still counted apart, for the summary).
+func measureTest(t adtestq.Test, rows []insightRow) (string, func(insightRow) float64) {
+	if t.Objective == "vendas" && (t.Event == "checkout" || t.Event == "carrinho") {
+		metric, types := "checkouts iniciados", []string{"omni_initiated_checkout", "offsite_conversion.fb_pixel_initiate_checkout"}
+		if t.Event == "carrinho" {
+			metric, types = "adições ao carrinho", []string{"omni_add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"}
+		}
+		count := func(r insightRow) float64 { return r.action(types...) }
+		for _, r := range rows {
+			if count(r) > 0 {
+				return metric, count
+			}
+		}
+	}
+	return measure(t.Objective, rows)
 }
 
 func (r adResult) cost() float64 {
@@ -683,7 +716,7 @@ func (e *executor) review(ctx context.Context, t adtestq.Test) error {
 	}, &res); err != nil {
 		return err
 	}
-	metric, count := measure(t.Objective, res.Data)
+	metric, count := measureTest(t, res.Data)
 	byAd := map[string]insightRow{}
 	for _, r := range res.Data {
 		byAd[r.AdID] = r
@@ -691,7 +724,7 @@ func (e *executor) review(ctx context.Context, t adtestq.Test) error {
 	results := make([]adResult, len(t.Meta.Ads))
 	for i, ad := range t.Meta.Ads {
 		r := byAd[ad.ID]
-		results[i] = adResult{index: i, spend: number(r.Spend), results: count(r)}
+		results[i] = adResult{index: i, spend: number(r.Spend), results: count(r), purchases: purchasesOf(r)}
 	}
 	meta := *t.Meta
 	meta.Ads = append([]adtestq.MetaAd(nil), t.Meta.Ads...)
@@ -806,6 +839,17 @@ func summarize(t adtestq.Test, meta adtestq.Meta, results []adResult, metric str
 			state = " (" + c.Permalink + ")" + state
 		}
 		fmt.Fprintf(&b, "\n%d. %s%s: R$ %.2f, %.0f %s, %s", i+1, c.Hook, state, r.spend, r.results, metric, cost)
+	}
+	if t.Objective == "vendas" && metric != "compras" {
+		var bought float64
+		for _, r := range results {
+			bought += r.purchases
+		}
+		if bought > 0 {
+			fmt.Fprintf(&b, "\nCompras: %.0f, R$ %.2f por compra.", bought, spent/bought)
+		} else {
+			b.WriteString("\nCompras: nenhuma.")
+		}
 	}
 	for _, r := range meta.Refused {
 		fmt.Fprintf(&b, "\nFicou de fora, o Meta recusou: %s", refusedLine(t, r))

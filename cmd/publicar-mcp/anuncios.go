@@ -54,8 +54,9 @@ type adCreativeInput struct {
 
 type proposeInput struct {
 	Objetivo   string            `json:"objetivo" jsonschema:"seguidores (leva para o perfil do Instagram), vendas (otimiza compra no site) ou mensagens (abre conversa no WhatsApp da loja e otimiza conversas iniciadas; ex.: A Collecta compra cartas). mensagens exige o WhatsApp da loja ligado à Página do Facebook"`
-	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse), brasil (Brasil, interesse em Pokémon, One Piece ou card game), remarketing (Brasil, só quem visitou o site, pôs no carrinho ou interagiu com o @tcgcollecta, sem quem já comprou; exige META_PUBLICO_REMARKETING), semelhante (Brasil, público semelhante aos clientes da loja, sem quem já comprou; exige META_PUBLICO_SEMELHANTE) ou clientes (só quem já comprou na loja; exige META_PUBLICO_COMPRADORES). Sem o id no anuncios.env, a ferramenta recusa e nada é criado. Em todos: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
+	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse), brasil (Brasil, interesse em Pokémon, One Piece ou card game), remarketing (Brasil, só quem visitou o site, pôs no carrinho ou interagiu com o @tcgcollecta, sem quem já comprou; exige META_PUBLICO_REMARKETING), semelhante (Brasil, público semelhante aos clientes da loja, sem quem já comprou; exige META_PUBLICO_SEMELHANTE) clientes (só quem já comprou na loja; exige META_PUBLICO_COMPRADORES) ou aberto (Brasil inteiro, sem interesse, com o público Advantage+ do Meta ligado: o Meta escolhe quem vê). Sem o id no anuncios.env, a ferramenta recusa e nada é criado. Em todos: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
 	Link       string            `json:"link,omitempty" jsonschema:"só em vendas: página do site para onde o anúncio leva (https://www.collectatcg.com.br/...)"`
+	Evento     string            `json:"evento,omitempty" jsonschema:"só em vendas, opcional: o que o Meta otimiza: compra (padrão), checkout (início do checkout) ou carrinho (adição ao carrinho). Com checkout ou carrinho, o resumo continua mostrando as compras e o custo por compra"`
 	Criativos  []adCreativeInput `json:"criativos" jsonschema:"de 2 a 5 criativos, cada um com um gancho diferente"`
 	VerbaReais int               `json:"verba_reais" jsonschema:"verba total do teste em reais, de 30 a 300, dentro do que cabe na semana"`
 	Dias       int               `json:"dias" jsonschema:"duração, de 3 a 7 dias"`
@@ -94,6 +95,17 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, proposeOutput{}, fmt.Errorf("de %d a %d criativos", adtestq.MinCreatives, adtestq.MaxCreatives)
 	case t.Note == "":
 		return nil, proposeOutput{}, errors.New("motivo vazio")
+	}
+	if ev := strings.ToLower(strings.TrimSpace(in.Evento)); ev != "" {
+		switch {
+		case t.Objective != "vendas":
+			return nil, proposeOutput{}, errors.New("evento só existe em vendas")
+		case !adtestq.SalesEvents[ev]:
+			return nil, proposeOutput{}, fmt.Errorf("evento %q não existe: compra, checkout ou carrinho", in.Evento)
+		}
+		if ev != "compra" {
+			t.Event = ev
+		}
 	}
 	if err := a.audienceReady(t.Audience); err != nil {
 		return nil, proposeOutput{}, err
@@ -305,7 +317,10 @@ var audienceLabel = map[string]string{
 	"remarketing": "Remarketing (site e Instagram, sem compradores)",
 	"semelhante":  "Semelhante aos clientes (Brasil, sem compradores)",
 	"clientes":    "Clientes que já compraram",
+	"aberto":      "Aberto (Brasil, Advantage+ público)",
 }
+
+var salesEventLabel = map[string]string{"": "compra", "compra": "compra", "checkout": "início do checkout", "carrinho": "adição ao carrinho"}
 
 // audienceReady refuses, before anything is created or spent, an audience whose
 // Meta id is missing from anuncios.env.
@@ -331,6 +346,9 @@ func (a *app) askAdApproval(ctx context.Context, t adtestq.Test, left int64) err
 	fmt.Fprintf(&b, "Objetivo: %s\nPúblico: %s\nVerba: %s em %d dias (sobra %s na semana)\n", objectiveLabel[t.Objective], audienceLabel[t.Audience], reais(t.BudgetCents), t.Days, reais(left))
 	if t.Link != "" {
 		fmt.Fprintf(&b, "Leva para: %s\n", t.Link)
+	}
+	if t.Objective == "vendas" {
+		fmt.Fprintf(&b, "Otimiza: %s\n", salesEventLabel[t.Event])
 	}
 	fmt.Fprintf(&b, "Por quê: %s\n", t.Note)
 	for i, c := range t.Creatives {
