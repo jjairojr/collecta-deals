@@ -35,6 +35,7 @@ var ruleGroupByHeading = map[string]string{
 	"Pós-venda: respostas":          rulesPostSaleResponses,
 	"Instagram":                     rulesInstagram,
 	"Carrinhos abandonados (mensagem do Pesquisador Collecta)": rulesCarts,
+	"Recuperação de pedido não pago":                           rulesRecovery,
 }
 
 var rules = mustSplitRules(instructions)
@@ -71,10 +72,11 @@ func mustSplitRules(src string) map[string]string {
 }
 
 var rulesTopics = map[string][]string{
-	"conversa":  {rulesConversation},
-	"posvenda":  {rulesPostSaleCompose, rulesPostSaleDelivery, rulesPostSaleResponses},
-	"instagram": {rulesInstagram},
-	"carrinhos": {rulesCarts},
+	"conversa":    {rulesConversation},
+	"posvenda":    {rulesPostSaleCompose, rulesPostSaleDelivery, rulesPostSaleResponses},
+	"instagram":   {rulesInstagram},
+	"carrinhos":   {rulesCarts},
+	"recuperacao": {rulesRecovery},
 }
 
 type rulesInput struct {

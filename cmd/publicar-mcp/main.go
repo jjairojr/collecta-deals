@@ -28,6 +28,7 @@ type config struct {
 	TCGCSVURL  string
 	LigaDir    string
 	AdsEnv     string
+	OpenBotDB  string
 }
 
 func loadConfig(getenv func(string) string) (config, error) {
@@ -41,6 +42,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		TCGCSVURL:  strings.TrimRight(cmp.Or(getenv("PUBLICAR_TCGCSV"), "https://tcgcsv.com"), "/"),
 		LigaDir:    filepath.Clean(cmp.Or(getenv("PUBLICAR_LIGA_DADOS"), "/Users/jjairo/Documents/www/opdeals/data")),
 		AdsEnv:     cmp.Or(getenv("PUBLICAR_ANUNCIOS_ENV"), defaultAdsEnv),
+		OpenBotDB:  cmp.Or(getenv("OPENBOT_DB"), defaultOpenBotDB),
 	}
 	if cfg.AdminToken == "" {
 		return cfg, errors.New("OPDEALS_ADMIN_TOKEN não definido: sem ele não há fila de publicação")

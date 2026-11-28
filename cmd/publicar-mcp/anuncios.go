@@ -35,7 +35,7 @@ var adStatusLabel = map[string]string{
 func (a *app) addAdTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "propor_teste",
-		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo celular. Depois do Aprovar, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 950 por semana somando vendas, seguidores e remarketing (mensagens tem verba à parte: R$ 250 por semana e R$ 1.000 por mês) em todos os testes.",
+		Description: "Só para o Social Collecta. Propõe um teste de anúncio no Meta (Instagram e Facebook) com 2 a 5 criativos diferentes, para o dono aprovar pelo chat do CEO Collecta (a saída traz o código; a frase dele precisa ter o valor) ou, com o chat desligado, pelo celular. Depois da aprovação, o teste sobe sozinho com a verba total aprovada e para na data de fim; os criativos que perdem são pausados sozinhos. Até R$ 300 por teste e teto de R$ 950 por semana somando vendas, seguidores e remarketing (mensagens tem verba à parte: R$ 250 por semana e R$ 1.000 por mês).",
 	}, a.toolProposeAdTest)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "testes_anuncio",
@@ -65,6 +65,7 @@ type proposeInput struct {
 
 type proposeOutput struct {
 	ID          string `json:"id"`
+	Codigo      string `json:"codigo,omitempty"`
 	Verba       string `json:"verba"`
 	SobraSemana string `json:"sobra_na_semana"`
 	Proximo     string `json:"proximo"`
@@ -159,6 +160,19 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, proposeOutput{}, err
 	}
 	a.adLog(fmt.Sprintf("proposto %s %s %s %s %d dias %d criativos", created.ID, t.Objective, t.Audience, reais(t.BudgetCents), t.Days, len(creatives)))
+	if _, chat := a.chatApprovers(); chat {
+		if err := a.saveTicket(a.ticketForAd(created, available-t.BudgetCents)); err != nil {
+			return nil, proposeOutput{}, fmt.Errorf("teste %s criado, mas não guardei o código de aprovação: %v", created.ID, err)
+		}
+		code := codeOf(created.ID)
+		return nil, proposeOutput{
+			ID:          created.ID,
+			Codigo:      code,
+			Verba:       fmt.Sprintf("%s em %d dias", reais(t.BudgetCents), t.Days),
+			SobraSemana: reais(available - t.BudgetCents),
+			Proximo:     "o Jairo decide pelo chat do CEO Collecta, nada vai ao celular, e a frase dele precisa ter o valor. Leve na hora o código " + code + ", a verba e os dias a quem mostra ao Jairo (o CEO Collecta, direto ou pela sua coordenação). Anote o id e o código na seção Meta Ads do seu arquivo do dia e acompanhe com testes_anuncio.",
+		}, nil
+	}
 	if err := a.askAdApproval(ctx, created, available-t.BudgetCents); err != nil {
 		return nil, proposeOutput{}, fmt.Errorf("teste %s criado, mas o aviso não chegou ao dono: %v", created.ID, err)
 	}
