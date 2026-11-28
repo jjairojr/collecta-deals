@@ -53,7 +53,7 @@ type adCreativeInput struct {
 
 type proposeInput struct {
 	Objetivo   string            `json:"objetivo" jsonschema:"seguidores (leva para o perfil do Instagram), vendas (otimiza compra no site) ou mensagens (abre conversa no WhatsApp da loja e otimiza conversas iniciadas; ex.: A Collecta compra cartas). mensagens exige o WhatsApp da loja ligado à Página do Facebook"`
-	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse), brasil (Brasil, interesse em Pokémon, One Piece ou card game) ou remarketing (Brasil, só quem visitou o site, pôs no carrinho ou interagiu com o @tcgcollecta, sem quem já comprou; exige os públicos no anuncios.env). Nos três: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
+	Publico    string            `json:"publico" jsonschema:"goiania (30 km da loja, sem interesse), brasil (Brasil, interesse em Pokémon, One Piece ou card game), remarketing (Brasil, só quem visitou o site, pôs no carrinho ou interagiu com o @tcgcollecta, sem quem já comprou; exige META_PUBLICO_REMARKETING), semelhante (Brasil, público semelhante aos clientes da loja, sem quem já comprou; exige META_PUBLICO_SEMELHANTE) ou clientes (só quem já comprou na loja; exige META_PUBLICO_COMPRADORES). Sem o id no anuncios.env, a ferramenta recusa e nada é criado. Em todos: 18 a 65 anos, todos os gêneros, só Facebook e Instagram (feed, stories e reels), sem Audience Network e sem Messenger"`
 	Link       string            `json:"link,omitempty" jsonschema:"só em vendas: página do site para onde o anúncio leva (https://www.collectatcg.com.br/...)"`
 	Criativos  []adCreativeInput `json:"criativos" jsonschema:"de 2 a 5 criativos, cada um com um gancho diferente"`
 	VerbaReais int               `json:"verba_reais" jsonschema:"verba total do teste em reais, de 30 a 300, dentro do que cabe na semana"`
@@ -83,8 +83,8 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 	switch {
 	case t.Objective != "seguidores" && t.Objective != "vendas" && t.Objective != "mensagens":
 		return nil, proposeOutput{}, fmt.Errorf("objetivo %q não existe: seguidores, vendas ou mensagens", in.Objetivo)
-	case t.Audience != "goiania" && t.Audience != "brasil" && t.Audience != "remarketing":
-		return nil, proposeOutput{}, fmt.Errorf("publico %q não existe: goiania, brasil ou remarketing", in.Publico)
+	case audienceLabel[t.Audience] == "":
+		return nil, proposeOutput{}, fmt.Errorf("publico %q não existe: goiania, brasil, remarketing, semelhante ou clientes", in.Publico)
 	case t.BudgetCents < adtestq.MinBudgetCents || t.BudgetCents > adtestq.MaxBudgetCents:
 		return nil, proposeOutput{}, fmt.Errorf("verba_reais vai de %d a %d", adtestq.MinBudgetCents/100, adtestq.MaxBudgetCents/100)
 	case t.Days < adtestq.MinDays || t.Days > adtestq.MaxDays:
@@ -93,6 +93,9 @@ func (a *app) toolProposeAdTest(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, proposeOutput{}, fmt.Errorf("de %d a %d criativos", adtestq.MinCreatives, adtestq.MaxCreatives)
 	case t.Note == "":
 		return nil, proposeOutput{}, errors.New("motivo vazio")
+	}
+	if err := a.audienceReady(t.Audience); err != nil {
+		return nil, proposeOutput{}, err
 	}
 	creativeLinks := make([]string, len(in.Criativos))
 	if t.Objective == "vendas" {
@@ -272,7 +275,27 @@ func (a *app) stageCreatives(stage string, in []adCreativeInput) ([]adtestq.Crea
 }
 
 var objectiveLabel = map[string]string{"seguidores": "seguidores (perfil do Instagram)", "vendas": "vendas no site", "mensagens": "conversas no WhatsApp da loja"}
-var audienceLabel = map[string]string{"goiania": "Goiânia, 30 km", "brasil": "Brasil, interesse em TCG", "remarketing": "Remarketing (site e Instagram, sem compradores)"}
+var audienceLabel = map[string]string{
+	"goiania":     "Goiânia, 30 km",
+	"brasil":      "Brasil, interesse em TCG",
+	"remarketing": "Remarketing (site e Instagram, sem compradores)",
+	"semelhante":  "Semelhante aos clientes (Brasil, sem compradores)",
+	"clientes":    "Clientes que já compraram",
+}
+
+// audienceReady refuses, before anything is created or spent, an audience whose
+// Meta id is missing from anuncios.env.
+func (a *app) audienceReady(audience string) error {
+	key, ok := customAudienceEnv[audience]
+	if !ok {
+		return nil
+	}
+	env, err := readEnvFile(a.cfg.AdsEnv)
+	if err != nil || len(idList(env[key])) == 0 {
+		return fmt.Errorf("público %s ainda não existe: falta %s no anuncios.env. Nada foi criado nem gasto; use goiania ou brasil, ou espere o público ser criado", audience, key)
+	}
+	return nil
+}
 
 func (a *app) adDecideURL(t adtestq.Test, action string) string {
 	q := url.Values{"acao": {action}, "t": {t.Token}}

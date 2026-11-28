@@ -59,6 +59,8 @@ type metaConfig struct {
 	// e quem sai (compradores). IDs separados por vírgula no anuncios.env.
 	Remarketing []string
 	Buyers      []string
+	// Lookalike is the Meta lookalike audience of the store's buyers (público semelhante).
+	Lookalike []string
 	// WhatsApp is the store's WhatsApp number (digits, with country code), sent
 	// with the Page on "mensagens" ads. Optional: without it Meta uses the number
 	// linked to the Page.
@@ -93,6 +95,7 @@ func loadMetaConfig(getenv func(string) string) (metaConfig, error) {
 		Trials:      getenv("META_REELS_TESTE") == "on",
 		Remarketing: idList(getenv("META_PUBLICO_REMARKETING")),
 		Buyers:      idList(getenv("META_PUBLICO_COMPRADORES")),
+		Lookalike:   idList(getenv("META_PUBLICO_SEMELHANTE")),
 		WhatsApp:    digitsOnly(getenv("META_WHATSAPP")),
 	}
 	for name, v := range map[string]string{"META_TOKEN": cfg.Token, "META_CONTA": cfg.Account, "META_PAGINA": cfg.PageID, "META_INSTAGRAM_ID": cfg.IGUserID} {
@@ -395,15 +398,16 @@ func (e *executor) targeting(ctx context.Context, audience string) (map[string]a
 	for k, v := range placements {
 		base[k] = v
 	}
-	if audience == "remarketing" {
+	if env, ok := customAudienceEnv[audience]; ok {
+		include, exclude := e.g.cfg.customAudience(audience)
 		// Nunca cai para um público aberto: sem os públicos, o teste não sobe.
-		if len(e.g.cfg.Remarketing) == 0 {
-			return nil, errors.New("público remarketing sem META_PUBLICO_REMARKETING em anuncios.env: crie os públicos no Meta e ponha os ids lá")
+		if len(include) == 0 {
+			return nil, fmt.Errorf("público %s sem %s em anuncios.env: crie o público no Meta e ponha o id lá", audience, env)
 		}
 		base["geo_locations"] = map[string]any{"countries": []string{"BR"}}
-		base["custom_audiences"] = audienceRefs(e.g.cfg.Remarketing)
-		if len(e.g.cfg.Buyers) > 0 {
-			base["excluded_custom_audiences"] = audienceRefs(e.g.cfg.Buyers)
+		base["custom_audiences"] = audienceRefs(include)
+		if len(exclude) > 0 {
+			base["excluded_custom_audiences"] = audienceRefs(exclude)
 		}
 		base["targeting_automation"] = map[string]int{"advantage_audience": 0}
 		return base, nil
@@ -438,6 +442,28 @@ func (e *executor) targeting(ctx context.Context, audience string) (map[string]a
 	base["flexible_spec"] = []map[string]any{{"interests": interests}}
 	base["targeting_automation"] = map[string]int{"advantage_audience": 0}
 	return base, nil
+}
+
+// customAudienceEnv is the anuncios.env key that must hold the Meta audience id
+// for each audience built from custom audiences. Without it, nothing goes live.
+var customAudienceEnv = map[string]string{
+	"remarketing": "META_PUBLICO_REMARKETING",
+	"semelhante":  "META_PUBLICO_SEMELHANTE",
+	"clientes":    "META_PUBLICO_COMPRADORES",
+}
+
+// customAudience returns who gets the ad and who is left out. Buyers are left
+// out of remarketing and semelhante, and are the audience itself in clientes.
+func (c metaConfig) customAudience(audience string) (include, exclude []string) {
+	switch audience {
+	case "remarketing":
+		return c.Remarketing, c.Buyers
+	case "semelhante":
+		return c.Lookalike, c.Buyers
+	case "clientes":
+		return c.Buyers, nil
+	}
+	return nil, nil
 }
 
 func audienceRefs(ids []string) []map[string]string {
