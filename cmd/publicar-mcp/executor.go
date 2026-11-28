@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -779,7 +780,12 @@ func (e *executor) review(ctx context.Context, t adtestq.Test) error {
 		return nil
 	}
 	summary := summarize(t, meta, results, metric)
-	if err := e.app.call(ctx, http.MethodPost, "/api/adtests/"+url.PathEscape(t.ID)+"/finished", map[string]string{"summary": summary}, nil); err != nil {
+	var spent float64
+	for _, r := range results {
+		spent += r.spend
+	}
+	spentCents := int64(math.Round(spent * 100))
+	if err := e.app.call(ctx, http.MethodPost, "/api/adtests/"+url.PathEscape(t.ID)+"/finished", map[string]any{"summary": summary, "spentCents": spentCents}, nil); err != nil {
 		return err
 	}
 	e.app.adLog(fmt.Sprintf("terminado %s: %s", t.ID, strings.ReplaceAll(summary, "\n", " | ")))

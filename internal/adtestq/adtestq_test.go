@@ -205,3 +205,66 @@ func TestValidSalesEventAndOpenAudience(t *testing.T) {
 		t.Fatal("evento fora de vendas passou")
 	}
 }
+
+func TestHeldUsesRealSpendOnceDone(t *testing.T) {
+	spent := int64(1234)
+	cases := []struct {
+		name string
+		t    Test
+		want int64
+	}{
+		{"ativo conta a verba inteira", Test{Status: StatusRunning, BudgetCents: 15000}, 15000},
+		{"aprovado conta a verba inteira", Test{Status: StatusApproved, BudgetCents: 15000}, 15000},
+		{"terminado com gasto gravado", Test{Status: StatusDone, BudgetCents: 15000, SpentCents: &spent}, 1234},
+		{"resumo do executor", Test{Status: StatusDone, BudgetCents: 12000, Summary: "vendas no site, Brasil, interesse em TCG: R$ 116.29 gastos de R$ 120,00, medido em visitas"}, 11629},
+		// Os dois resumos escritos à mão em 28/11 (A38A04 e F1A434).
+		{"resumo à mão A38A04", Test{Status: StatusDone, BudgetCents: 15000, Summary: `Encerrado pelo Jairo em 27/11/2026 ("desliga pra mim mano"): campanha 120252903149630671 pausada pelo Instalador às 22:05 pela API do Meta. Gasto real segundo o Meta: R$ 75,06 (24 a 27/11).`}, 7506},
+		{"resumo à mão F1A434", Test{Status: StatusDone, BudgetCents: 30000, Summary: `Encerrado em 28/11/2026 às 12:56 pelo Instalador: campanha 120252966561440671 pausada pela API do Meta. Gasto real segundo o Meta: R$ 0,13 (24 impressões, 27 a 28/11).`}, 13},
+		{"milhar", Test{Status: StatusDone, BudgetCents: 30000, Summary: "Gasto real segundo o Meta: R$ 1.250,50"}, 30000},
+		{"terminado sem gasto conhecido", Test{Status: StatusDone, BudgetCents: 15000, Summary: "vencedor: a2"}, 15000},
+	}
+	for _, c := range cases {
+		if got := Held(c.t); got != c.want {
+			t.Errorf("%s: %d, quer %d", c.name, got, c.want)
+		}
+	}
+}
+
+// Caso de 28/11: A38A04 (R$ 75,06 de R$ 150) e F1A434 (R$ 0,13 de R$ 300)
+// terminados seguravam R$ 450 e só sobravam R$ 50 na semana.
+func TestAvailableFreesBudgetOfFinishedTests(t *testing.T) {
+	now := time.Date(2026, 11, 28, 13, 0, 0, 0, saoPaulo)
+	at := now.Add(-24 * time.Hour)
+	a, f := int64(7506), int64(13)
+	all := []Test{
+		{Objective: "vendas", Status: StatusDone, BudgetCents: 15000, SpentCents: &a, CreatedAt: at},
+		{Objective: "vendas", Status: StatusDone, BudgetCents: 30000, SpentCents: &f, CreatedAt: at},
+		{Objective: "vendas", Status: StatusRunning, BudgetCents: 15000, CreatedAt: at},
+		{Objective: "vendas", Status: StatusRunning, BudgetCents: 30000, CreatedAt: at},
+		{Objective: "mensagens", Status: StatusRunning, BudgetCents: 15000, CreatedAt: at},
+	}
+	want := int64(WeeklyCapCents - (7506 + 13 + 15000 + 30000))
+	if got := available(all, now, "vendas"); got != want {
+		t.Fatalf("sobra = %d, quer %d", got, want)
+	}
+}
+
+func TestFinishedSpentRecordsSpend(t *testing.T) {
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	s := newStore(t, &now)
+	x, err := s.Add(sample(5000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Decide(x.ID, x.Token, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Started(x.ID, Meta{CampaignID: "c", AdSetID: "s", Ads: []MetaAd{{ID: "a1"}, {ID: "a2", Creative: 1}}}, now.Add(96*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	spent := int64(4321)
+	done, err := s.FinishedSpent(x.ID, "fim", &spent)
+	if err != nil || done.SpentCents == nil || *done.SpentCents != 4321 || Held(done) != 4321 {
+		t.Fatalf("terminado = %+v %v", done, err)
+	}
+}

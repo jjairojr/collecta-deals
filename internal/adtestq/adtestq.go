@@ -6,9 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -116,11 +120,14 @@ type Test struct {
 	Error       string     `json:"error,omitempty"`
 	Meta        *Meta      `json:"meta,omitempty"`
 	Summary     string     `json:"summary,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	DecidedAt   time.Time  `json:"decidedAt,omitzero"`
-	StartedAt   time.Time  `json:"startedAt,omitzero"`
-	EndsAt      time.Time  `json:"endsAt,omitzero"`
-	FinishedAt  time.Time  `json:"finishedAt,omitzero"`
+	// SpentCents é o gasto real no Meta, gravado ao terminar. Teste terminado
+	// conta no teto pelo que gastou, não pela verba aprovada.
+	SpentCents *int64    `json:"spentCents,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	DecidedAt  time.Time `json:"decidedAt,omitzero"`
+	StartedAt  time.Time `json:"startedAt,omitzero"`
+	EndsAt     time.Time `json:"endsAt,omitzero"`
+	FinishedAt time.Time `json:"finishedAt,omitzero"`
 }
 
 func (t Test) Public() Test {
@@ -204,16 +211,59 @@ func messagesPool(objective string) bool {
 	return objective == "mensagens"
 }
 
-// committed sums the budget of non-rejected tests created since `since` in the
-// same pool as `objective` (mensagens alone; everything else together).
+// committed sums what non-rejected tests created since `since` hold in the same
+// pool as `objective` (mensagens alone; everything else together): the whole
+// approved budget while a test can still spend, and the real spend once it is
+// done (Jairo/CEO, 28/11/2026: tests closed early were holding budget they will
+// never spend).
 func committed(all []Test, since time.Time, objective string) int64 {
 	var sum int64
 	for _, t := range all {
 		if t.Status != StatusRejected && !t.CreatedAt.Before(since) && messagesPool(t.Objective) == messagesPool(objective) {
-			sum += t.BudgetCents
+			sum += Held(t)
 		}
 	}
 	return sum
+}
+
+// spentInSummary reads the spend out of a summary: the executor's ("R$ 116.29
+// gastos de ...") or one written by hand ("Gasto real segundo o Meta: R$ 75,06").
+var spentInSummary = regexp.MustCompile(`(?i)(?:R\$\s*([\d.,]+)\s+gastos?\s+de|gasto\s+real[^R]{0,40}R\$\s*([\d.,]+))`)
+
+func parseReais(s string) (int64, bool) {
+	s = strings.TrimRight(s, ".,")
+	if i := strings.LastIndexAny(s, ".,"); i >= 0 && len(s)-i == 3 {
+		s = strings.NewReplacer(".", "", ",", "").Replace(s[:i]) + "." + s[i+1:]
+	} else {
+		s = strings.NewReplacer(".", "", ",", "").Replace(s)
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || v < 0 {
+		return 0, false
+	}
+	return int64(math.Round(v * 100)), true
+}
+
+// Held is what a test holds of the budget: the whole budget until it is done;
+// then the recorded spend, or the spend in its summary, or (without either) the
+// whole budget, as before. Never more than the approved budget.
+func Held(t Test) int64 {
+	if t.Status != StatusDone {
+		return t.BudgetCents
+	}
+	if t.SpentCents != nil {
+		return min(max(*t.SpentCents, 0), t.BudgetCents)
+	}
+	if m := spentInSummary.FindStringSubmatch(t.Summary); m != nil {
+		raw := m[1]
+		if raw == "" {
+			raw = m[2]
+		}
+		if v, ok := parseReais(raw); ok {
+			return min(v, t.BudgetCents)
+		}
+	}
+	return t.BudgetCents
 }
 
 var saoPaulo = func() *time.Location {
@@ -272,7 +322,7 @@ func (s *Store) Add(t Test) (Test, error) {
 	t.ID = randomHex(8)
 	t.Token = randomHex(16)
 	t.Status = StatusPending
-	t.Error, t.Summary = "", ""
+	t.Error, t.Summary, t.SpentCents = "", "", nil
 	t.Meta = nil
 	t.CreatedAt = s.now()
 	t.DecidedAt, t.StartedAt, t.EndsAt, t.FinishedAt = time.Time{}, time.Time{}, time.Time{}, time.Time{}
@@ -364,12 +414,22 @@ func (s *Store) SetMeta(id string, meta Meta) (Test, error) {
 }
 
 func (s *Store) Finished(id, summary string) (Test, error) {
+	return s.FinishedSpent(id, summary, nil)
+}
+
+// FinishedSpent ends a running test with its summary and, when known, the real
+// spend in cents.
+func (s *Store) FinishedSpent(id, summary string, spentCents *int64) (Test, error) {
 	return s.update(id, func(t *Test) error {
 		if t.Status != StatusRunning {
 			return ErrWrongStatus
 		}
 		t.Status = StatusDone
 		t.Summary = summary
+		if spentCents != nil {
+			v := max(*spentCents, 0)
+			t.SpentCents = &v
+		}
 		t.FinishedAt = s.now()
 		return nil
 	})

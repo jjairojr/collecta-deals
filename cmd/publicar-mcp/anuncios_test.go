@@ -65,10 +65,11 @@ func (f *fixture) serveAds(w http.ResponseWriter, r *http.Request) {
 		out, err = f.ads.SetMeta(id, in)
 	case action == "finished":
 		var in struct {
-			Summary string `json:"summary"`
+			Summary    string `json:"summary"`
+			SpentCents *int64 `json:"spentCents"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&in)
-		out, err = f.ads.Finished(id, in.Summary)
+		out, err = f.ads.FinishedSpent(id, in.Summary, in.SpentCents)
 	case action == "failed":
 		var in struct {
 			Error string        `json:"error"`
@@ -500,6 +501,10 @@ func TestExecutorPausesLosersKeepsTwoAndFinishes(t *testing.T) {
 	done, _ := f.ads.List(adtestq.StatusDone)
 	if len(done) != 1 || !strings.Contains(done[0].Summary, "Vencedor: 1. preço no Pix") || !strings.Contains(done[0].Summary, "R$ 56.00 gastos") {
 		t.Fatalf("resumo = %+v", done)
+	}
+	// O gasto real vai junto, e é ele que conta no teto daqui em diante.
+	if done[0].SpentCents == nil || *done[0].SpentCents != 5600 || adtestq.Held(done[0]) != 5600 {
+		t.Fatalf("gasto gravado = %v", done[0].SpentCents)
 	}
 }
 

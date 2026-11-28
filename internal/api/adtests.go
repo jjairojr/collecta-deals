@@ -105,13 +105,14 @@ func (s *Server) handleAdTestMeta(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAdTestFinished(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Summary string `json:"summary"`
+		Summary    string `json:"summary"`
+		SpentCents *int64 `json:"spentCents"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || strings.TrimSpace(in.Summary) == "" {
 		http.Error(w, "informe o resumo do teste", http.StatusBadRequest)
 		return
 	}
-	t, err := s.AdTests.Finished(r.PathValue("id"), strings.TrimSpace(in.Summary))
+	t, err := s.AdTests.FinishedSpent(r.PathValue("id"), strings.TrimSpace(in.Summary), in.SpentCents)
 	if err != nil {
 		adTestError(w, err)
 		return
