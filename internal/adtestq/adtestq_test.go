@@ -20,14 +20,17 @@ func newStore(t *testing.T, now *time.Time) *Store {
 func TestWeeklyCap(t *testing.T) {
 	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
 	s := newStore(t, &now)
+	// Teto de vendas/seguidores: R$ 950 por 7 dias (3 testes de R$ 300 cabem juntos).
 	first, err := s.Add(sample(30000))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add(sample(20000)); err != nil {
-		t.Fatal(err)
+	for i := 0; i < 2; i++ {
+		if _, err := s.Add(sample(30000)); err != nil {
+			t.Fatalf("3 testes de R$ 300 devem caber: %v", err)
+		}
 	}
-	if _, err := s.Add(sample(12100)); !errors.Is(err, ErrOverBudget) {
+	if _, err := s.Add(sample(WeeklyCapCents - 90000 + 100)); !errors.Is(err, ErrOverBudget) {
 		t.Fatalf("passou do teto: %v", err)
 	}
 	if _, err := s.Decide(first.ID, first.Token, false); err != nil {
@@ -36,14 +39,11 @@ func TestWeeklyCap(t *testing.T) {
 	if _, err := s.Add(sample(MaxBudgetCents + 100)); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("acima do teto por teste devia ser recusado: %v", err)
 	}
-	if _, err := s.Add(sample(12000)); err != nil {
-		t.Fatal(err)
-	}
 	second, err := s.Add(sample(30000))
 	if err != nil {
 		t.Fatalf("rejeitado devia liberar a verba: %v", err)
 	}
-	if avail, _ := s.Available(); avail != 0 {
+	if avail, _ := s.Available(); avail != WeeklyCapCents-90000 {
 		t.Fatalf("disponível = %d", avail)
 	}
 	now = now.Add(BudgetWindow + time.Hour)
@@ -123,7 +123,7 @@ func messages(budget int64) Test {
 func TestMessagesBudgetIsSeparateWeeklyAndMonthly(t *testing.T) {
 	now := time.Date(2026, 12, 1, 12, 0, 0, 0, saoPaulo)
 	s := newStore(t, &now)
-	for _, b := range []int64{30000, 29000, 3000} { // vendas: semana cheia (R$ 620)
+	for _, b := range []int64{30000, 30000, 30000, WeeklyCapCents - 90000} { // vendas: semana cheia (R$ 950)
 		if _, err := s.Add(sample(b)); err != nil {
 			t.Fatal(err)
 		}
