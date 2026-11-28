@@ -31,16 +31,17 @@ type ntfyCall struct {
 }
 
 type fixture struct {
-	app     *app
-	session *mcp.ClientSession
-	store   *publishq.Store
-	ads     *adtestq.Store
-	media   string
-	data    string
-	now     time.Time
-	mu      sync.Mutex
-	pushes  []ntfyCall
-	refuse  bool
+	app        *app
+	session    *mcp.ClientSession
+	store      *publishq.Store
+	ads        *adtestq.Store
+	media      string
+	data       string
+	now        time.Time
+	mu         sync.Mutex
+	pushes     []ntfyCall
+	refuse     bool
+	refuseFoto bool
 }
 
 func decodeHeader(v string) string {
@@ -58,6 +59,12 @@ func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/api/storefront" {
 		_, _ = w.Write([]byte(`{"items":[{"slug":"reinado-box","cardBRL":410},{"slug":"luffy","cardBRL":0}]}`))
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/aprovar-anuncio/") {
+		if _, err := f.ads.Decide(strings.TrimPrefix(r.URL.Path, "/api/aprovar-anuncio/"), r.URL.Query().Get("t"), r.URL.Query().Get("acao") == "aprovar"); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+		}
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/api/adtests") {
@@ -81,6 +88,10 @@ func (f *fixture) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && r.URL.Path == "/api/publish":
 		var in publishq.Item
 		_ = json.NewDecoder(r.Body).Decode(&in)
+		if f.refuseFoto && in.Format == "foto" {
+			http.Error(w, "formato inválido", http.StatusBadRequest)
+			return
+		}
 		it, err := f.store.Add(in)
 		if err != nil {
 			writeErr(err)
@@ -328,24 +339,17 @@ func TestRequestFallsBackToTextWhenAttachmentRefused(t *testing.T) {
 	}
 }
 
-func TestRequestTiktokApprovesItself(t *testing.T) {
+func TestRequestTiktokAloneRefused(t *testing.T) {
 	f := newFixture(t)
 	video := f.file(t, "peca.mp4", "v")
-	f.file(t, "peca-previa-1.png", "png")
 	args := reelsArgs(video)
 	args["canal"] = "tiktok"
 	args["formato"] = "video"
-	out, errText := callTool[requestOutput](t, f, "pedir_aprovacao", args)
-	if errText != "" || !out.Previa || !strings.Contains(out.Proximo, "já está aprovado") {
-		t.Fatalf("saída errada: %+v %s", out, errText)
+	if _, errText := callTool[requestOutput](t, f, "pedir_aprovacao", args); !strings.Contains(errText, "TikTok só com peça aprovada") {
+		t.Fatalf("TikTok sozinho devia recusar: %s", errText)
 	}
-	approved, _ := f.store.List(publishq.StatusApproved)
-	if len(approved) != 1 || approved[0].ID != out.ID || approved[0].Channel != "tiktok" {
-		t.Fatalf("TikTok devia ficar aprovado: %+v", approved)
-	}
-	p := f.pushed()
-	if len(p) != 1 || p[0].actions != "" || p[0].title != "TikTok agendado pela Collecta" || p[0].filename != "peca-previa-1.png" {
-		t.Fatalf("aviso errado: %+v", p)
+	if all, _ := f.store.List(""); len(all) != 0 || len(f.pushed()) != 0 {
+		t.Fatalf("nada devia entrar na fila: %+v", all)
 	}
 }
 
@@ -383,7 +387,7 @@ func TestRequestRefuses(t *testing.T) {
 		{"horário longe", with("publicar_em", "2026-12-06T15:00"), "14 dias"},
 		{"horário inválido", with("publicar_em", "amanhã"), "inválido"},
 		{"story", with("formato", "story"), "não existe"},
-		{"reels no tiktok", with("canal", "tiktok"), "não existe"},
+		{"tiktok sem peça do instagram", with("canal", "tiktok"), "TikTok só com peça aprovada"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -489,7 +493,6 @@ func TestFailedRetriesThenGivesUp(t *testing.T) {
 	f := newFixture(t)
 	video := f.file(t, "tt.mp4", "video")
 	args := reelsArgs(video)
-	args["canal"], args["formato"] = "tiktok", "video"
 	created, errText := callTool[requestOutput](t, f, "pedir_aprovacao", args)
 	if errText != "" {
 		t.Fatal(errText)

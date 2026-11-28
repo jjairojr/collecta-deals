@@ -131,6 +131,7 @@ func (a *app) server() *mcp.Server {
 	}, a.toolHandoff)
 	if a.cfg.AgentToken != "" {
 		a.addPostSaleTools(s)
+		a.addRecoveryTools(s)
 	}
 	return s
 }

@@ -29,18 +29,19 @@ import (
 //go:embed instructions.md
 var instructions string
 
-const serverInstructions = "Fila de publicação da Collecta TCG. O Social Collecta usa criar_peca, pedir_aprovacao, situacao, propor_teste e testes_anuncio; o Estrategista só situacao e testes_anuncio. O Publicador Collecta começa toda rodada pela ferramenta inicio, que traz as regras completas: leia inteiras e siga todas. No Instagram nada é postado sem aprovação do dono pelo celular; no TikTok o pedido já sai aprovado, para aquecer a conta."
+const serverInstructions = "Fila de publicação da Collecta TCG. O Social Collecta usa criar_peca, pedir_aprovacao, situacao, propor_teste e testes_anuncio; o Estrategista só situacao e testes_anuncio. O Publicador Collecta começa toda rodada pela ferramenta inicio, que traz as regras completas: leia inteiras e siga todas. No Instagram nada é postado sem aprovação do dono: pelo chat do CEO Collecta quando a aprovação pelo chat está ligada (o CEO usa esperando_jairo e aprovar_pelo_chat), senão pelo celular; no TikTok só vai a mesma peça de um post do Instagram já aprovado pelo Jairo no chat (pedir_aprovacao com do_instagram), e ela sai aprovada."
 
 const (
-	captionMax    = 2200
-	hashtagMax    = 30
-	fileMax       = 250 << 20
-	attachMax     = 2 << 20
-	scheduleAhead = 14 * 24 * time.Hour
-	scheduleSlack = 10 * time.Minute
-	carouselMin   = 2
-	carouselMax   = 10
-	pushCaption   = 900
+	captionMax     = 2200
+	hashtagMax     = 30
+	fileMax        = 250 << 20
+	attachMax      = 2 << 20
+	scheduleAhead  = 14 * 24 * time.Hour
+	scheduleSlack  = 10 * time.Minute
+	carouselMin    = 2
+	carouselMax    = 10
+	tiktokPhotoMax = 35
+	pushCaption    = 900
 )
 
 var (
@@ -60,15 +61,16 @@ func mustLocation(name string) *time.Location {
 }
 
 type app struct {
-	cfg      config
-	client   *http.Client
-	now      func() time.Time
-	render   renderFunc
-	renderMu sync.Mutex
-	feedMu   sync.Mutex
-	feed     feedCache
-	tcgMu    sync.Mutex
-	tcgCache map[string]tcgCache
+	cfg       config
+	client    *http.Client
+	now       func() time.Time
+	render    renderFunc
+	slideshow slideshowFunc
+	renderMu  sync.Mutex
+	feedMu    sync.Mutex
+	feed      feedCache
+	tcgMu     sync.Mutex
+	tcgCache  map[string]tcgCache
 }
 
 func newApp(cfg config, client *http.Client, now func() time.Time) *app {
@@ -79,7 +81,7 @@ func (a *app) server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "collecta-publicar", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "pedir_aprovacao",
-		Description: "Só para o Social Collecta. Manda uma peça pronta para a fila do Publicador: canal (instagram ou tiktok), formato (instagram: reels, post, carrossel ou teste; tiktok: video), os arquivos (caminho completo dentro de store/), a legenda final e quando postar. Instagram só sai depois que o dono toca em Aprovar no celular. TikTok e Reels de teste (instagram teste) já saem aprovados e o dono só recebe o aviso.",
+		Description: "Só para o Social Collecta. Manda uma peça pronta para a fila do Publicador: canal (instagram ou tiktok), formato (instagram: reels, post, carrossel ou teste; tiktok: video), os arquivos (caminho completo dentro de store/), a legenda final e quando postar. Instagram só sai depois que o dono aprova: pelo chat do CEO Collecta (a saída traz o código para levar a ele) ou, com o chat desligado, pelo celular. TikTok (decisão do Jairo de 24/11/2026): só a mesma peça de um post do Instagram que ele já aprovou pelo chat, com do_instagram = o código desse post; a ferramenta monta o vídeo com os mesmos arquivos e a mesma legenda e ele sai aprovado. Reels de teste (instagram teste) sai aprovado e o dono só recebe o aviso.",
 	}, a.toolRequest)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "situacao",
@@ -108,20 +110,23 @@ func (a *app) server() *mcp.Server {
 	a.addPecaTool(s)
 	a.addListaTool(s)
 	a.addAdTools(s)
+	a.addChatTools(s)
 	return s
 }
 
 type requestInput struct {
-	Canal      string   `json:"canal" jsonschema:"instagram ou tiktok"`
-	Formato    string   `json:"formato" jsonschema:"instagram: reels, post, carrossel ou teste (Reels de teste: só para quem não segue, sai pela API sem aprovação e entra no perfil sozinho se for bem); tiktok: video"`
-	Arquivos   []string `json:"arquivos" jsonschema:"caminhos completos dos arquivos, na ordem do post (ex.: /Users/jjairo/Documents/www/collecta-app/store/motion/out/collecta-tcg-loja-feed.mp4)"`
-	Legenda    string   `json:"legenda" jsonschema:"a legenda final, exatamente como vai ao ar, com hashtags"`
-	PublicarEm string   `json:"publicar_em" jsonschema:"quando postar, horário de Goiânia: 2026-11-06T15:00"`
-	Motivo     string   `json:"motivo,omitempty" jsonschema:"uma linha: por que essa peça, para o dono decidir (ex.: ação de hoje do radar)"`
+	Canal       string   `json:"canal" jsonschema:"instagram ou tiktok"`
+	Formato     string   `json:"formato" jsonschema:"instagram: reels, post, carrossel ou teste (Reels de teste: só para quem não segue, sai pela API sem aprovação e entra no perfil sozinho se for bem); tiktok: video"`
+	Arquivos    []string `json:"arquivos" jsonschema:"caminhos completos dos arquivos, na ordem do post (ex.: /Users/jjairo/Documents/www/collecta-app/store/motion/out/collecta-tcg-loja-feed.mp4)"`
+	Legenda     string   `json:"legenda" jsonschema:"a legenda final, exatamente como vai ao ar, com hashtags"`
+	PublicarEm  string   `json:"publicar_em" jsonschema:"quando postar, horário de Goiânia: 2026-11-06T15:00"`
+	Motivo      string   `json:"motivo,omitempty" jsonschema:"uma linha: por que essa peça, para o dono decidir (ex.: ação de hoje do radar)"`
+	DoInstagram string   `json:"do_instagram,omitempty" jsonschema:"só no TikTok: o código de 6 letras do post do Instagram que o Jairo aprovou pelo chat; a ferramenta usa os mesmos arquivos e a mesma legenda e ignora arquivos e legenda daqui"`
 }
 
 type requestOutput struct {
 	ID       string `json:"id"`
+	Codigo   string `json:"codigo,omitempty"`
 	Quando   string `json:"quando"`
 	Previa   bool   `json:"previa_no_celular"`
 	Proximo  string `json:"proximo"`
@@ -131,6 +136,13 @@ type requestOutput struct {
 func (a *app) toolRequest(ctx context.Context, _ *mcp.CallToolRequest, in requestInput) (*mcp.CallToolResult, requestOutput, error) {
 	canal := strings.ToLower(strings.TrimSpace(in.Canal))
 	formato := strings.ToLower(strings.TrimSpace(in.Formato))
+	if canal == "tiktok" {
+		out, err := a.tiktokFromInstagram(ctx, in)
+		if err != nil {
+			return nil, requestOutput{}, err
+		}
+		return nil, out, nil
+	}
 	if !publishq.ValidFormat(canal, formato) {
 		return nil, requestOutput{}, fmt.Errorf("canal %q com formato %q não existe: instagram (reels, post, carrossel, teste) ou tiktok (video)", in.Canal, in.Formato)
 	}
@@ -164,6 +176,14 @@ func (a *app) toolRequest(ctx context.Context, _ *mcp.CallToolRequest, in reques
 		if publishq.ViaAPI(canal, formato) {
 			out.Proximo = "Reels de teste não espera o dono: já está aprovado e sai pela API do Instagram no horário (até 30 min depois), só para quem não segue a conta; se for bem, entra no perfil sozinho. Anote o id na seção Peças do seu arquivo do dia e não peça de novo a mesma peça."
 		}
+		return nil, out, nil
+	}
+	if _, chat := a.chatApprovers(); chat {
+		if err := a.saveTicket(a.ticketForPost(created)); err != nil {
+			return nil, requestOutput{}, fmt.Errorf("pedido %s criado, mas não guardei o código de aprovação: %v", created.ID, err)
+		}
+		out.Codigo = codeOf(created.ID)
+		out.Proximo = "o Jairo decide pelo chat do CEO Collecta, nada vai ao celular. Mande ao CEO Collecta, na hora, o código " + out.Codigo + ", a prévia, a legenda e o horário, para ele mostrar ao Jairo. Anote o id e o código na seção Peças do seu arquivo do dia e não peça de novo a mesma peça."
 		return nil, out, nil
 	}
 	preview, err := a.askOwner(ctx, created)
@@ -251,7 +271,9 @@ func (a *app) checkFiles(formato string, paths []string) ([]publishq.File, error
 	switch {
 	case formato == "carrossel" && (len(paths) < carouselMin || len(paths) > carouselMax):
 		return nil, fmt.Errorf("carrossel leva de %d a %d arquivos", carouselMin, carouselMax)
-	case formato != "carrossel" && len(paths) != 1:
+	case formato == "foto" && (len(paths) < 1 || len(paths) > tiktokPhotoMax):
+		return nil, fmt.Errorf("foto do TikTok leva de 1 a %d imagens", tiktokPhotoMax)
+	case formato != "carrossel" && formato != "foto" && len(paths) != 1:
 		return nil, fmt.Errorf("%s leva exatamente 1 arquivo", formato)
 	}
 	out := make([]publishq.File, 0, len(paths))
@@ -272,7 +294,7 @@ func (a *app) checkFiles(formato string, paths []string) ([]publishq.File, error
 			if !videoExt[ext] {
 				return nil, fmt.Errorf("%s precisa de vídeo .mp4 ou .mov, veio %s", formato, filepath.Base(real))
 			}
-		case "post":
+		case "post", "foto":
 			if !imageExt[ext] {
 				return nil, fmt.Errorf("post precisa de imagem .jpg ou .png, veio %s", filepath.Base(real))
 			}
